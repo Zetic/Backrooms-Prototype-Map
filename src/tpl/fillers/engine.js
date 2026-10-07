@@ -1022,15 +1022,17 @@
    * solid steps three or more times the same way in a row (every other run
    * at most 1.5 m, the rest at most 5 m), the steps are drawn as one smooth
    * curve through their middles, easing in from the straight wall at either
-   * end. Points where rooms meet, the ends of openings and partitions, and
-   * the cells round columns are pinned and never move; steps within 1 m of
-   * a column or partition stay as they are. The raster stays the truth: rooms,
-   * walls and the walker are unchanged, and the curve keeps within half a
-   * step of the stairs.
+   * end. In a soft room (a filler's `soft` tags: a cave-like hall, a
+   * winding tail) every run of 2 m or less between two corners is rounded
+   * too, so small bumps and jogs go as well. Points where rooms meet, the
+   * ends of openings and partitions, and the cells round columns are pinned
+   * and never move; a step touching the cells round a column, or a
+   * partition, stays as it is. The raster stays the truth: rooms, walls and
+   * the walker are unchanged, and the curve keeps close to the steps.
    * Returns { outline: [rings], curves: [{ room, pts, line }] }, cell units.
    */
-  const CURVE = { short: 3, long: 10, steps: 3, ease: 2, samples: 4 };
-  function curves(P, J) {
+  const CURVE = { short: 3, long: 10, steps: 3, soft: 4, ease: 2, samples: 4 };
+  function curves(P, J, soft) {
     const W = P.W, H = P.H, A = P.R.a, W1 = W + 1;
     const own = (x, y) => (x >= 0 && y >= 0 && x < W && y < H ? A[y * W + x] : VOID);
     const pin = new Uint8Array(W1 * (H + 1));
@@ -1081,16 +1083,16 @@
         if (t !== 0 || pinned) V.push({ x, y, t: pinned ? 0 : t, cell: EC[e] });
       }
       const n = V.length, seg = (k) => { const a = V[((k % n) + n) % n], b = V[(((k + 1) % n) + n) % n]; return { a, b, len: Math.abs(b.x - a.x) + Math.abs(b.y - a.y), dx: Math.sign(b.x - a.x), dy: Math.sign(b.y - a.y) }; };
-      // a step touching the cells round a column, or a partition, stays a step
       const near = (s) => {
         const x0 = Math.min(s.a.x, s.b.x), x1 = Math.max(s.a.x, s.b.x), y0 = Math.min(s.a.y, s.b.y), y1 = Math.max(s.a.y, s.b.y), d = 1;
         return P.columns.some((c) => c.rect[0] <= x1 + d && c.rect[2] >= x0 - d && c.rect[1] <= y1 + d && c.rect[3] >= y0 - d) ||
           P.partitions.some((p) => (p.o === 'h' ? p.c >= y0 - d && p.c <= y1 + d && p.s0 <= x1 + d && p.s1 >= x0 - d : p.c >= x0 - d && p.c <= x1 + d && p.s0 <= y1 + d && p.s1 >= y0 - d));
       };
       const alt = (k) => { const s = seg(k); return s.len <= CURVE.long && s.a.t !== 0 && s.b.t !== 0 && s.a.t === -s.b.t && !near(s); };
-      // start on a segment that is not part of a staircase (a closed ring always has one)
+      const round = (k) => { const s = seg(k); return soft.has(A[s.a.cell]) && s.len <= CURVE.soft && s.a.t !== 0 && s.b.t !== 0 && !near(s); };
+      // start on a segment that stays straight (a closed ring nearly always has one)
       let r0 = -1;
-      for (let k = 0; k < n; k++) if (!alt(k)) { r0 = k; break; }
+      for (let k = 0; k < n; k++) if (!alt(k) && !round(k)) { r0 = k; break; }
       const pts = V.map((v) => [v.x, v.y]);
       if (r0 < 0) { outline.push(pts); continue; }
       const mark = new Uint8Array(n);
@@ -1112,6 +1114,7 @@
         }
         k = m;
       }
+      for (let k = 0; k < n; k++) if (round(k)) mark[k] = 1;
       // each marked chain becomes one curve
       const ringPts = [];
       for (let k = 1; k <= n; k++) {
@@ -1192,7 +1195,9 @@
     for (const p of J.portals) graph.edges.push([id(p.room), 'outside', p.conn.kind, 'o' + p.opening]);
     const built = P.R.a.reduce((s, v) => s + (v >= 0 ? 1 : 0), 0);
     const bigFloor = rooms.reduce((s, r) => s + (r.area >= 80 ? r.area : 0), 0);
-    const cv = curves(P, J), mp = (p) => [m(p[0]), m(p[1])];
+    const soft = new Set();
+    if (F.soft) P.rooms.forEach((rm, v) => { if ((rm.tags || []).some((t) => F.soft.indexOf(t) >= 0)) soft.add(v); });
+    const cv = curves(P, J, soft), mp = (p) => [m(p[0]), m(p[1])];
     const smooth = cv.curves.length ? {
       outline: [{ level: 0, rings: cv.outline.map((r) => r.map(mp)) }],
       curves: cv.curves.map((c, k) => ({ id: 'c' + k, level: 0, room: id(c.room), pts: c.pts.map(mp), line: c.line.map(mp) }))

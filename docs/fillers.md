@@ -199,17 +199,20 @@ of the site once, and the shared pipeline makes the result sound:
    middles, easing in from the straight wall at each end. Points where rooms
    meet, the ends of openings and partitions, and the cells round columns
    never move. The raster stays the truth: rooms, walls and the walker are
-   unchanged, and a curve keeps within half a step of its stairs. Single
-   jogs and the offset rectangles of blob rooms stay square. The meandering
-   hall, the curved room and the hall with a tail get curves on nearly every
-   site, the stair-step corridor on about two in five.
+   unchanged, and a curve keeps close to its stairs. Single jogs and the
+   offset rectangles of blob rooms stay square. A filler can name **soft**
+   rooms by tag (`soft: ['meander']`): there every run of 2 m or less
+   between two corners is rounded too, so small bumps and jogs go as well.
+   The meandering hall, the hall with a tail's corridor and the curved room
+   are soft. They get curves on every site, the stair-step corridor on
+   about two in five.
 
    ![Stair-step walls before, curves after](fillers-curves.png)
 8. **Output.** Metres, site frame. The renderer draws the floor inside
    `outline` and the curves in place of the wall pieces they replace.
 
 A new filler is a `layout` (and maybe a `furnish`), registered with
-`BR.FILL.register({ id, name, feel, weight, blurb, fits, doors, loops, layout, furnish })`.
+`BR.FILL.register({ id, name, feel, weight, blurb, fits, doors, loops, soft, layout, furnish })`.
 The pipeline's helpers are in `BR.FILL.lib`: `bsp`, `voidSome`, `notch`,
 `paintRooms`, `route`, `paintPath`; the shared layout pieces in `BR.FILL.kit`.
 A layout can ask for links in `P.require` (pairs of rooms that must share
@@ -236,7 +239,7 @@ seeds, site shapes (rect, L, U, notched, random) and 0–4 connections:
 * the pool picks only fillers that fit and leans enclosed;
 * every curve starts and ends on its room's straight exterior walls,
   replaces only that room's exterior wall pieces, never runs over an
-  opening, and keeps within 0.8 m of the steps it replaces;
+  opening, and keeps within 1 m of the steps it replaces;
 * the average time on 10–24 m sites stays under 5 ms (it is about 2.5 ms).
 
 ## Next

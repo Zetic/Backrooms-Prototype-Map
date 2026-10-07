@@ -570,7 +570,7 @@
   FILL.register({
     id: 'meander', name: 'Meandering hall', feel: 'mixed', weight: 2,
     blurb: 'A 3-6 m hall that bends across the site through solid, its width wobbling like a cave, with a few stray small columns.',
-    doors: { opening: 0.8, wide: 0.2 }, loops: 0.1,
+    doors: { opening: 0.8, wide: 0.2 }, loops: 0.1, soft: ['meander'],
     fits: (S) => Math.min(...dims(S)) >= 18 && Math.max(...dims(S)) >= 20,
     site: { w: [10, 36], h: [10, 30] },
     layout(P, rng) {
@@ -650,7 +650,7 @@
   FILL.register({
     id: 'tail', name: 'Hall with a tail', feel: 'mixed', weight: 1,
     blurb: 'A long room that ends in a thin winding 1 m corridor through the solid, sometimes reaching a small end room.',
-    doors: { opening: 0.85, door: 0.15 }, loops: 0,
+    doors: { opening: 0.85, door: 0.15 }, loops: 0, soft: ['tail'],
     fits: (S) => Math.min(...dims(S)) >= 18 && Math.max(...dims(S)) >= 24,
     site: { w: [12, 36], h: [9, 24] },
     layout(P, rng) {

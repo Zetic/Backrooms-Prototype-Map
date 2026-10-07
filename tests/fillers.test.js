@@ -128,7 +128,7 @@ function contract(b, spec) {
       const p = c.line[k], dx = q[0] - p[0], dy = q[1] - p[1], t = Math.max(0, Math.min(1, ((x - p[0]) * dx + (y - p[1]) * dy) / (dx * dx + dy * dy || 1)));
       return Math.hypot(x - p[0] - t * dx, y - p[1] - t * dy);
     }));
-    if (c.pts.some(([x, y]) => dist(x, y) > 0.8)) bad.push('curve ' + c.id + ' strays from its steps');
+    if (c.pts.some(([x, y]) => dist(x, y) > 1)) bad.push('curve ' + c.id + ' strays from its steps');
   }
   return bad;
 }

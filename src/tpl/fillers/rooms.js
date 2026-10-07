@@ -309,7 +309,7 @@
   FILL.register({
     id: 'curved', name: 'Curved big room', feel: 'mixed', weight: 1,
     blurb: 'One big, mostly rectangular room with one or two sides curving: a slope easing across, the solid bowing in, the room bowing out, or a wave; now and then a small room in the solid by the curve.',
-    doors: { opening: 0.7, door: 0.3 }, loops: 0.1,
+    doors: { opening: 0.7, door: 0.3 }, loops: 0.1, soft: ['curved'],
     fits: (S) => Math.min(...dims(S)) >= 16,
     site: { w: [8, 34], h: [8, 30] },
     layout(P, rng) {
