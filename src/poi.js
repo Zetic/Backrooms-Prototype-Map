@@ -2,14 +2,14 @@
  * poi.js - the POI plan layer: where points of interest are, which template
  * each one is, and the site it is given.
  *
- * Like the territory plan it is cheap and lazy. Every planning cell decides
+ * It is cheap and lazy, like the world plan. Every planning cell decides
  * its own POIs from (seed, i, j) alone, and a site never leaves its cell, so
  * any part of the infinite map can be asked for in any order and the answer
  * never changes.
  *
  *   cells     CFG.cell metres square; sites stay CFG.margin inside their cell
  *             and CFG.gap apart from each other, so neighbouring cells never
- *             conflict and the fill always has room to pass between sites
+ *             conflict and the world can cut blocks between sites
  *   tiers     tiny / small / medium / large / huge - a template's size class
  *             (TPL.sizeClass). Each tier has a density per hectare; tiers with
  *             no templates in the catalogue are skipped
@@ -21,16 +21,12 @@
  *             ragged L / U / notched band behind the template's own rectangle,
  *             so the main side and the room the template asked for stay whole
  *
- * Data hooks (all optional):
- *   archetype.weight          relative frequency within its tier (default 1)
- *   archetype.areas           { areaId: weight, '*': weight } - which semantic
- *                             areas a template appears in (default: all)
- *   AREAS[id].poi.density     density multiplier inside that area
- *   AREAS[id].poi.tiers       { tier: multiplier }
+ * Data hook (optional): archetype.weight, its relative frequency within its
+ * tier (default 1). archetype.poi === false keeps a template off the map.
  *
- * Buildings are the detail layer: W.poiBuilding(P) runs the template on its
- * site on demand (cached by the world). Sites are not yet carved out of the
- * fill; that is the next step (see docs/POI_PLACEMENT.md).
+ * POIs claim their sites first; the world (world.js) then splits the rest of
+ * the cell into filler sites round them and builds each POI with buildPOI
+ * inside a host hall (docs/world.md).
  */
 (function (root) {
   'use strict';
@@ -74,12 +70,6 @@
     }
     CAT_N = list.length;
     return CAT;
-  }
-
-  function areaWeight(arch, area) {
-    if (!arch.areas) return 1;
-    const w = arch.areas[area];
-    return w !== undefined ? w : arch.areas['*'] !== undefined ? arch.areas['*'] : 0;
   }
 
   // --------------------------------------------------------------- density
@@ -128,7 +118,7 @@
   /**
    * POIs of planning cell (i, j):
    * { i, j, density, rect, pois: [{ id, i, j, k, tier, archetype, name, engine,
-   *   area, approach, shape, w, h, bbox, rects, cx, cy, seed, cluster }] }
+   *   approach, shape, w, h, bbox, rects, cx, cy, seed, cluster }] }
    * bbox / rects are world metres (whole metres). w x h is the canonical size
    * (w along the main side).
    */
@@ -137,8 +127,6 @@
     const rng = new Rng(hash4(seed, i, j, S.CELL));
     const ux0 = i * C + CFG.margin, uy0 = j * C + CFG.margin, ux1 = (i + 1) * C - CFG.margin, uy1 = (j + 1) * C - CFG.margin;
     const density = cellDensity(seed, i, j);
-    const centreArea = BR.areaAt(W, (i + 0.5) * C, (j + 0.5) * C).area;
-    const AP = (BR.AREAS[centreArea] && BR.AREAS[centreArea].poi) || {};
     const ha = ((ux1 - ux0) * (uy1 - uy0)) / 10000;
     const placed = [];
     const clash = (b) => {
@@ -154,7 +142,7 @@
       const list = cat[tier];
       if (!list.length) continue;
       const T = CFG.tiers[tier];
-      const e = T.perHa * ha * density * (AP.density === undefined ? 1 : AP.density) * ((AP.tiers && AP.tiers[tier]) === undefined ? 1 : AP.tiers[tier]);
+      const e = T.perHa * ha * density;
       const n = Math.floor(e) + (rng.f() < e - Math.floor(e) ? 1 : 0);
       for (let m = 0; m < n; m++) {
         for (let at = 0; at < CFG.attempts; at++) {
@@ -168,12 +156,9 @@
             px = side & 1 ? (side === 1 ? q[2] + dist : q[0] - dist) : q[0] + along * (q[2] - q[0]);
             py = side & 1 ? q[1] + along * (q[3] - q[1]) : (side === 0 ? q[3] + dist : q[1] - dist);
           }
-          // which template: weighted by its frequency and the area it is in
-          const area = BR.areaAt(W, px, py).area;
+          // which template: weighted by its frequency
           const w8 = {};
-          let any = false;
-          for (const a of list) { const v = (a.weight || 1) * areaWeight(a, area); if (v > 0) { w8[a.id] = v; any = true; } }
-          if (!any) continue;
+          for (const a of list) w8[a.id] = a.weight || 1;
           const arch = BR.TPL.archetypes[rng.weighted(w8)];
           const site = arch.site || { w: [10, 20], h: [10, 20] };
           const cw = sizeIn(rng, site.w), ch = sizeIn(rng, site.h);
@@ -193,7 +178,7 @@
           const k = placed.length;
           const O = BR.TG.orient(approach, cw, cd), local = canon.rects.map((q) => O.rect(q));
           placed.push({
-            id: i + ',' + j + ':' + k, i, j, k, tier, archetype: arch.id, name: arch.name, engine: arch.engine, area,
+            id: i + ',' + j + ':' + k, i, j, k, tier, archetype: arch.id, name: arch.name, engine: arch.engine,
             approach, shape, w: cw, h: ch, bbox, rects: local.map((q) => [q[0] + x0, q[1] + y0, q[2] + x0, q[3] + y0]),
             cx: x0 + rw / 2, cy: y0 + rh / 2, seed: hash4(seed, i, j, (k << 8) ^ S.TPL), cluster: near ? near.id : null
           });
@@ -201,7 +186,7 @@
         }
       }
     }
-    return { i, j, density, area: centreArea, rect: [i * C, j * C, (i + 1) * C, (j + 1) * C], pois: placed };
+    return { i, j, density, rect: [i * C, j * C, (i + 1) * C, (j + 1) * C], pois: placed };
   }
 
   // ------------------------------------------------------------- building

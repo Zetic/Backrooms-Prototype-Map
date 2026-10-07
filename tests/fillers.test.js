@@ -202,7 +202,7 @@ check('connections that do not fit are refused, not moved', (() => {
     feel[F.feel]++; seen.add(id);
   }
   check('the pool picks only fillers that fit the site', misfit === 0, misfit + ' misfits');
-  check('every filler gets picked', seen.size === FILL.list().length, [...seen].join(', '));
+  check('every pool filler gets picked', seen.size === FILL.list().filter((F) => F.weight > 0).length, [...seen].join(', '));
   check('the pool leans enclosed', feel.enclosed > feel.mixed + feel.open && feel.open < feel.enclosed / 3,
     'enclosed ' + feel.enclosed + ', mixed ' + feel.mixed + ', open ' + feel.open + ' of 400');
   const w = { enclosed: 0, mixed: 0, open: 0 };

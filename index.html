@@ -6,7 +6,7 @@
 <title>Backrooms Map Prototype</title>
 <style>
   :root {
-    --bg: #4e4c49; --panel: rgba(28, 27, 25, 0.9); --text: #e9e3d6; --muted: #a39d92;
+    --bg: #3b3934; --panel: rgba(28, 27, 25, 0.9); --text: #e9e3d6; --muted: #a39d92;
     --accent: #e5cc9b; --line: rgba(255, 255, 255, 0.09);
   }
   * { box-sizing: border-box; }
@@ -33,9 +33,9 @@
   #legend { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 8px; margin-bottom: 8px; }
   #legend div { display: flex; align-items: center; gap: 6px; color: var(--text); font-size: 12px; }
   #legend i { width: 12px; height: 12px; border-radius: 3px; flex: none; border: 1px solid rgba(0,0,0,.35); }
-  #poiLegend { display: flex; flex-wrap: wrap; gap: 3px 10px; margin: -2px 0 8px; font-size: 11.5px; color: var(--muted); }
-  #poiLegend span { display: inline-flex; align-items: center; gap: 5px; }
-  #poiLegend i { width: 9px; height: 9px; border-radius: 50%; border: 1px solid rgba(0,0,0,.4); }
+  .note { font-size: 11px; line-height: 1.5; color: var(--muted); margin: 2px 0 8px; }
+  .note b { font-weight: 600; }
+  a { color: var(--accent); }
   #info { min-height: 34px; color: var(--text); font-size: 12px; border-top: 1px solid var(--line); padding-top: 7px; }
   #info b { color: var(--accent); font-weight: 600; }
   #stats { color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; border-top: 1px solid var(--line);
@@ -58,74 +58,39 @@
     <input id="goto" type="text" spellcheck="false" placeholder="go to x, y" aria-label="Go to coordinates">
     <button id="home" title="Back to origin">Origin</button>
   </div>
-  <div class="sec">Areas</div>
-  <div id="legend"></div>
+  <div class="sec">Map</div>
+  <div id="legend">
+    <div><i style="background:#ecd9b4"></i>Backrooms floor</div>
+    <div><i style="background:#3b3934"></i>Solid</div>
+    <div><i style="background:#c4a068"></i>POI site (far)</div>
+    <div><i style="background:#988462"></i>Site (far)</div>
+  </div>
+  <div class="note">Every site is built by a template from its connections: a filler from the Backrooms pool, or a POI building inside a host hall. Zoom in past 1 px/m to see blueprints.</div>
   <div class="sec">Show</div>
   <div class="grid2">
-    <label class="tg"><input type="checkbox" id="o-walls" checked> Interior detail</label>
-    <label class="tg"><input type="checkbox" id="o-areaMap"> Area map</label>
-    <label class="tg"><input type="checkbox" id="o-territories"> Territories</label>
-    <label class="tg"><input type="checkbox" id="o-cells"> Super-cells</label>
-    <label class="tg"><input type="checkbox" id="o-rooms"> Room graph</label>
+    <label class="tg"><input type="checkbox" id="o-labels" checked> Room labels</label>
+    <label class="tg"><input type="checkbox" id="o-outlines"> Site outlines</label>
+    <label class="tg"><input type="checkbox" id="o-graph"> Connection graph</label>
   </div>
-  <div class="sec">Points of interest</div>
-  <div class="grid2">
-    <label class="tg"><input type="checkbox" id="o-pois" checked> POIs</label>
-    <label class="tg"><input type="checkbox" id="o-poiCells"> Planning cells</label>
-  </div>
-  <div id="poiLegend"></div>
-  <div class="sec">Generation stage</div>
-  <select id="stage" aria-label="Generation stage">
-    <option value="final">Final architecture</option>
-    <option value="manifestations">1 · Area manifestations</option>
-    <option value="program">2 · Structural program</option>
-    <option value="dna">3 · DNA regions</option>
-    <option value="patterns">4 · Architectural patterns</option>
-    <option value="connections">5 · Global connectivity (abstract)</option>
-    <option value="envelopes">6 · Rooms and corridors</option>
-    <option value="traversals">7 · Actual traversal paths</option>
-    <option value="entrances">8 · Shared entrances</option>
-    <option value="pois">9 · Points of interest</option>
-    <option value="full">Full generation debug</option>
-  </select>
-  <div class="sec">Generation debug</div>
-  <div class="grid2">
-    <label class="tg"><input type="checkbox" id="o-manifestations"> Manifestations</label>
-    <label class="tg"><input type="checkbox" id="o-programRegions"> Program regions</label>
-    <label class="tg"><input type="checkbox" id="o-dnaDebug"> Shared DNA</label>
-    <label class="tg"><input type="checkbox" id="o-patterns"> Architectural patterns</label>
-    <label class="tg"><input type="checkbox" id="o-connections"> Abstract connections</label>
-    <label class="tg"><input type="checkbox" id="o-roomEnvelopes"> Room envelopes</label>
-    <label class="tg"><input type="checkbox" id="o-traversals"> Actual traversal paths</label>
-    <label class="tg"><input type="checkbox" id="o-entrances"> Shared entrances</label>
-    <label class="tg"><input type="checkbox" id="o-clearances"> Traversal clearance</label>
-    <label class="tg"><input type="checkbox" id="o-infillFailures"> Infill fallbacks</label>
-  </div>
-  <div style="font-size:11px;line-height:1.5;margin-top:8px">Debug only: pink required connections · cyan optional connections<br>Orange paths use corridors; green paths traverse rooms. Routes have no separate floor treatment.</div>
+  <div class="note" id="graphKey" style="display:none"><b style="color:#e8913a">orange</b> route (tree) · <b style="color:#3fb6bf">cyan</b> loop · <b style="color:#e0609a">pink</b> across a cell border · <b style="color:#3fbf6f">green</b> into a POI</div>
   <div id="info">Hover the map to inspect it.</div>
   <div id="stats"></div>
+  <div class="note" style="margin-top:8px"><a href="workbench.html">Template workbench</a></div>
 </div>
-<div id="help">drag / WASD to pan &middot; wheel / +&minus; to zoom &middot; M area map</div>
+<div id="help">drag / WASD to pan &middot; wheel / +&minus; to zoom</div>
 
 <script src="src/core.js"></script>
-<script src="src/areas.js"></script>
-<script src="src/manifestation.js"></script>
-<script src="src/layout.js"></script>
-<script src="src/structure.js"></script>
-<script src="src/spaceplan.js"></script>
-<script src="src/zones.js"></script>
-<script src="src/traversal.js"></script>
-<script src="src/interior.js"></script>
-<script src="src/boundary.js"></script>
-<script src="src/world.js"></script>
 <script src="src/tpl/grid.js"></script>
 <script src="src/tpl/framework.js"></script>
 <script src="src/tpl/house.js"></script>
 <script src="src/tpl/room.js"></script>
 <script src="src/tpl/archetypes/house.js"></script>
 <script src="src/tpl/archetypes/room.js"></script>
+<script src="src/tpl/fillers/engine.js"></script>
+<script src="src/tpl/fillers/pool.js"></script>
 <script src="src/tpl/render2d.js"></script>
 <script src="src/poi.js"></script>
+<script src="src/world.js"></script>
 <script src="src/render.js"></script>
 <script>
 (function () {
@@ -134,8 +99,8 @@
   const canvas = document.getElementById('c');
   const ctx = canvas.getContext('2d');
   const $ = (id) => document.getElementById(id);
-  const OPTS = ['walls','areaMap','territories','cells','rooms','manifestations','programRegions','dnaDebug','patterns','connections','roomEnvelopes','traversals','entrances','clearances','infillFailures','pois','poiCells'];
-  const DEFAULT_ON = new Set(['walls','pois']);           // on unless the URL says 0
+  const OPTS = ['labels', 'outlines', 'graph'];
+  const DEFAULT_ON = new Set(['labels']);                 // on unless the URL says 0
 
   // ---------- state (mirrored into the URL hash so views are shareable)
   const Q = new URLSearchParams(location.hash.slice(1));
@@ -143,13 +108,13 @@
     seed: Q.has('seed') ? Q.get('seed') : '31337',
     x: parseFloat(Q.get('x')) || 0,
     y: parseFloat(Q.get('y')) || 0,
-    zoom: parseFloat(Q.get('z')) || 2,
+    zoom: parseFloat(Q.get('z')) || 4,
     opts: {}
   };
   for (const k of OPTS) state.opts[k] = DEFAULT_ON.has(k) ? Q.get(k) !== '0' : Q.get(k) === '1';
   const hideHud = Q.get('hud') === '0';
   if (hideHud) { $('hud').style.display = 'none'; $('help').style.display = 'none'; }
-  const ZMIN = 0.08, ZMAX = 40;
+  const ZMIN = 0.03, ZMAX = 40;
 
   function seedNum(s) {
     if (/^-?\d+$/.test(s.trim())) return (parseInt(s, 10) >>> 0);
@@ -158,22 +123,6 @@
     return h >>> 0;
   }
   let world = new BR.World(seedNum(state.seed));
-
-  // ---------- legend
-  for (const k of BR.AREA_ORDER) {
-    const A = BR.AREAS[k], d = document.createElement('div');
-    const col = A.color || '#e5cc9b';
-    d.innerHTML = '<i style="background:' + col + '"></i>' + A.name;
-    d.title = A.role;
-    $('legend').appendChild(d);
-  }
-
-  if (BR.POI_TIER_COLORS) for (const t of BR.POI_TIERS) {
-    if (!BR.poiCatalogue()[t].length) continue;
-    const d = document.createElement('span');
-    d.innerHTML = '<i style="background:' + BR.POI_TIER_COLORS[t] + '"></i>' + t;
-    $('poiLegend').appendChild(d);
-  }
 
   // ---------- canvas sizing
   let W = 0, H = 0, DPR = 1;
@@ -184,17 +133,15 @@
     dirty = true;
   }
 
-  // ---------- render loop: generation is time-boxed; while the view is
-  // filling in, most frames generate and only every few hundred ms redraw
   // ---------- render loop: the renderer draws into cached tiles; each frame
-  // blits them and spends a time budget building the missing ones
+  // blits them and spends a time budget building the sites still missing
   let dirty = true, pending = false, lastItems = { tiles: 0, built: 0, mode: '' }, frameMs = 0;
   const GEN_BUDGET = 14;
   function frame() {
     if (dirty || pending) {
       const t0 = performance.now();
       const view = { cx: state.x, cy: state.y, zoom: state.zoom, w: W, h: H, dpr: DPR };
-      lastItems = BR.draw(ctx, world, view, Object.assign({ hover: hoverKey, hoverPoi: hoverPoi }, state.opts), GEN_BUDGET);
+      lastItems = BR.draw(ctx, world, view, Object.assign({ hover: hoverSite }, state.opts), GEN_BUDGET);
       frameMs = performance.now() - t0;
       pending = !lastItems.done;
       dirty = false;
@@ -208,62 +155,36 @@
     const s = world.stats;
     $('stats').textContent =
       'x ' + state.x.toFixed(0).padStart(7) + '   y ' + state.y.toFixed(0).padStart(7) + '   zoom ' + state.zoom.toFixed(2) + '\n' +
-      'view: ' + lastItems.mode + ' · ' + lastItems.tiles + ' tiles' + (pending ? '  (generating…)' : '') + '\n' +
-      'built: ' + world.plans.size + ' plans · ' + s.structuresBuilt + ' compositions · ' + s.patternsBuilt + ' patterns · ' + s.interiorsBuilt + ' interiors (' + (s.interiorMs / Math.max(1, s.interiorsBuilt)).toFixed(2) + ' ms avg)\n' +
-      poiLine() +
+      'view: ' + lastItems.mode + ' · ' + lastItems.tiles + ' tiles' + (pending ? '  (building…)' : '') + '\n' +
+      'planned: ' + s.cellsPlanned + ' cells · built: ' + s.sitesBuilt + ' sites, ' + s.poisBuilt + ' POIs (' + (s.buildMs / Math.max(1, s.sitesBuilt)).toFixed(1) + ' ms avg)' +
+      (s.issues ? ' · ' + s.issues + ' issues' : '') + '\n' +
       'frame: ' + frameMs.toFixed(1) + ' ms';
-  }
-  /** POIs in view: count by size class and density (only once the view is small enough to be cheap) */
-  function poiLine() {
-    if (!state.opts.pois || !BR.buildPOICell || state.zoom < 0.25) return '';
-    const hw = W / 2 / state.zoom, hh = H / 2 / state.zoom;
-    const list = world.poisIn(state.x - hw, state.y - hh, state.x + hw, state.y + hh);
-    const st = BR.poiStats(list, (4 * hw * hh) / 1e4), parts = [];
-    for (const t of BR.POI_TIERS) if (st.byTier[t]) parts.push(st.byTier[t] + ' ' + t);
-    const s = world.stats;
-    return 'POIs: ' + st.count + ' in view · ' + st.perHa.toFixed(1) + '/ha\n  ' + parts.join(' · ') + '\n' +
-      'blueprints: ' + s.buildingsBuilt + ' built · ' + (s.buildingMs / Math.max(1, s.buildingsBuilt)).toFixed(1) + ' ms avg' + (s.buildingFailures ? ' · ' + s.buildingFailures + ' failed' : '') + '\n';
   }
 
   // ---------- hover inspection
-  let hoverKey = null, hoverPoi = null;
-  function poiInfo(P) {
-    const st = world.hasBuilding(P) ? world.poiBuilding(P) : null;
-    let html = '<b>' + P.name + '</b> &middot; ' + P.tier + ' POI &middot; ' + P.engine + ' engine' +
-      '<br>site ' + (P.bbox[2] - P.bbox[0]) + '×' + (P.bbox[3] - P.bbox[1]) + ' m &middot; ' + P.shape + ' &middot; faces ' + ({ N: 'north', S: 'south', E: 'east', W: 'west' })[P.approach] +
-      ' &middot; in ' + (BR.AREAS[P.area] ? BR.AREAS[P.area].name : P.area) + (P.cluster ? ' &middot; beside ' + P.cluster : '');
-    if (st && st.error) html += '<br>no layout fit this site';
-    else if (st) html += '<br>' + st.rooms.length + ' rooms &middot; ' + st.portals.length + ' entrances/exits &middot; ' + ((st.meta.plan && st.meta.plan.type) || 'plan') + ' plan &middot; score ' + st.meta.score +
-      (st.meta.mutations && st.meta.mutations.length ? ' &middot; wrong: ' + st.meta.mutations.join(', ') : '');
-    return html + '<br><span style="color:var(--muted)">POI ' + P.id + ' &middot; not carved into the fill yet</span><br>';
-  }
+  let hoverSite = null;
+  const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
   function inspect(px, py) {
     const x = state.x + (px - W / 2) / state.zoom, y = state.y + (py - H / 2) / state.zoom;
-    const P = state.opts.pois && BR.buildPOICell && state.zoom >= 0.7 ? world.poiAt(x, y) : null;
-    const pid = P ? P.id : null;
-    if (pid !== hoverPoi) { hoverPoi = pid; dirty = true; }
-    const r = world.inspect(x, y);
-    if (!r) { $('info').innerHTML = P ? poiInfo(P) : ''; return; }
-    const T = r.territory, b = T.bbox;
-    const A = BR.AREAS[r.area];
-    let html = (P ? poiInfo(P) : '') + '<b>' + A.name + '</b> &middot; ' + A.role + (r.area !== r.base ? ' in ' + BR.AREAS[r.base].name : '') +
-      '<br>territory ' + T.key + ' &middot; ' + (b[2] - b[0]) + '×' + (b[3] - b[1]) + ' m';
-    if (r.manifestation) html += '<br>manifestation ' + r.manifestation.id + ' &middot; ' + r.manifestation.form + ' &middot; ' + r.manifestation.scale +
-      ' &middot; ' + r.manifestation.lobes.length + ' lobes' + (r.manifestation.holes.length ? ' &middot; ' + r.manifestation.holes.length + ' substrate cuts' : '');
-    if (r.programRole) html += '<br>program role ' + r.programRole;
-    if (r.dna) html += '<br>DNA ' + r.dna.key + ' &middot; ' + r.dna.majorAxis.toUpperCase() + '-axis &middot; ' + r.dna.corridorWidth + 'm corridor &middot; ' + r.dna.module + 'm module';
-    if(r.pattern)html+='<br>pattern '+r.pattern.family+' &middot; '+r.pattern.blocks.length+' spaces &middot; '+r.pattern.ports.length+' entrances';
-    if(r.block){
-      html+='<br>space '+r.block.programRole+' &middot; zone '+r.block.zone+
-        (r.block.sub.length>1?' ('+r.block.sub.join(' › ')+')':'')+(r.room?' &middot; '+r.room.kind:'');
-      if(r.block.space)html+='<br>'+r.block.space.entrances+' access points &middot; '+
-        r.block.space.frontage.toFixed(1)+'m frontage &middot; '+r.block.space.depth.toFixed(1)+'m depth';
-      if(r.block.infillFallback)html+='<br>bounded infill fallback';
+    const s = state.zoom >= 0.3 ? world.siteAt(x, y) : null;
+    const id = s ? s.id : null;
+    if (id !== hoverSite) { hoverSite = id; dirty = true; }
+    const bio = world.biomeAt(x, y);
+    if (!s) { $('info').innerHTML = '<b>' + bio.name + '</b> · openness ' + bio.openness.toFixed(2); return; }
+    const F = BR.FILL.fillers[world.fillerOf(s)], b = s.bbox;
+    let html = '<b>' + esc(F.name) + '</b> · ' + (s.host ? 'POI host' : F.feel + ' filler') + '<br>site ' + s.id + ' · ' + (b[2] - b[0]) + '×' + (b[3] - b[1]) + ' m · ' + s.area + ' m²' +
+      (s.rects.length > 1 ? ' · ' + s.rects.length + ' blocks' : '') + '<br>' + s.conns.length + (s.conns.length === 1 ? ' connection · ' : ' connections · ') + bio.name + ' (openness ' + s.openness.toFixed(2) + ')';
+    if (world.hasBuild(s)) {
+      const r = world.build(s), f = r.filler;
+      html += '<br>' + f.rooms.length + ' rooms · built ' + Math.round(f.meta.built * 100) + '% · ' + r.ms.toFixed(1) + ' ms' + (r.issues.length ? '<br><span style="color:#e0503f">' + esc(r.issues[0]) + '</span>' : '');
     }
-    if(r.diagnostics)html+='<br>'+r.diagnostics.throughRooms+' room spaces &middot; '+r.diagnostics.corridors+
-      ' corridor spaces &middot; '+r.diagnostics.fallbacks+' infill fallbacks';
+    const P = world.poiAt(x, y);
+    if (P) {
+      const B = world.hasBuild(s) ? world.build(s).buildings.find((q) => q.poi.id === P.id) : null;
+      html += '<br><b>' + esc(P.name) + '</b> · ' + P.tier + ' POI · ' + P.engine + ' engine · faces ' + ({ N: 'north', S: 'south', E: 'east', W: 'west' })[P.approach];
+      if (B) html += '<br>' + B.b.rooms.length + ' rooms · ' + Object.keys(B.conns).length + ' doors onto the hall · score ' + B.b.meta.score;
+    }
     $('info').innerHTML = html;
-    if (hoverKey !== T.key) { hoverKey = T.key; dirty = true; }
   }
 
   let hashTimer = 0;
@@ -329,7 +250,6 @@
   window.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT') return;
     const k = e.key.toLowerCase();
-    if (k === 'm') { state.opts.areaMap = !state.opts.areaMap; $('o-areaMap').checked = state.opts.areaMap; changed(); return; }
     if (k === '+' || k === '=') { zoomAt(W / 2, H / 2, 1.25); return; }
     if (k === '-' || k === '_') { zoomAt(W / 2, H / 2, 0.8); return; }
     keys.add(k);
@@ -347,30 +267,13 @@
     requestAnimationFrame(keyLoop);
   })(lastT);
 
-  // ---------- generation-stage presets
-  const DEBUG_KEYS = ['manifestations','programRegions','dnaDebug','patterns','connections','roomEnvelopes','traversals','entrances','clearances','infillFailures'];
-  const STAGES = {
-    final: [], manifestations:['manifestations'], program:['manifestations','programRegions'],
-    dna:['dnaDebug','patterns'], patterns:['patterns'], connections:['patterns','connections','entrances'], pois:[],
-    envelopes:['patterns','roomEnvelopes'], traversals:['traversals','entrances'],
-    entrances:['entrances'], full:DEBUG_KEYS
-  };
-  function applyStage(name) {
-    const on=new Set(STAGES[name]||[]);
-    for(const k of DEBUG_KEYS){state.opts[k]=on.has(k);$('o-'+k).checked=state.opts[k];}
-    if(['envelopes','traversals','entrances','full'].includes(name)){
-      state.opts.areaMap=false;$('o-areaMap').checked=false;state.zoom=Math.max(1.2,state.zoom);
-    }
-    if(name==='pois'){for(const k of ['pois','poiCells']){state.opts[k]=true;$('o-'+k).checked=true;}}
-    changed();
-  }
-
   // ---------- HUD
+  function newWorld() { world = new BR.World(seedNum(state.seed)); hoverSite = null; changed(); }
   $('seed').value = state.seed;
-  $('seed').addEventListener('change', () => { state.seed = $('seed').value.trim() || '0'; world = new BR.World(seedNum(state.seed)); changed(); });
+  $('seed').addEventListener('change', () => { state.seed = $('seed').value.trim() || '0'; newWorld(); });
   $('rnd').addEventListener('click', () => {
     state.seed = String((Math.random() * 1e9) >>> 0);   // UI only; generation itself never uses Math.random
-    $('seed').value = state.seed; world = new BR.World(seedNum(state.seed)); changed();
+    $('seed').value = state.seed; newWorld();
   });
   $('home').addEventListener('click', () => { state.x = 0; state.y = 0; changed(); });
   $('goto').addEventListener('change', () => {
@@ -380,9 +283,9 @@
   for (const k of OPTS) {
     const el = $('o-' + k);
     el.checked = state.opts[k];
-    el.addEventListener('change', () => { state.opts[k] = el.checked; changed(); });
+    el.addEventListener('change', () => { state.opts[k] = el.checked; $('graphKey').style.display = state.opts.graph ? '' : 'none'; changed(); });
   }
-  $('stage').addEventListener('change', () => applyStage($('stage').value));
+  $('graphKey').style.display = state.opts.graph ? '' : 'none';
   document.querySelector('#hud h1').addEventListener('click', () => $('hud').classList.toggle('min'));
 
   window.addEventListener('resize', resize);

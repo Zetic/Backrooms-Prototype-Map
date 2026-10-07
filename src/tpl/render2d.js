@@ -4,8 +4,10 @@
  * it doubles as a check that the contract carries everything a client needs.
  *
  *   BR.TPL.drawBuilding(ctx, building, { scale, ox, oy, level, theme: 'plan' | 'blueprint',
- *                       labels, dims, tags, graph, portals, highlight })
+ *                       labels, dims, tags, graph, portals, highlight, site, layer })
  * (ox, oy) is where the site's (0, 0) lands in canvas pixels; scale is px/m.
+ * layer 'floors' draws only the site and floors, 'walls' everything else, so
+ * a map can draw every site's floors before any walls.
  */
 (function (root) {
   'use strict';
@@ -42,9 +44,10 @@
     const X = (x) => ox + x * S, Y = (y) => oy + y * S;
     const rooms = new Map(b.rooms.map((r) => [r.id, r]));
     const onLv = (x) => (x.level || 0) === lv;
+    const floors = o.layer !== 'walls', walls = o.layer !== 'floors';
     g.save();
     // ---- the site: what the world allotted (the backrooms fills the rest)
-    if (o.site !== false && b.site) {
+    if (floors && o.site !== false && b.site) {
       g.fillStyle = TH.site;
       g.beginPath();
       for (const r of b.site.rects) g.rect(X(r[0]), Y(r[1]), (r[2] - r[0]) * S, (r[3] - r[1]) * S);
@@ -53,7 +56,7 @@
       g.stroke(); g.setLineDash([]);
     }
     // ---- floors
-    for (const rm of b.rooms) {
+    if (floors) for (const rm of b.rooms) {
       if (!onLv(rm)) continue;
       g.fillStyle = TH.floor[floorKey(rm)] || TH.floor._;
       g.beginPath();
@@ -61,6 +64,7 @@
       g.fill();
       if (o.highlight === rm.id) { g.fillStyle = o.theme === 'blueprint' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.4)'; g.fill(); }
     }
+    if (!walls) { g.restore(); return; }
     // ---- verticals (stairs / lifts): a tread pattern in the room
     for (const v of b.verticals || []) for (const rid of v.rooms) {
       const rm = rooms.get(rid);

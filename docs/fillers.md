@@ -22,7 +22,9 @@ side, metres along it, width). Pool pick with 48 seeds shows the mix in the
 summary bar. *Check health* builds each filler on 12 standard sites and
 shows how many came out clean.
 
-Fillers are separate from the old prototype map and do not touch it.
+The map (`index.html`) is built from fillers: every site no POI claims gets
+one from the pool, weighted by the biome, and every POI sits in a `host` hall
+([docs/world.md](world.md)).
 
 ## The pool
 
@@ -36,12 +38,13 @@ Fillers are separate from the old prototype map and do not touch it.
 | `broken` | mixed | 20 | a 10–18 m room cut up by stub walls and gapped partitions, with small rooms or solid around it |
 | `ragged_hall` | open | 5 | a big room with a notched outline, a few columns, sometimes a solid block to walk around |
 | `pillar_hall` | open | 5 | an open floor on a 3.5–6 m column grid |
+| `host` | open | 0 | not in the pool: the hall the world wraps round a POI building (the POI's site comes as a `hint`), with a warren beyond it |
 
 The weights add up to 70 enclosed, 20 mixed and 10 open. `BR.FILL.pick`
 chooses by weight among the fillers that fit the site (each has a `fits`
 rule, for example halls need 12 m). A biome can pass its own `weights`.
 
-The old fill's Backrooms zones (open, split, warren, ring, corridor rooms)
+The old world-first fill's Backrooms zones (open, split, warren, ring, corridor rooms)
 and knobs (room scale, pillars, loops, wide openings) were the starting
 point, retuned for less open floor and more solid between rooms.
 
@@ -56,7 +59,8 @@ BR.FILL.generate({
     { id: 'n1', side: 'S', at: 4, width: 1.5, route: true },
     { id: 'n2', side: 'E', at: 10, width: 2, kind: 'door', route: false }
   ],
-  weights: { warren: 30 }      // optional, only used when picking
+  weights: { warren: 30 },     // optional, only used when picking
+  hint: { hall: [[4, 4, 16, 12]] }  // optional, metres: where the host filler puts its hall
 })
 ```
 
@@ -136,7 +140,6 @@ seeds, site shapes (rect, L, U, notched, random) and 0–4 connections:
 ## Next
 
 * House and Rooms take their entrances from connections in the same way.
-* A host-room filler that wraps a POI.
 * More variety: a gallery (a room with a ring of bays), a stair-ish split
   level, corridor-with-rooms, and wrongness for fillers (false doors,
   dead-end loops, a ceiling at the wrong height).

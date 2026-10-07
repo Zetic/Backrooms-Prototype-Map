@@ -13,10 +13,13 @@
  *   mixed     broken room                                     (weight 20)
  *   open      ragged hall, pillar hall                        (weight 10)
  *
+ * Not in the pool (weight 0): `host`, the hall the world wraps round a POI
+ * building (src/world.js passes the POI's site as a hint).
+ *
  * Each filler's `site` ranges are a typical site for it (tools use them; the
  * world sizes sites itself). `fits` is the hard limit.
  *
- * Ideas from the old fill (src/areas.js, src/zones.js): its Backrooms zones
+ * Ideas from the old world-first fill (since removed): its Backrooms zones
  * (open, split, warren, ring, gallery, corridorRooms...) and its knobs
  * (room scale, pillars, pOpen, pLoop, pWide), here retuned for less open
  * floor and more solid between rooms.
@@ -358,6 +361,33 @@
       if (!r) return;
       const sp = rng.int(7, 12), s = rng.f() < 0.6 ? 1 : 2, ox = rng.int(2, sp), oy = rng.int(2, sp);
       for (let y = r[1] + oy; y + s <= r[3] - 2; y += sp) for (let x = r[0] + ox; x + s <= r[2] - 2; x += sp) walk.column([x, y, x + s, y + s]);
+    }
+  });
+
+  // ------------------------------------------------------------ host (not in the pool)
+  FILL.register({
+    id: 'host', name: 'Host hall', feel: 'open', weight: 0,
+    blurb: 'A big hall wrapped round a POI building, plain Backrooms beyond it. The world uses it for POI sites; it is not in the pool.',
+    doors: { opening: 0.75, door: 0.15, wide: 0.1 }, loops: 0.25,
+    fits: (S) => Math.min(...dims(S)) >= 8,
+    site: { w: [24, 44], h: [22, 40] },
+    layout(P, rng) {
+      // the hall: the POI's site (the hint) plus 1-3 m round it; without a hint, the middle of the site
+      const c = P.inner, mx = TG.rw(c) >> 2, my = TG.rh(c) >> 2;
+      const hall = P.hint && P.hint.hall.length ? P.hint.hall : [[c[0] + mx, c[1] + my, c[2] - mx, c[3] - my]];
+      const grow = rng.int(2, 6), v = P.add('hall', ['host']);
+      for (const q of hall) P.paint([q[0] - grow, q[1] - grow, q[2] + grow, q[3] + grow], v);
+      P.hall = v;
+      // beyond it: a warren, part of it left solid
+      const ids = paintRooms(P, bsp([0, 0, P.W, P.H], rng, 6, 18, 0.3), 'room', ['host'], true);
+      voidSome(P, rng, rng.range(0.25, 0.45), (k) => ids.indexOf(k) >= 0);
+    },
+    furnish(P, walk, rng) {
+      if (rng.f() < 0.5) return;
+      const r = P.bigRect(P.hall);
+      if (!r || TG.rshort(r) < 14) return;
+      const sp = rng.int(8, 12), ox = rng.int(3, sp), oy = rng.int(3, sp);
+      for (let y = r[1] + oy; y + 1 <= r[3] - 3; y += sp) for (let x = r[0] + ox; x + 1 <= r[2] - 3; x += sp) walk.column([x, y, x + 1, y + 1]);
     }
   });
 })(typeof window !== 'undefined' ? window : globalThis);
