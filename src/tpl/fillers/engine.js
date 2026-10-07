@@ -51,8 +51,8 @@
     room: { zone: 'public', tags: ['backrooms'], ceil: [2.4, 3.0] },
     hall: { zone: 'public', tags: ['backrooms', 'large'], ceil: [2.8, 4.2] },
     passage: { zone: 'circulation', tags: ['backrooms', 'circulation'], ceil: [2.3, 2.7] },
-    cell: { zone: 'private', tags: ['backrooms', 'small'], ceil: [2.2, 2.6] },
-    alcove: { zone: 'private', tags: ['backrooms', 'alcove'], ceil: [2.2, 2.6] },
+    cell: { zone: 'public', tags: ['backrooms', 'small'], ceil: [2.2, 2.6] },
+    alcove: { zone: 'public', tags: ['backrooms', 'alcove'], ceil: [2.2, 2.6] },
     closet: { zone: 'service', tags: ['backrooms', 'closet'], ceil: [2.2, 2.5] }
   };
 
@@ -908,6 +908,23 @@
         const alone = margin >= 1 && !P.partitions.some((p) => p.room === room);
         if (!alone && !ok()) { for (let y = r[1]; y < r[3]; y++) for (let x = r[0]; x < r[2]; x++) col[y * W + x] = 0; return false; }
         P.columns.push({ rect: r.slice(), room });
+        return true;
+      },
+      /** a pillar made of several disjoint rects (a plus, an L), all or nothing, as column() */
+      pillar(rects, margin) {
+        margin = margin === undefined ? 2 : margin;
+        const room = P.own(rects[0][0], rects[0][1]);
+        if (room < 0) return false;
+        const inside = (x, y) => rects.some((r) => x >= r[0] && x < r[2] && y >= r[1] && y < r[3]);
+        for (const r of rects) for (let y = r[1] - margin; y < r[3] + margin; y++) for (let x = r[0] - margin; x < r[2] + margin; x++) {
+          if (P.own(x, y) !== room) return false;
+          const i = y * W + x;
+          if (col[i] || (inside(x, y) && keep[i])) return false;
+        }
+        const set = (val) => { for (const r of rects) for (let y = r[1]; y < r[3]; y++) for (let x = r[0]; x < r[2]; x++) col[y * W + x] = val; };
+        set(1);
+        if ((margin < 2 || P.partitions.some((p) => p.room === room)) && !ok()) { set(0); return false; }
+        for (const r of rects) P.columns.push({ rect: r.slice(), room });
         return true;
       }
     };
