@@ -10,6 +10,8 @@
  * windows: chance per window position (0 = none, 1 = every exterior wall that
  *   wants one).
  * wrongness: chance of liminal mutations (see the engine's MUTATIONS).
+ * vertical: the connection types this template prefers, in order (elevation
+ *   layer, tpl/connections.js); a type that does not fit falls through to the next.
  */
 (function (root) {
   'use strict';
@@ -41,6 +43,7 @@
     openPlan: 0.35,
     hall: { w: [1, 1.2] },
     windows: 1,
+    vertical: { prefer: ['stair', 'ladder'] },
     wrongness: 0.15
   });
 
@@ -67,6 +70,7 @@
     openPlan: 0.5,
     hall: { w: [1, 1] },
     windows: 1,
+    vertical: { prefer: ['stair', 'ladder'] },
     wrongness: 0.15
   });
 
@@ -96,6 +100,7 @@
     openPlan: 0.45,
     hall: { w: [1, 1.2] },
     windows: 1,
+    vertical: { prefer: ['stair', 'ladder'] },
     wrongness: 0.15
   });
 
@@ -126,6 +131,7 @@
     openPlan: 0.4,
     hall: { w: [1, 1.5] },
     windows: 1,
+    vertical: { prefer: ['stair', 'ladder'] },
     wrongness: 0.12
   });
 })(typeof window !== 'undefined' ? window : globalThis);

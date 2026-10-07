@@ -9,6 +9,7 @@
  *   end of the cross path (side). gate: opening width (m).
  * pillars: { p (chance of any), every (grid spacing), size, pad (m) }.
  * seats: how many bench spots. ceiling: the hall's (m).
+ * vertical: preferred connection types (a long ramp first: the park is big enough).
  */
 (function (root) {
   'use strict';
@@ -24,6 +25,7 @@
     pillars: { p: 0.75, every: [8, 11], size: [0.8, 1.5], pad: [2.5, 3.5] },
     seats: [1, 4],
     ceiling: [4.5, 7],
+    vertical: { prefer: ['ramp', 'stair', 'ladder'] },
     wrongness: 0.15
   });
 })(typeof window !== 'undefined' ? window : globalThis);

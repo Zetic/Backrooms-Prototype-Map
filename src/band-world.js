@@ -24,7 +24,11 @@
     for (const v of b.volumes.concat(b.voids || [])) { v.z0 += base; v.z1 += base; }
     for (const c of b.connectors) {
       for (const p of c.path.concat(c.landings)) p[2] += base;
-      c.reservation.z0 += base; c.reservation.z1 += base;
+      for (const v of E.reservationsOf(c)) { v.z0 += base; v.z1 += base; }
+    }
+    for (const z of b.connectionZones || []) {
+      z.entry[2] += base; z.exit[2] += base; z.floorZ += base; z.targetZ += base;
+      for (const p of z.path || []) p[2] += base;
     }
     for (const p of b.route) p[2] += base;
     for (const d of ['up', 'down']) for (const c of b.capabilities[d].candidates) c.at[2] += base;

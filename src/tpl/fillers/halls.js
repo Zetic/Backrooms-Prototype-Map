@@ -271,7 +271,7 @@
 
   // ------------------------------------------------------------ cross-pillar hall
   FILL.register({
-    id: 'cross_pillars', name: 'Cross-pillar hall', feel: 'open', weight: 3,
+    id: 'cross_pillars', vertical: { prefer: ['ramp', 'stair', 'ladder'] }, name: 'Cross-pillar hall', feel: 'open', weight: 3,
     blurb: 'A big hall with rows of plus-shaped pillars on a regular grid and a scalloped edge, a tooth in the wall at every pillar line.',
     doors: { opening: 0.6, wide: 0.4 }, loops: 0.3,
     fits: (S) => Math.min(...dims(S)) >= 18,

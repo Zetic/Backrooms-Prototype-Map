@@ -1,5 +1,5 @@
 {
-  "schema": "br.elevation/0.1",
+  "schema": "br.elevation/0.2",
   "filler": "circular_hall",
   "name": "Circular hall and wing",
   "feel": "mixed",
@@ -46,7 +46,7 @@
     },
     {
       "index": 1,
-      "elevation": 8,
+      "elevation": 3,
       "height": 2.2,
       "band": "up"
     }
@@ -199,10 +199,10 @@
       "level": 1,
       "rects": [
         [
-          3,
-          13.5,
-          4,
-          14.5
+          16,
+          6,
+          17,
+          7
         ]
       ]
     }
@@ -409,21 +409,22 @@
       "type": "landing",
       "name": "Upper landing",
       "zone": "circulation",
-      "floorZ": 8,
+      "floorZ": 3,
       "ceiling": 2.2,
-      "ceilingZ": 10.2,
+      "ceilingZ": 5.2,
       "band": "up",
       "rects": [
         [
-          3,
-          13.5,
-          4,
-          14.5
+          16,
+          6,
+          17,
+          7
         ]
       ],
       "area": 1,
       "tags": [
-        "vertical-landing"
+        "vertical-landing",
+        "stair"
       ],
       "level": 1
     }
@@ -2193,80 +2194,80 @@
       "id": "elev:w:elev:landing:up:0",
       "kind": "exterior",
       "a": [
-        3,
-        13.5
+        16,
+        6
       ],
       "b": [
-        4,
-        13.5
+        17,
+        6
       ],
       "rooms": [
         "elev:landing:up",
         null
       ],
       "thickness": 0.3,
-      "floorZ": 8,
-      "ceilingZ": 10.2,
+      "floorZ": 3,
+      "ceilingZ": 5.2,
       "level": 1
     },
     {
       "id": "elev:w:elev:landing:up:1",
       "kind": "exterior",
       "a": [
-        4,
-        13.5
+        17,
+        6
       ],
       "b": [
-        4,
-        14.5
+        17,
+        7
       ],
       "rooms": [
         "elev:landing:up",
         null
       ],
       "thickness": 0.3,
-      "floorZ": 8,
-      "ceilingZ": 10.2,
+      "floorZ": 3,
+      "ceilingZ": 5.2,
       "level": 1
     },
     {
       "id": "elev:w:elev:landing:up:2",
       "kind": "exterior",
       "a": [
-        4,
-        14.5
+        17,
+        7
       ],
       "b": [
-        3,
-        14.5
+        16,
+        7
       ],
       "rooms": [
         "elev:landing:up",
         null
       ],
       "thickness": 0.3,
-      "floorZ": 8,
-      "ceilingZ": 10.2,
+      "floorZ": 3,
+      "ceilingZ": 5.2,
       "level": 1
     },
     {
       "id": "elev:w:elev:landing:up:3",
       "kind": "exterior",
       "a": [
-        3,
-        14.5
+        16,
+        7
       ],
       "b": [
-        3,
-        13.5
+        16,
+        6
       ],
       "rooms": [
         "elev:landing:up",
         null
       ],
       "thickness": 0.3,
-      "floorZ": 8,
-      "ceilingZ": 10.2,
+      "floorZ": 3,
+      "ceilingZ": 5.2,
       "level": 1
     }
   ],
@@ -2361,6 +2362,31 @@
         10
       ],
       "floorZ": 0
+    },
+    {
+      "id": "elev:o:elev:landing:up",
+      "wall": "elev:w:elev:landing:up:0",
+      "kind": "opening",
+      "a": [
+        16,
+        6
+      ],
+      "b": [
+        17,
+        6
+      ],
+      "width": 1,
+      "rooms": [
+        "elev:landing:up",
+        null
+      ],
+      "height": 2.2,
+      "floorZ": 3,
+      "tags": [
+        "arrival",
+        "stair"
+      ],
+      "level": 1
     }
   ],
   "portals": [
@@ -2449,10 +2475,10 @@
         "o1"
       ],
       [
-        "r0",
+        "r1",
         "elev:landing:up",
-        "ladder",
-        "elev:ladder:up"
+        "stair",
+        "elev:stair:up"
       ]
     ]
   },
@@ -2465,8 +2491,7 @@
     "curves": 2,
     "carved": 0,
     "loops": 0,
-    "issues": [],
-    "ms": 17.08
+    "issues": []
   },
   "outline": [
     {
@@ -4781,7 +4806,7 @@
     "archetype": "circular_hall",
     "seed": 7
   },
-  "kind": "ladder-variant",
+  "kind": "stair-variant",
   "fillId": "fill:circular_hall:7",
   "bands": [
     {
@@ -4790,116 +4815,250 @@
     },
     {
       "id": "up",
-      "elevation": 8
+      "elevation": 3
     }
   ],
   "connectors": [
     {
-      "id": "elev:ladder:up",
-      "kind": "ladder",
-      "from": "s:r0",
+      "id": "elev:stair:up",
+      "kind": "stair",
+      "shape": "straight",
+      "zone": "zone:up:stair:s:r1",
+      "from": "s:r1",
       "to": "s:elev:landing:up",
       "state": "connected",
       "direction": "both",
-      "width": 0.5,
-      "clearance": 1.8,
+      "width": 1,
+      "clearance": 2,
+      "slope": 0.667,
+      "rise": 3,
       "landings": [
         [
-          3.25,
-          14,
+          16.5,
+          1,
           0
         ],
         [
-          3.25,
-          14,
-          8
+          16.5,
+          6.5,
+          3
         ]
       ],
       "path": [
         [
-          3.25,
-          14,
+          16.5,
+          1,
           0
         ],
         [
-          3.75,
-          13.75,
+          16.5,
+          1.5,
           0
         ],
         [
-          3.75,
-          13.75,
-          8
+          16.5,
+          6,
+          3
         ],
         [
-          3.25,
-          14,
-          8
+          16.5,
+          6.5,
+          3
         ]
       ],
-      "reservation": {
-        "id": "volume:elev:ladder:up",
-        "kind": "connector",
-        "rects": [
-          [
-            3,
-            13.5,
-            4,
-            14.5
-          ]
-        ],
-        "z0": -0.25,
-        "z1": 9.8
-      }
+      "reservations": [
+        {
+          "id": "volume:elev:stair:up:0",
+          "kind": "connector",
+          "rects": [
+            [
+              16,
+              0.5,
+              17,
+              1.5
+            ]
+          ],
+          "z0": 0,
+          "z1": 2
+        },
+        {
+          "id": "volume:elev:stair:up:1",
+          "kind": "connector",
+          "rects": [
+            [
+              16,
+              1.5,
+              17,
+              2
+            ]
+          ],
+          "z0": 0,
+          "z1": 2.333
+        },
+        {
+          "id": "volume:elev:stair:up:2",
+          "kind": "connector",
+          "rects": [
+            [
+              16,
+              2,
+              17,
+              2.5
+            ]
+          ],
+          "z0": 0.083,
+          "z1": 2.667
+        },
+        {
+          "id": "volume:elev:stair:up:3",
+          "kind": "connector",
+          "rects": [
+            [
+              16,
+              2.5,
+              17,
+              3
+            ]
+          ],
+          "z0": 0.417,
+          "z1": 3
+        },
+        {
+          "id": "volume:elev:stair:up:4",
+          "kind": "connector",
+          "rects": [
+            [
+              16,
+              3,
+              17,
+              3.5
+            ]
+          ],
+          "z0": 0.75,
+          "z1": 3.333
+        },
+        {
+          "id": "volume:elev:stair:up:5",
+          "kind": "connector",
+          "rects": [
+            [
+              16,
+              3.5,
+              17,
+              4
+            ]
+          ],
+          "z0": 1.083,
+          "z1": 3.667
+        },
+        {
+          "id": "volume:elev:stair:up:6",
+          "kind": "connector",
+          "rects": [
+            [
+              16,
+              4,
+              17,
+              4.5
+            ]
+          ],
+          "z0": 1.417,
+          "z1": 4
+        },
+        {
+          "id": "volume:elev:stair:up:7",
+          "kind": "connector",
+          "rects": [
+            [
+              16,
+              4.5,
+              17,
+              5
+            ]
+          ],
+          "z0": 1.75,
+          "z1": 4.333
+        },
+        {
+          "id": "volume:elev:stair:up:8",
+          "kind": "connector",
+          "rects": [
+            [
+              16,
+              5,
+              17,
+              5.5
+            ]
+          ],
+          "z0": 2.083,
+          "z1": 4.667
+        },
+        {
+          "id": "volume:elev:stair:up:9",
+          "kind": "connector",
+          "rects": [
+            [
+              16,
+              5.5,
+              17,
+              6
+            ]
+          ],
+          "z0": 2.417,
+          "z1": 5
+        },
+        {
+          "id": "volume:elev:stair:up:10",
+          "kind": "connector",
+          "rects": [
+            [
+              16,
+              6,
+              17,
+              7
+            ]
+          ],
+          "z0": 3,
+          "z1": 5
+        }
+      ]
     }
   ],
   "holes": [
     {
-      "id": "elev:ladder:up:ceiling",
-      "connector": "elev:ladder:up",
-      "surface": "s:r0",
+      "id": "elev:stair:up:ceiling:0",
+      "connector": "elev:stair:up",
+      "surface": "s:r1",
       "face": "ceiling",
       "rect": [
-        3.5,
-        13.5,
-        4,
-        14
-      ]
-    },
-    {
-      "id": "elev:ladder:up:floor",
-      "connector": "elev:ladder:up",
-      "surface": "s:elev:landing:up",
-      "face": "floor",
-      "rect": [
-        3.5,
-        13.5,
-        4,
-        14
+        16,
+        2.5,
+        17,
+        6
       ]
     }
   ],
   "voids": [],
   "route": [
     [
-      3.25,
-      14,
+      16.5,
+      1,
       0
     ],
     [
-      3.75,
-      13.75,
+      16.5,
+      1.5,
       0
     ],
     [
-      3.75,
-      13.75,
-      8
+      16.5,
+      6,
+      3
     ],
     [
-      3.25,
-      14,
-      8
+      16.5,
+      6.5,
+      3
     ]
   ],
   "surfaces": [
@@ -5081,14 +5240,14 @@
       "band": "up",
       "rects": [
         [
-          3,
-          13.5,
-          4,
-          14.5
+          16,
+          6,
+          17,
+          7
         ]
       ],
-      "floorZ": 8,
-      "ceilingZ": 10.2,
+      "floorZ": 3,
+      "ceilingZ": 5.2,
       "slab": 0.25
     }
   ],
@@ -5260,28 +5419,168 @@
       "kind": "room",
       "rects": [
         [
-          3,
-          13.5,
-          4,
-          14.5
+          16,
+          6,
+          17,
+          7
         ]
       ],
-      "z0": 7.75,
-      "z1": 10.2
+      "z0": 2.75,
+      "z1": 5.2
     },
     {
-      "id": "volume:elev:ladder:up",
+      "id": "volume:elev:stair:up:0",
       "kind": "connector",
       "rects": [
         [
-          3,
-          13.5,
-          4,
-          14.5
+          16,
+          0.5,
+          17,
+          1.5
         ]
       ],
-      "z0": -0.25,
-      "z1": 9.8
+      "z0": 0,
+      "z1": 2
+    },
+    {
+      "id": "volume:elev:stair:up:1",
+      "kind": "connector",
+      "rects": [
+        [
+          16,
+          1.5,
+          17,
+          2
+        ]
+      ],
+      "z0": 0,
+      "z1": 2.333
+    },
+    {
+      "id": "volume:elev:stair:up:2",
+      "kind": "connector",
+      "rects": [
+        [
+          16,
+          2,
+          17,
+          2.5
+        ]
+      ],
+      "z0": 0.083,
+      "z1": 2.667
+    },
+    {
+      "id": "volume:elev:stair:up:3",
+      "kind": "connector",
+      "rects": [
+        [
+          16,
+          2.5,
+          17,
+          3
+        ]
+      ],
+      "z0": 0.417,
+      "z1": 3
+    },
+    {
+      "id": "volume:elev:stair:up:4",
+      "kind": "connector",
+      "rects": [
+        [
+          16,
+          3,
+          17,
+          3.5
+        ]
+      ],
+      "z0": 0.75,
+      "z1": 3.333
+    },
+    {
+      "id": "volume:elev:stair:up:5",
+      "kind": "connector",
+      "rects": [
+        [
+          16,
+          3.5,
+          17,
+          4
+        ]
+      ],
+      "z0": 1.083,
+      "z1": 3.667
+    },
+    {
+      "id": "volume:elev:stair:up:6",
+      "kind": "connector",
+      "rects": [
+        [
+          16,
+          4,
+          17,
+          4.5
+        ]
+      ],
+      "z0": 1.417,
+      "z1": 4
+    },
+    {
+      "id": "volume:elev:stair:up:7",
+      "kind": "connector",
+      "rects": [
+        [
+          16,
+          4.5,
+          17,
+          5
+        ]
+      ],
+      "z0": 1.75,
+      "z1": 4.333
+    },
+    {
+      "id": "volume:elev:stair:up:8",
+      "kind": "connector",
+      "rects": [
+        [
+          16,
+          5,
+          17,
+          5.5
+        ]
+      ],
+      "z0": 2.083,
+      "z1": 4.667
+    },
+    {
+      "id": "volume:elev:stair:up:9",
+      "kind": "connector",
+      "rects": [
+        [
+          16,
+          5.5,
+          17,
+          6
+        ]
+      ],
+      "z0": 2.417,
+      "z1": 5
+    },
+    {
+      "id": "volume:elev:stair:up:10",
+      "kind": "connector",
+      "rects": [
+        [
+          16,
+          6,
+          17,
+          7
+        ]
+      ],
+      "z0": 3,
+      "z1": 5
     }
   ],
   "bandTerritories": [
@@ -5429,29 +5728,71 @@
           16.5
         ],
         [
-          3,
-          13.5,
-          4,
-          14.5
+          16,
+          0.5,
+          17,
+          1.5
+        ],
+        [
+          16,
+          1.5,
+          17,
+          2
         ]
       ]
     },
     {
       "band": "up",
-      "elevation": 8,
+      "elevation": 3,
       "owner": "fill:circular_hall:7",
       "rects": [
         [
-          3,
-          13.5,
-          4,
-          14.5
+          16,
+          6,
+          17,
+          7
         ],
         [
+          16,
           3,
-          13.5,
+          17,
+          3.5
+        ],
+        [
+          16,
+          3.5,
+          17,
+          4
+        ],
+        [
+          16,
           4,
-          14.5
+          17,
+          4.5
+        ],
+        [
+          16,
+          4.5,
+          17,
+          5
+        ],
+        [
+          16,
+          5,
+          17,
+          5.5
+        ],
+        [
+          16,
+          5.5,
+          17,
+          6
+        ],
+        [
+          16,
+          6,
+          17,
+          7
         ]
       ]
     }
@@ -5483,10 +5824,10 @@
         "status": "connected"
       },
       {
-        "from": "s:r0",
+        "from": "s:r1",
         "to": "s:elev:landing:up",
-        "kind": "ladder",
-        "connector": "elev:ladder:up",
+        "kind": "stair",
+        "connector": "elev:stair:up",
         "direction": "both",
         "connected": true,
         "status": "connected"
@@ -5494,6 +5835,361 @@
     ],
     "complete": true
   },
+  "connectionZones": [
+    {
+      "id": "zone:up:ladder:s:r0",
+      "kind": "connection-zone",
+      "owner": "fill:circular_hall:7",
+      "direction": "up",
+      "type": "ladder",
+      "shape": "shaft",
+      "state": "available",
+      "surface": "s:r0",
+      "room": "r0",
+      "rects": [
+        [
+          3,
+          13.5,
+          4,
+          14.5
+        ]
+      ],
+      "hatch": [
+        3.5,
+        13.5,
+        4,
+        14
+      ],
+      "entry": [
+        3.25,
+        14,
+        0
+      ],
+      "exit": [
+        3.25,
+        14,
+        8
+      ],
+      "floorZ": 0,
+      "targetZ": 8,
+      "rise": 8,
+      "width": 0.5,
+      "clearance": 1.8,
+      "destination": [
+        3,
+        13.5,
+        4,
+        14.5
+      ]
+    },
+    {
+      "id": "zone:up:stair:s:r1",
+      "kind": "connection-zone",
+      "owner": "fill:circular_hall:7",
+      "direction": "up",
+      "type": "stair",
+      "shape": "straight",
+      "state": "connected",
+      "surface": "s:r1",
+      "room": "r1",
+      "rects": [
+        [
+          16,
+          0.5,
+          17,
+          1.5
+        ],
+        [
+          16,
+          1.5,
+          17,
+          2
+        ],
+        [
+          16,
+          2,
+          17,
+          2.5
+        ],
+        [
+          16,
+          2.5,
+          17,
+          3
+        ],
+        [
+          16,
+          3,
+          17,
+          3.5
+        ],
+        [
+          16,
+          3.5,
+          17,
+          4
+        ],
+        [
+          16,
+          4,
+          17,
+          4.5
+        ],
+        [
+          16,
+          4.5,
+          17,
+          5
+        ],
+        [
+          16,
+          5,
+          17,
+          5.5
+        ],
+        [
+          16,
+          5.5,
+          17,
+          6
+        ],
+        [
+          16,
+          6,
+          17,
+          7
+        ]
+      ],
+      "entry": [
+        16.5,
+        1,
+        0
+      ],
+      "exit": [
+        16.5,
+        6.5,
+        3
+      ],
+      "floorZ": 0,
+      "targetZ": 3,
+      "rise": 3,
+      "width": 1,
+      "clearance": 2,
+      "run": 4.5,
+      "slope": 0.667,
+      "destination": [
+        16,
+        6,
+        17,
+        7
+      ],
+      "path": [
+        [
+          16.5,
+          1,
+          0
+        ],
+        [
+          16.5,
+          1.5,
+          0
+        ],
+        [
+          16.5,
+          6,
+          3
+        ],
+        [
+          16.5,
+          6.5,
+          3
+        ]
+      ],
+      "plan": {
+        "axis": "v",
+        "sign": 1,
+        "ox": 16,
+        "oy": 0.5
+      },
+      "connector": "elev:stair:up"
+    },
+    {
+      "id": "zone:down:ladder:s:r0",
+      "kind": "connection-zone",
+      "owner": "fill:circular_hall:7",
+      "direction": "down",
+      "type": "ladder",
+      "shape": "shaft",
+      "state": "available",
+      "surface": "s:r0",
+      "room": "r0",
+      "rects": [
+        [
+          3,
+          13.5,
+          4,
+          14.5
+        ]
+      ],
+      "hatch": [
+        3.5,
+        13.5,
+        4,
+        14
+      ],
+      "entry": [
+        3.25,
+        14,
+        0
+      ],
+      "exit": [
+        3.25,
+        14,
+        -8
+      ],
+      "floorZ": 0,
+      "targetZ": -8,
+      "rise": 8,
+      "width": 0.5,
+      "clearance": 1.8,
+      "destination": [
+        3,
+        13.5,
+        4,
+        14.5
+      ]
+    },
+    {
+      "id": "zone:down:stair:s:r1",
+      "kind": "connection-zone",
+      "owner": "fill:circular_hall:7",
+      "direction": "down",
+      "type": "stair",
+      "shape": "straight",
+      "state": "available",
+      "surface": "s:r1",
+      "room": "r1",
+      "rects": [
+        [
+          16,
+          0.5,
+          17,
+          1.5
+        ],
+        [
+          16,
+          1.5,
+          17,
+          2
+        ],
+        [
+          16,
+          2,
+          17,
+          2.5
+        ],
+        [
+          16,
+          2.5,
+          17,
+          3
+        ],
+        [
+          16,
+          3,
+          17,
+          3.5
+        ],
+        [
+          16,
+          3.5,
+          17,
+          4
+        ],
+        [
+          16,
+          4,
+          17,
+          4.5
+        ],
+        [
+          16,
+          4.5,
+          17,
+          5
+        ],
+        [
+          16,
+          5,
+          17,
+          5.5
+        ],
+        [
+          16,
+          5.5,
+          17,
+          6
+        ],
+        [
+          16,
+          6,
+          17,
+          7
+        ]
+      ],
+      "entry": [
+        16.5,
+        1,
+        0
+      ],
+      "exit": [
+        16.5,
+        6.5,
+        -3
+      ],
+      "floorZ": 0,
+      "targetZ": -3,
+      "rise": 3,
+      "width": 1,
+      "clearance": 2,
+      "run": 4.5,
+      "slope": 0.667,
+      "destination": [
+        16,
+        6,
+        17,
+        7
+      ],
+      "path": [
+        [
+          16.5,
+          1,
+          0
+        ],
+        [
+          16.5,
+          1.5,
+          0
+        ],
+        [
+          16.5,
+          6,
+          -3
+        ],
+        [
+          16.5,
+          6.5,
+          -3
+        ]
+      ],
+      "plan": {
+        "axis": "v",
+        "sign": 1,
+        "ox": 16,
+        "oy": 0.5
+      }
+    }
+  ],
   "capabilities": {
     "up": {
       "supported": true,
@@ -5504,27 +6200,41 @@
           "kind": "ladder",
           "surface": "s:elev:landing:up",
           "landing": [
-            3,
-            13.5,
-            4,
-            14.5
+            16,
+            6,
+            17,
+            7
           ],
           "hatch": [
-            3.5,
-            13.5,
-            4,
-            14
+            16.5,
+            6,
+            17,
+            6.5
           ],
           "at": [
-            3.25,
-            14,
-            8
+            16.25,
+            6.5,
+            3
           ],
           "state": "supported",
           "variant": "ladder-hatch"
         }
       ],
-      "connection": "elev:ladder:up"
+      "zones": [
+        "zone:up:ladder:s:r0",
+        "zone:up:stair:s:r1"
+      ],
+      "types": [
+        "ladder",
+        "stair"
+      ],
+      "prefer": [
+        "ramp",
+        "stair",
+        "ladder"
+      ],
+      "connection": "elev:stair:up",
+      "type": "stair"
     },
     "down": {
       "supported": true,
@@ -5554,6 +6264,19 @@
           "state": "supported",
           "variant": "ladder-hatch"
         }
+      ],
+      "zones": [
+        "zone:down:ladder:s:r0",
+        "zone:down:stair:s:r1"
+      ],
+      "types": [
+        "ladder",
+        "stair"
+      ],
+      "prefer": [
+        "ramp",
+        "stair",
+        "ladder"
       ]
     }
   }

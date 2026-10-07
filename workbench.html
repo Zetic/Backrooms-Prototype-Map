@@ -162,7 +162,7 @@
       <div id="dhead">
         <div style="display:flex;align-items:center;gap:8px"><h2 id="dtitle"></h2><button class="close" id="dclose" title="Close (Esc)">✕</button></div>
         <div id="dsub" class="k"></div>
-        <div class="r"><button id="dprev">◀ seed</button><button id="dnext">seed ▶</button><button id="dcopy">Copy JSON</button><button id="ddown">Download JSON</button></div>
+        <div class="r"><button id="dprev">◀ seed</button><button id="dnext">seed ▶</button><button id="dcopy">Copy JSON</button><button id="ddown">Download JSON</button><a id="dlab" href="elevation.html" target="_blank" rel="noopener" title="The same template, seed and site size with an up connection: ladders, stairs, ramps and their zones" style="font-size:12px;align-self:center">Open in elevation lab ↗</a></div>
       </div>
       <div class="dtabs" id="dtabs"><button data-t="score" class="on">Score</button><button data-t="rooms">Rooms</button><button data-t="portals">Portals</button><button data-t="program">Program</button><button data-t="issues">Issues</button><button data-t="json">JSON</button></div>
       <div id="dbody"></div>
@@ -762,6 +762,10 @@
     const L = b.lot ? b : null;
     if (L) b = L.main;
     const m = b.meta;
+    // the same template, seed and size in the elevation lab (a plain site: no lot, approach or wrongness)
+    const labId = TPL.archetypes[detailId] ? 'template:' + detailId : FILLERS[detailId] && FILL.fillers[FILLERS[detailId].filler] ? detailId : null, half = (v) => Math.min(128, Math.max(1, Math.round(v * 2) / 2));
+    $('dlab').style.display = labId && b.site ? '' : 'none';
+    if (labId && b.site) $('dlab').href = 'elevation.html#' + new URLSearchParams({ template: labId, seed: String(detailSeed), width: String(half(b.site.w)), depth: String(half(b.site.h)), connection: 'up' });
     if (isFillerB(b) && tab !== 'rooms' && tab !== 'portals' && tab !== 'json') { fillerPanel(b, A, body); return; }
     if (isFillerB(b)) fillerPanel(b, A, null);
     else $('dsub').innerHTML = (L ? '<b>' + esc(lotLabel(L)) + '</b> · ' + (L.kind === 'flush' ? 'the doors are the lot edge' : 'lot ' + L.site.w + '×' + L.site.h + ' m · ' + L.conns.length + ' edge connection(s) · ' + L.meta.ms + ' ms') + (L.issues.length ? ' · <span class="bad">' + L.issues.length + ' problem(s)</span>' : '') + (seamLine(L) ? '<br>' + esc(seamLine(L)) : '') + '<br>' : '') +

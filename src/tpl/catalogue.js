@@ -70,13 +70,30 @@
   };
 
   // ------------------------------------------------------------ zones
+  // routes: a stair or ramp may be built on this zone (lawn); every other zone
+  // is kept clear of them (paths, playgrounds, pads, seating, pits)
   const ZONES = {
-    lawn: { label: 'lawn', tags: ['grass', 'soft'], lone: { pool: 'weird', weight: 0.6, site: { w: [4, 7.5], h: [4, 7.5] } } },
+    lawn: { label: 'lawn', tags: ['grass', 'soft'], routes: true, lone: { pool: 'weird', weight: 0.6, site: { w: [4, 7.5], h: [4, 7.5] } } },
     path: { label: 'path', tags: ['tile', 'walkway'], lone: { pool: 'weird', weight: 0.4, site: { w: [2, 3], h: [6, 12] }, exit: 0.8 } },
     plaza: { label: 'plaza', tags: ['tile'], lone: { pool: 'weird', weight: 0.4, site: { w: [3, 6], h: [3, 6] } } },
     playground: { label: 'playground', tags: ['play', 'equipment'], lone: { pool: 'weird', weight: 1, site: { w: [5, 7.5], h: [5, 7.5] } } },
     seating: { label: 'seating', tags: ['bench'], lone: { pool: 'weird', weight: 0.6, site: { w: [2, 3], h: [1.5, 2.5] } } },
     pit: { label: 'pit', tags: ['hazard', 'drop', 'wrong:pit'], lone: { pool: 'weird', weight: 0.5, site: { w: [2, 4], h: [2, 4] } } }
+  };
+
+  // ------------------------------------------------------------ vertical connections
+  // What a ladder, a stair and a ramp are, wherever they turn up (elevation
+  // layer, tpl/connections.js). No steps, rails or meshes: the area a route
+  // needs, its width, its slope and the headroom over it.
+  //   width      the width a generator builds (m); minWidth what validation accepts
+  //   slope      rise / run accepted [min, max]; design the slope generators build
+  //   clearance  headroom over every point of the route (m)
+  //   landing    flat floor at each end of a flight (m, along the route)
+  //   rise       the smallest change in height worth the type (m)
+  const CONNECTIONS = {
+    ladder: { label: 'ladder', tags: ['vertical', 'ladder', 'hatch'], width: 0.5, minWidth: 0.5, clearance: 1.8, rise: 3 },
+    stair: { label: 'stair', tags: ['vertical', 'stair'], width: 1, minWidth: 0.9, slope: [0.45, 0.84], design: 0.7, clearance: 2, landing: 1, rise: 1 },
+    ramp: { label: 'ramp', tags: ['vertical', 'ramp'], width: 1.5, minWidth: 1.2, slope: [0, 0.25], design: 0.25, clearance: 2, landing: 1.5, rise: 0.5 }
   };
 
   /**
@@ -98,5 +115,5 @@
     return out;
   }
 
-  TPL.CAT = { ROOMS, ZONES, types, zones: (list, context) => types(list, context, ZONES) };
+  TPL.CAT = { ROOMS, ZONES, CONNECTIONS, types, zones: (list, context) => types(list, context, ZONES) };
 })(typeof window !== 'undefined' ? window : globalThis);

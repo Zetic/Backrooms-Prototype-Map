@@ -65,7 +65,8 @@
   <aside>
     <div class="controls">
       <label class="field">Template<select id="template" aria-label="Template"></select></label>
-      <label class="field">Connection<select id="connection"><option value="none">Potential only</option><option value="up" selected>Upward</option><option value="down">Downward</option></select></label>
+      <label class="field">Connection<select id="connection"><option value="none">Potential only · show zones</option><option value="up" selected>Upward</option><option value="down">Downward</option></select></label>
+      <div class="row"><label class="field">Type<select id="type"><option value="auto" selected>Auto · template's preference</option><option value="ladder">Ladder</option><option value="stair">Stair</option><option value="ramp">Ramp</option></select></label><label class="field" style="max-width:92px">Rise (m)<input id="rise" type="number" min="0.5" max="40" step="any" placeholder="auto"></label></div>
       <label class="field">Seed<div class="row"><input id="seed" type="number" min="0" max="4294967295" step="1" value="7" aria-label="Seed"><button id="next" type="button">Next</button></div></label>
       <div class="row"><label class="field">Width (m)<input id="width" type="number" min="1" max="128" step="0.5" value="40"></label><label class="field">Depth (m)<input id="depth" type="number" min="1" max="128" step="0.5" value="36"></label></div>
     </div>
@@ -77,7 +78,7 @@
     <div id="capabilities" class="small"></div>
     <button id="export" type="button">Download elevation JSON</button>
     <div id="status" class="small" role="status" aria-live="polite"></div>
-    <p id="note" class="muted small">The atrium is retired. These optional ladder variants demonstrate local elevation data; world bands remain separate until replacement journeys are authored.</p>
+    <p id="note" class="muted small">Connection zones are where a template can climb or descend. Each template prefers some types; a type that does not fit falls through to the next, down to the ladder every template has. A connected variant adds a real landing, its cutouts and a reservation that follows the slope. World bands stay separate until journeys are composed from these zones.</p>
   </aside>
   <section id="workspace" aria-label="Elevation inspection">
     <div id="floorbar"><label>View<select id="mode"><option value="cutaway">Cutaway</option><option value="exact">Exact floor</option></select></label><label>Local floor<select id="floor" aria-label="Floor elevation"></select></label><span id="summary"></span></div>
@@ -86,11 +87,13 @@
     <div id="planwrap"><canvas id="plan" role="img" aria-label="Floor plan with vertical routes and neighboring floors"></canvas><div id="hover"></div></div>
     <h2>Main route · elevation along the journey</h2>
     <canvas id="profile" role="img" aria-label="Elevation profile from the entrance to the destination"></canvas>
-    <div class="muted small">Cutaway shows the highest floor below the cut at each XY. Exact floor isolates a local floor. Connections occupy their drawn width; dashed continuation and destination outlines show where they go. Click a connection to reveal its other landing.</div>
+    <div class="muted small">Cutaway shows the highest floor below the cut at each XY. Exact floor isolates a local floor. Stairs and ramps are drawn at their width: solid where you see them, violet dashes above the cut, blue dashes where a floor hides them. A ladder is its outlined footprint and a dark hatch. The far landing is outlined violet above or blue below. Click a connection to reveal its other landing.</div>
     <h2>Rooms and floor surfaces</h2>
     <div class="tablewrap"><table><thead><tr><th>Room</th><th>Floor</th><th>Clear height</th><th>Home band</th></tr></thead><tbody id="rooms"></tbody></table></div>
     <h2>Physical connections</h2>
-    <div class="tablewrap"><table><thead><tr><th>Type</th><th>From</th><th>To</th><th>Width</th><th>Travel</th></tr></thead><tbody id="links"></tbody></table></div>
+    <div class="tablewrap"><table><thead><tr><th>Type</th><th>From</th><th>To</th><th>Width</th><th>Run · slope</th><th>Reserved prisms</th><th>Travel</th></tr></thead><tbody id="links"></tbody></table></div>
+    <h2>Connection zones · opportunities, not connections</h2>
+    <div class="tablewrap"><table><thead><tr><th>Direction</th><th>Type</th><th>Shape</th><th>Room</th><th>Rise</th><th>Footprint</th><th>State</th></tr></thead><tbody id="zones"></tbody></table></div>
   </section>
 </main>
 <script src="src/core.js"></script>
@@ -117,6 +120,7 @@
 <script src="src/tpl/fillers/architectural.js"></script>
 <script src="src/tpl/render2d.js"></script>
 <script src="src/tpl/elevation.js"></script>
+<script src="src/tpl/connections.js"></script>
 <script src="src/tpl/elevation-view.js"></script>
 <script src="src/elevation-lab.js"></script>
 </body>

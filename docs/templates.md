@@ -82,8 +82,9 @@ what to allot.
 ## 3. Output: `br.building/0.2`
 
 The optional elevation adapter in `src/tpl/elevation.js` converts this output
-into `br.elevation/0.1` without mutating it. Every template and filler receives
-physical up/down ladder/hatch candidates through that common adapter. Bands,
+into `br.elevation/0.2` without mutating it. Every template and filler receives
+physical up/down connection zones through that common adapter: a ladder/hatch
+always, and stairs or ramps where its rooms fit them (`src/tpl/connections.js`). Bands,
 actual floor heights, shared reservations, and connected variants are described
 in [the elevation implementation plan](elevation.md). Existing abstract vertical
 links require authored XYZ paths before they are complete elevation exports.
@@ -314,7 +315,12 @@ A **recipe** (archetype) is pure data in `src/tpl/archetypes/`:
 * `windows`;
 * `wrongness`;
 * `category`, `blurb` and `rarity`, which the workbench uses;
-* `pool`: `expected` (default) or `weird`.
+* `pool`: `expected` (default) or `weird`;
+* `vertical`: `{ prefer: ['stair', 'ladder'] }`, the connection types this
+  template tries first when the elevation lab or a later world journey asks it
+  to go up or down (default stair, ramp, ladder; the ladder always ends the
+  list). A preference is an order, not a promise: a type that does not fit the
+  rooms is refused and the next is tried ([docs/elevation.md](elevation.md)).
 
 A new house type is a new recipe:
 
@@ -508,7 +514,9 @@ connections, by count or exactly (fillers and lots).
 * level tabs;
 * tabs for score breakdown and rejections, rooms with tags (grouped by part
   in a composite) and zones, portals, program (with the parts of a composite), issues,
-  and the JSON (copy or download).
+  and the JSON (copy or download);
+* *Open in elevation lab*: the same template, seed and site size with its
+  connection zones and an upward connection.
 
 **Recipes:** *Edit recipe* changes a recipe live. *Save as new…* forks it into
 a new template in the library, which is the fastest way to grow the catalogue.

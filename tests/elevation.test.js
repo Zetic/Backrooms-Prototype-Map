@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { BR } = require('./helpers');
-require('../src/tpl/elevation');
+require('../src/tpl/elevation'); require('../src/band-world');
 const E = BR.ELEV, copy = (b) => JSON.parse(JSON.stringify(b));
 let builds = 0;
 function good(b) { assert.deepEqual(E.validate(b).errors, [], b.name); builds++; }
@@ -15,7 +15,7 @@ assert.equal(E.reachable(fixture, [start]).size, fixture.surfaces.length);
   assert(!E.reachable(b, [start]).has(end));
   const overlap = copy(fixture); overlap.rooms[1].floorZ = 1; E.refresh(overlap); bad(overlap, /overlaps.*in 3D/);
   const landing = copy(fixture); landing.connectors[0].landings[0][2] += .5; bad(landing, /landing does not meet/);
-  const reservation = copy(fixture); reservation.volumes = reservation.volumes.filter((v) => v.id !== reservation.connectors[0].reservation.id); bad(reservation, /no spatial reservation/);
+  const reservation = copy(fixture); reservation.volumes = reservation.volumes.filter((v) => v.id !== reservation.connectors[0].reservations[0].id); bad(reservation, /no spatial reservation/);
   const holes = copy(fixture); holes.holes = []; bad(holes, /cutouts/);
   const low = copy(fixture); low.rooms[0].ceiling = 1; low.rooms[0].ceilingZ = low.rooms[0].floorZ + 1; E.refresh(low); bad(low, /headroom/);
   const directed = copy(fixture); directed.connectors[0].direction = 'forward'; E.refresh(directed);
@@ -52,18 +52,48 @@ console.log('ok   protected voids, atomic reservation replacement and detached s
 console.log('ok   ramps enforce slope, occupied width, landing openings and reservations');
 
 let potentials = 0, variants = 0;
+// Every instance, not just the first seed that works: a house reaching its
+// garage wing only through the garage door, or a yard lot built in pieces,
+// still gets its compact fallback in both directions.
 for (const a of BR.TPL.listArchetypes()) {
-  let tested = false;
-  for (let seed = 1; seed <= 8 && !tested; seed++) {
-    const source = BR.TPL.generate({ archetype: a.id, seed, wrongness: 0 });
+  let tested = 0;
+  for (let seed = 1; seed <= 6; seed++) {
+    const source = BR.TPL.generate({ archetype: a.id, seed: seed * 7919, approach: 'SENW'[seed % 4] });
     if (source.error) continue;
     const before = JSON.stringify(source), b = E.prepare(source);
     assert.equal(JSON.stringify(source), before, 'adapter never mutates source');
+    assert.deepEqual(E.validate(b).errors, [], a.id + '#' + seed + ' is a valid elevation blueprint as built');
     for (const dir of ['up','down']) assert(b.capabilities[dir].supported && b.capabilities[dir].candidates.length, a.id + ' ' + dir);
     for (const direction of ['up','down']) { good(E.ladderVariant(source, { direction })); variants++; }
-    potentials++; tested = true;
+    tested++;
   }
   assert(tested, 'could not build ' + a.id);
+  potentials++;
+}
+{
+  // the houses that broke the fallback before: wings reached through a second door
+  let multi = 0;
+  for (const id of ['ranch', 'bungalow', 'suburban']) for (let seed = 1; seed <= 40; seed++) {
+    const source = BR.TPL.generate({ archetype: id, seed: seed * 31, approach: 'SENW'[seed % 4] });
+    const main = source.portals.find((p) => p.main), adj = new Map(source.rooms.map((r) => [r.id, []]));
+    for (const [x, y, k] of source.graph.edges) if (adj.has(x) && adj.has(y) && !['window', 'false'].includes(k)) { adj.get(x).push(y); adj.get(y).push(x); }
+    const seen = new Set([main.room]), todo = [main.room];
+    while (todo.length) for (const v of adj.get(todo.pop())) if (!seen.has(v)) { seen.add(v); todo.push(v); }
+    if (seen.size === source.rooms.length) continue;
+    multi++;
+    for (const direction of ['up','down']) { good(E.ladderVariant(source, { direction })); variants++; }
+  }
+  assert(multi >= 5, 'houses with a wing behind a second door are exercised: ' + multi);
+}
+{
+  // yard lots on the map are built in pieces: the front yard and each door's passage
+  const w = new BR.BandWorld(31337); let yards = 0;
+  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const s of w.cell(i, j, 0).sites) {
+    if (s.kind !== 'lot') continue;
+    const b = w.spatial(s).filler, a = JSON.parse(JSON.stringify(b)); a.capabilities = E.capabilities(a);
+    assert.deepEqual(E.validate(a).errors, [], s.id + ' yard'); yards++;
+  }
+  assert(yards > 2, 'yard lots checked: ' + yards);
 }
 for (const f of BR.FILL.list()) {
   const site = { w: Math.round(f.site.w[1] * 2) / 2, h: Math.round(f.site.h[1] * 2) / 2 }, source = BR.FILL.generate({ filler: f.id, site, seed: 7, connections: BR.FILL.sampleConnections(site, 2, 7) });

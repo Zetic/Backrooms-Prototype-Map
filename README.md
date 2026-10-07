@@ -88,12 +88,16 @@ Open `workbench.html` to:
 - export the JSON.
 
 Open [the elevation lab](elevation.html) to inspect actual floors, continuous
-cutaway heights, full-width connection footprints, and optional up/down ladder
-variants of every template and filler. Exact local floor inspection, ghosting,
-route profiles and `br.elevation/0.1` JSON export remain available. The main map
+cutaway heights and the connection zones of every template and filler: where a
+ladder, stair or ramp fits up or down, and a connected variant of any of them
+(the template's preferred type by default, the ladder as fallback) with its
+landing, cutouts and slope-following reservation. Exact local floor inspection,
+ghosting, route profiles and `br.elevation/0.2` JSON export remain available.
+The workbench detail panel opens the same template in the lab. The main map
 uses band controls, a continuous cut height, and template-specific inspection.
 [Elevation world planning, reservations and export](docs/elevation-world.md).
 [Elevation design, data contract, and milestones](docs/elevation.md).
+[Agent handoff and current implementation context](CONTEXT.md).
 
 ## Controls (`index.html`)
 
@@ -124,7 +128,8 @@ The URL hash keeps the seed, position, zoom, band, cut height and toggles, for e
 | `seams.js` | Where two blueprints end up wall to wall: each shared wall recorded once, and the seam rules that sometimes cut a window or door through it (a house against the backrooms) |
 | `render.js` | The map: tile cache, detail / plan / far views, overlays |
 | `tpl/` | The template system: kit grid, framework, the shared catalogue of room and zone types (`catalogue.js`), House, Rooms and Zone engines, the composite pipeline (`composite.js`: templates built inside a template and merged into one blueprint) and the Neighborhood and Park engines, archetypes, fillers, lots (`lot.js`: settings, the yard, and the adapter that builds templates inside bigger ones), blueprint renderer |
-| `tpl/elevation.js`, `tpl/elevation-view.js`, `elevation-lab.js` | Stacked surfaces, reservations, compact connection variants, cutaway, JSON renderer and standalone lab |
+| `tpl/elevation.js`, `tpl/elevation-view.js`, `elevation-lab.js` | Stacked surfaces, reservations, ladder variants, validation, cutaway, JSON renderer and standalone lab |
+| `tpl/connections.js` | Connection zones (ladder, stair, ramp), template preferences, slope-following reservations, `connectionVariant` |
 | `band-world.js` | Deterministic reference-band networks, spatial reservations, exact portal matching and canonical world export |
 
 ```js
@@ -161,6 +166,12 @@ The runner checks:
   and face it, every door a house chose opens onto its front yard, and on the
   map a neighborhood is its own lot, joined through its doors, every room
   reachable.
+- **Elevation and connection zones.** Every template and filler validates with
+  up/down ladder potential on many seeds; stairs and ramps meet real floors,
+  keep their slope, width and headroom, cut only what they pass through, and
+  reserve space that follows the slope (a room fits under the high end, not the
+  low). Preferences never override fit, explicit rises are exact, variants are
+  deterministic, and the cutaway shows routes and far landings both ways.
 - **Fillers.** Every filler keeps the contract on any site shape and honours
   every connection. The pool leans enclosed, and fillers are fast.
 - **The world, on five seeds.** Sites tile every cell exactly. Connections are

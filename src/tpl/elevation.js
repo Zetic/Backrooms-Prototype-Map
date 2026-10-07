@@ -2,11 +2,20 @@
  * Experimental elevation contract and compact connection variants.
  * Bands are reference elevations; levels group actual floor elevations.
  * All geometry is in metres, Z up. See docs/elevation.md.
+ *
+ * br.elevation/0.2: a connector reserves a list of prisms (`reservations`)
+ * that follow its path, so a ramp claims its slope and headroom rather than
+ * its whole bounding box. A ladder's list holds its one shaft prism. 0.1
+ * blueprints (one `reservation`) are read and upgraded by prepare().
+ * Connection zones (connections.js) describe where ladders, stairs and ramps
+ * fit; an unselected zone cuts nothing, reserves nothing and adds no edge.
  */
 (function (root) {
   'use strict';
   const BR = root.BR, TG = BR.TG;
-  const E = BR.ELEV = { SCHEMA: 'br.elevation/0.1', SLAB: 0.25 };
+  const E = BR.ELEV = { SCHEMA: 'br.elevation/0.2', LEGACY: ['br.elevation/0.1'], SLAB: 0.25 };
+  /** a connector's reserved prisms, whichever schema wrote it */
+  const reservationsOf = (c) => c.reservations || (c.reservation ? [c.reservation] : []);
   const EPS = 1e-7, clone = (v) => JSON.parse(JSON.stringify(v));
   const round = (n) => Math.round(n * 1000) / 1000;
   const overlap = (a, b) => a[0] < b[2] - EPS && b[0] < a[2] - EPS && a[1] < b[3] - EPS && b[1] < a[3] - EPS;
@@ -39,7 +48,7 @@
   function floorPoint(b, surface, p) {
     return inside(surface.rects, p) && !(b.holes || []).some((h) => h.surface === surface.id && h.face === 'floor' && inside([h.rect], p));
   }
-  function capabilities(b) {
+  function capabilities(b, opts) {
     const out = { up: { supported: true, selected: false, candidates: [] }, down: { supported: true, selected: false, candidates: [] } };
     for (const dir of ['up', 'down']) {
       const order = b.surfaces.slice().sort((a, c) => (dir === 'up' ? c.floorZ - a.floorZ : a.floorZ - c.floorZ) || a.id.localeCompare(c.id));
@@ -66,6 +75,17 @@
         break;
       }
     }
+    // Stair and ramp opportunities (connections.js). Every direction keeps
+    // its ladder candidate as the compact fallback.
+    if (E.findZones) {
+      const zones = opts && opts.zones ? opts.zones : E.findZones(b, out);
+      for (const dir of ['up', 'down']) {
+        out[dir].zones = zones.filter((z) => z.direction === dir).map((z) => z.id);
+        out[dir].types = [...new Set(zones.filter((z) => z.direction === dir).map((z) => z.type))];
+        out[dir].prefer = E.preferenceOf(b);
+      }
+      b.connectionZones = zones;
+    }
     return out;
   }
 
@@ -85,8 +105,9 @@
     for (const q of (b.zones || []).concat(b.columns || [], b.curves || [], b.outline || [])) q.level = lv(q.floorZ);
     b.footprint = b.levels.map((l) => ({ level: l.index, rects: b.rooms.filter((r) => r.level === l.index).flatMap((r) => clone(r.rects)) }));
     b.surfaces = b.rooms.map((r) => ({ id: 's:' + r.id, room: r.id, owner: b.fillId, band: r.band, rects: clone(r.rects), floorZ: r.floorZ, ceilingZ: r.ceilingZ, slab: E.SLAB }));
+    for (const c of b.connectors) if (!c.reservations) { c.reservations = reservationsOf(c).map(clone); delete c.reservation; }
     b.volumes = b.surfaces.map((s) => prism(s.rects, s.floorZ - s.slab, s.ceilingZ, 'room', 'volume:' + s.id))
-      .concat(b.connectors.map((c) => clone(c.reservation)), clone(b.voids || []));
+      .concat(...b.connectors.map((c) => clone(c.reservations)), clone(b.voids || []));
     b.bandTerritories = b.bands.map((band) => ({ band: band.id, elevation: band.elevation, owner: b.fillId,
       rects: b.volumes.filter((v) => v.z0 <= band.elevation + EPS && v.z1 > band.elevation + EPS).flatMap((v) => clone(v.rects)) }));
     const physical = new Map(b.connectors.map((c) => [c.id, c]));
@@ -99,9 +120,16 @@
     }
     for (const c of b.connectors) edges.push({ from: c.from, to: c.to, kind: c.kind, connector: c.id, direction: c.direction, connected: c.state === 'connected', status: c.state });
     b.navigation = { nodes: b.surfaces.map((s) => s.id), edges, complete: !edges.some((e) => e.status === 'legacy-unresolved') };
-    b.capabilities = options && options.deferCapabilities
+    const keep = b.capabilities, deferred = options && options.deferCapabilities;
+    if (!deferred) b.connectionZones = [];
+    // a variant keeps the zones its template offered (options.zones) rather
+    // than searching again round its own new landing
+    b.capabilities = deferred
       ? { up: { supported: true, selected: false, candidates: [], deferred: true }, down: { supported: true, selected: false, candidates: [], deferred: true } }
-      : capabilities(b);
+      : capabilities(b, { zones: options && options.zones });
+    // a selected connection survives a refresh
+    if (keep) for (const dir of ['up', 'down']) if (keep[dir] && keep[dir].selected) { b.capabilities[dir].selected = true; b.capabilities[dir].connection = keep[dir].connection; b.capabilities[dir].type = keep[dir].type; }
+    if (b.connectionZones) for (const z of b.connectionZones) { const c = b.connectors.find((k) => k.zone === z.id); if (c) { z.state = 'connected'; z.connector = c.id; } }
     return b;
   }
 
@@ -110,8 +138,9 @@
   function prepare(source, options) {
     if (!source || source.error) throw new Error((source && source.error) || 'missing blueprint');
     const o = options || {};
-    if (source.schema === E.SCHEMA) {
+    if (source.schema === E.SCHEMA || E.LEGACY.includes(source.schema)) {
       const b = clone(source);
+      if (b.schema !== E.SCHEMA) { b.schema = E.SCHEMA; return refresh(b, o); }
       if (!o.deferCapabilities && b.capabilities.up.deferred) b.capabilities = capabilities(b);
       return b;
     }
@@ -138,7 +167,7 @@
     return { id, kind: 'ladder', from: 's:' + a.id, to: 's:' + c.id, state: 'connected', direction: 'both', width: 0.5, clearance: 1.8,
       landings: [[p[0], p[1], a.floorZ], [p[0], p[1], c.floorZ]],
       path: [[p[0], p[1], a.floorZ], [q[0], q[1], a.floorZ], [q[0], q[1], c.floorZ], [p[0], p[1], c.floorZ]],
-      reservation: prism([landing], Math.min(a.floorZ, c.floorZ) - E.SLAB, Math.max(a.floorZ, c.floorZ) + 1.8, 'connector', 'volume:' + id) };
+      reservations: [prism([landing], Math.min(a.floorZ, c.floorZ) - E.SLAB, Math.max(a.floorZ, c.floorZ) + 1.8, 'connector', 'volume:' + id)] };
   }
 
   /** A compact real variant of ANY source template. Destination geometry and
@@ -159,16 +188,18 @@
       const target = { id: 'elev:landing:' + dir, type: 'landing', name: (dir === 'up' ? 'Upper' : 'Lower') + ' landing', zone: 'circulation', floorZ: targetZ, ceiling: 2.2, ceilingZ: round(targetZ + 2.2), band: dir, rects: [p.landing.slice()], area: 1, tags: ['vertical-landing'] };
       trial.rooms.push(target); trial.bands.push({ id: dir, elevation: targetZ });
       const c = ladderConnector('elev:ladder:' + dir, host, target, p.landing, p.hatch);
+      c.zone = 'zone:' + dir + ':ladder:' + p.surface;
       trial.connectors.push(c); trial.graph.nodes.push(target.id); trial.graph.edges.push([host.id, target.id, 'ladder', c.id]);
       addHoles(trial, c.id, 's:' + (host.floorZ < targetZ ? host.id : target.id), 's:' + (host.floorZ > targetZ ? host.id : target.id), p.hatch);
       // Physical shaft cannot tunnel through another pre-existing room.
-      if (trial.surfaces.some((s) => s.room !== host.id && volumeOverlap(c.reservation, prism(s.rects, s.floorZ - s.slab, s.ceilingZ, 'room', s.id)))) continue;
+      if (trial.surfaces.some((s) => s.room !== host.id && c.reservations.some((v) => volumeOverlap(v, prism(s.rects, s.floorZ - s.slab, s.ceilingZ, 'room', s.id))))) continue;
       addRoomWalls(trial, target);
       trial.kind = 'ladder-variant';
       trial.route = c.path.map((v) => v.slice());
-      refresh(trial);
+      refresh(trial, { zones: b.connectionZones });
       trial.capabilities[dir].selected = true;
       trial.capabilities[dir].connection = c.id;
+      trial.capabilities[dir].type = 'ladder';
       const check = validate(trial);
       if (check.errors.length) throw new Error(check.errors.join('; '));
       if (o.reservations) {
@@ -218,34 +249,61 @@
     }
     for (const v of b.voids || []) for (const s of b.surfaces) if (volumeOverlap(v, prism(s.rects, s.floorZ - s.slab, s.ceilingZ))) bad(s.id + ' occupies protected void ' + v.id);
     for (const c of b.connectors) {
-      const a = surfaces.get(c.from), d = surfaces.get(c.to);
+      const a = surfaces.get(c.from), d = surfaces.get(c.to), rule = (BR.TPL.CAT && BR.TPL.CAT.CONNECTIONS || {})[c.kind] || {};
       if (!a || !d) { bad(c.id + ' has no destination surface'); continue; }
       if (c.state !== 'connected' || !['both', 'forward', 'reverse'].includes(c.direction)) bad(c.id + ' has invalid connection state or direction');
-      if (!Number.isFinite(c.width) || c.width < 0.5 || !Number.isFinite(c.clearance) || c.clearance < 1.8) bad(c.id + ' has invalid width or clearance');
+      if (!Number.isFinite(c.width) || c.width < Math.max(0.5, rule.minWidth || 0) - EPS || !Number.isFinite(c.clearance) || c.clearance < Math.max(1.8, rule.clearance || 0) - EPS) bad(c.id + ' has invalid width or clearance');
       if (!Array.isArray(c.path) || c.path.length < 2 || !c.path.every((p) => p.length === 3 && p.every(Number.isFinite))) { bad(c.id + ' has invalid XYZ path'); continue; }
       if (!Array.isArray(c.landings) || c.landings.length !== 2) { bad(c.id + ' has no two landings'); continue; }
+      const res = reservationsOf(c);
       for (const [s, p, end] of [[a, c.landings[0], c.path[0]], [d, c.landings[1], c.path[c.path.length - 1]]]) {
         if (!p || p.length !== 3 || !p.every(Number.isFinite) || Math.abs(p[2] - s.floorZ) > EPS || !floorPoint(b, s, p)) bad(c.id + ' landing does not meet ' + s.id + ' floor');
         if (p && p.some((v, i) => Math.abs(v - end[i]) > EPS)) bad(c.id + ' path does not meet its landing');
         if (s.ceilingZ - s.floorZ < c.clearance - EPS) bad(c.id + ' landing lacks headroom');
-        if (c.kind === 'ramp' && !b.openings.some((op) => op.rooms.includes(s.room) && !['window', 'false'].includes(op.kind) && op.floorZ === s.floorZ && op.width >= c.width - EPS && op.height >= c.clearance - EPS && onSegment(p, op.a, op.b))) bad(c.id + ' landing has no matching physical opening');
+        // a sloped route that lands on a wall needs a real opening there; one
+        // that lands inside a room's floor does not
+        const onWall = b.walls.some((w) => w.floorZ === s.floorZ && (w.rooms || []).includes(s.room) && onSegment(p, w.a, w.b));
+        if (c.kind !== 'ladder' && onWall && !b.openings.some((op) => op.rooms.includes(s.room) && !['window', 'false'].includes(op.kind) && op.floorZ === s.floorZ && op.width >= c.width - EPS && op.height >= c.clearance - EPS && onSegment(p, op.a, op.b))) bad(c.id + ' landing has no matching physical opening');
       }
-      if (c.kind === 'ramp') for (let k = 1; k < c.path.length; k++) {
-        const p = c.path[k - 1], q = c.path[k], run = Math.hypot(q[0] - p[0], q[1] - p[1]);
-        if (!run || Math.abs(q[2] - p[2]) / run > 0.25 + EPS) bad(c.id + ' ramp is too steep');
-        if (run) {
-          const nx = -(q[1] - p[1]) / run * c.width / 2, ny = (q[0] - p[0]) / run * c.width / 2;
-          for (const end of [p, q]) for (const side of [-1, 1]) if (!inside(c.reservation.rects, [end[0] + side * nx, end[1] + side * ny])) bad(c.id + ' full width outside reservation');
+      if (c.kind !== 'ladder') for (let k = 1; k < c.path.length; k++) {
+        const p = c.path[k - 1], q = c.path[k], run = Math.hypot(q[0] - p[0], q[1] - p[1]), slope = run ? Math.abs(q[2] - p[2]) / run : Infinity;
+        if (!run) { bad(c.id + ' has a vertical segment; only ladders climb straight up'); continue; }
+        if (slope > EPS) {
+          if (slope > (rule.slope ? rule.slope[1] : 0.25) + EPS) bad(c.id + ' ' + c.kind + ' is too steep');
+          if (rule.slope && slope < rule.slope[0] - EPS) bad(c.id + ' ' + c.kind + ' is too shallow for its type');
+        }
+        const nx = -(q[1] - p[1]) / run * c.width / 2, ny = (q[0] - p[0]) / run * c.width / 2;
+        for (const end of [p, q]) for (const side of [-1, 1]) if (!res.some((v) => inside(v.rects, [end[0] + side * nx, end[1] + side * ny]))) bad(c.id + ' full width outside reservation');
+      }
+      if (!res.length || !res.every((v) => validVolume(v) && b.volumes.some((u) => u.id === v.id))) bad(c.id + ' has no spatial reservation');
+      // every point along the route, with its headroom, lies in a reserved prism
+      for (let k = 0; k < c.path.length; k++) {
+        const p = c.path[k], q = c.path[Math.min(k + 1, c.path.length - 1)], run = Math.hypot(q[0] - p[0], q[1] - p[1]), n = k === c.path.length - 1 ? 1 : Math.max(1, Math.ceil(run / 0.25));
+        for (let t = 0; t < n; t++) {
+          const f = k === c.path.length - 1 ? 0 : t / n, at = p.map((v, i) => v + (q[i] - v) * f);
+          if (!res.some((v) => inside(v.rects, at) && at[2] >= v.z0 - EPS && at[2] + c.clearance <= v.z1 + EPS)) { bad(c.id + ' path/headroom outside reservation'); break; }
         }
       }
-      if (!validVolume(c.reservation) || !b.volumes.some((v) => v.id === c.reservation.id)) bad(c.id + ' has no spatial reservation');
-      for (const p of c.path) if (!inside(c.reservation.rects, p) || p[2] < c.reservation.z0 - EPS || p[2] + c.clearance > c.reservation.z1 + EPS) bad(c.id + ' path/headroom outside reservation');
-      for (const s of b.surfaces) if (s.id !== c.from && s.id !== c.to && volumeOverlap(c.reservation, prism(s.rects, s.floorZ - s.slab, s.ceilingZ))) bad(c.id + ' crosses occupied room ' + s.id);
+      for (const s of b.surfaces) if (s.id !== c.from && s.id !== c.to && res.some((v) => volumeOverlap(v, prism(s.rects, s.floorZ - s.slab, s.ceilingZ)))) bad(c.id + ' crosses occupied room ' + s.id);
+      // where its reserved space passes through an endpoint's floor slab or
+      // ceiling, that surface is explicitly cut
+      if (c.kind !== 'ladder') for (const s of [a, d]) for (const v of res) for (const r of s.rects) {
+        const q = [Math.max(r[0], v.rects[0][0]), Math.max(r[1], v.rects[0][1]), Math.min(r[2], v.rects[0][2]), Math.min(r[3], v.rects[0][3])];
+        if (q[2] - q[0] < EPS || q[3] - q[1] < EPS) continue;
+        const faces = [];
+        if (v.z0 < s.floorZ - EPS && v.z1 > s.floorZ - s.slab + EPS) faces.push('floor');
+        if (v.z0 < s.ceilingZ - EPS && v.z1 > s.ceilingZ + EPS) faces.push('ceiling');
+        for (const face of faces) for (let y = q[1] + 0.125; y < q[3]; y += 0.25) for (let x = q[0] + 0.125; x < q[2]; x += 0.25) {
+          if (!(b.holes || []).some((h) => h.connector === c.id && h.surface === s.id && h.face === face && inside([h.rect], [x, y]))) { bad(c.id + ' passes through the ' + face + ' of ' + s.id + ' without a cutout'); x = Infinity; y = Infinity; }
+        }
+      }
     }
     for (const h of b.holes) {
       const s = surfaces.get(h.surface);
       if (!s || !['floor', 'ceiling'].includes(h.face) || !b.connectors.some((c) => c.id === h.connector)) { bad(h.id + ' has invalid ownership'); continue; }
       for (const p of [[h.rect[0], h.rect[1]], [h.rect[2], h.rect[3]]]) if (!inside(s.rects, p)) bad(h.id + ' cutout outside surface');
+      // an unselected zone cuts nothing: every cutout belongs to a selected connector
+      if (!b.connectors.some((c) => c.id === h.connector && c.state === 'connected')) bad(h.id + ' cut by an unselected connection');
     }
     for (const c of b.connectors.filter((c) => c.kind === 'ladder')) if (!b.holes.some((h) => h.connector === c.id && h.face === 'floor') || !b.holes.some((h) => h.connector === c.id && h.face === 'ceiling')) bad(c.id + ' lacks explicit floor/ceiling cutouts');
     for (const e of b.navigation.edges) {
@@ -254,13 +312,17 @@
       if (e.connected && !e.connector && surfaces.has(e.from) && surfaces.has(e.to) && surfaces.get(e.from).floorZ !== surfaces.get(e.to).floorZ) bad('ordinary opening joins different elevations');
     }
     if (b.navigation.complete) {
-      const entrance = b.portals.find((p) => p.main) || b.portals[0], start = entrance ? ['s:' + entrance.room] : [];
+      // Every portal is a way in from the world, not only the main entrance:
+      // a house wing behind its garage door, or a yard lot built in pieces
+      // (its front yard and each door's passage), is reached through its own
+      // door. A blueprint with no portals is walked from its first surface.
+      const start = b.portals.length ? [...new Set(b.portals.map((p) => 's:' + p.room))] : b.surfaces.slice(0, 1).map((s) => s.id);
       const seen = reachable(b, start);
-      for (const s of b.surfaces) if (!seen.has(s.id)) bad(s.id + ' is unreachable from the main entrance');
+      for (const s of b.surfaces) if (!seen.has(s.id)) bad(s.id + ' is unreachable from every way in');
     }
     for (const dir of ['up', 'down']) if (!b.capabilities[dir].supported || !b.capabilities[dir].candidates.length) bad('no physical ' + dir + ' capability');
     return { errors: [...new Set(errors)], warnings: [...new Set(warnings)] };
   }
 
-  Object.assign(E, { prepare, ladderVariant, refresh, capabilities, validate, reachable, ReservationIndex, volumeOverlap });
+  Object.assign(E, { prepare, ladderVariant, refresh, capabilities, validate, reachable, ReservationIndex, volumeOverlap, reservationsOf, prism, addRoomWalls, addHoles, floorPoint, inside, overlap });
 })(typeof window !== 'undefined' ? window : globalThis);

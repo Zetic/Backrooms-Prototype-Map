@@ -47,8 +47,17 @@
     const nx = -(b[1] - a[1]) / run * width / 2, ny = (b[0] - a[0]) / run * width / 2;
     return [[a[0] + nx, a[1] + ny], [b[0] + nx, b[1] + ny], [b[0] - nx, b[1] - ny], [a[0] - nx, a[1] - ny]];
   }
+  const reservedOf = (c) => (E.reservationsOf ? E.reservationsOf(c) : c.reservation ? [c.reservation] : []);
+  /** a generated stair or ramp: its half-metre pieces, each with its walking height */
+  const piecesOf = (c) => {
+    const vs = reservedOf(c);
+    if (c.kind === 'ladder' || vs.length < 2 || !vs.every((v) => v.rects.length === 1)) return null;
+    return vs.map((v) => ({ rect: v.rects[0], pts: [[v.rects[0][0], v.rects[0][1]], [v.rects[0][2], v.rects[0][1]], [v.rects[0][2], v.rects[0][3]], [v.rects[0][0], v.rects[0][3]]], z: v.z1 - c.clearance }));
+  };
   function connectionAreas(c, height, floors) {
-    if (c.kind === 'ladder') return (c.reservation ? c.reservation.rects : []).map((r) => ({ pts: [[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]], above: Math.min(...c.path.map((p) => p[2])) > height + EPS, z: Math.min(...c.path.map((p) => p[2])) }));
+    const pieces = piecesOf(c);
+    if (pieces) return pieces.map((p) => ({ pts: p.pts, above: p.z > height + EPS, z: p.z }));
+    if (c.kind === 'ladder') return reservedOf(c).flatMap((v) => v.rects).map((r) => ({ pts: [[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]], above: Math.min(...c.path.map((p) => p[2])) > height + EPS, z: Math.min(...c.path.map((p) => p[2])) }));
     const areas = [];
     for (let k = 1; k < c.path.length; k++) {
       const a = c.path[k - 1], b = c.path[k], ts = [0, 1];
@@ -67,52 +76,125 @@
     return inside;
   }
   function connectionAt(b, x, y, height, ghost) { return (b.connectors || []).find((c) => (ghost || Math.min(...c.path.map((p) => p[2])) <= height + EPS) && connectionAreas(c, height).some((a) => pointInPolygon(a.pts, x, y))) || null; }
-  function tag(g, text, x, y, align) {
+  function tag(g, text, x, y, align, color) {
     g.save(); g.font = '11px system-ui'; const w = g.measureText(text).width;
     const left = align === 'right' ? x-w : align === 'center' ? x-w/2 : x;
     g.fillStyle = 'rgba(28,27,25,0.86)'; g.fillRect(left-3,y-11,w+6,15);
-    g.fillStyle = '#e5cc9b'; g.textAlign = 'left'; g.fillText(text,left,y); g.restore();
+    g.fillStyle = color || '#e5cc9b'; g.textAlign = 'left'; g.fillText(text,left,y); g.restore();
   }
+  // Colours: what the route is made of, and which way its far end lies.
+  const INK = { ladder: '#d6bd84', stair: '#b99f78', ramp: '#c8b69a', edge: '#705b3e', hatch: '#262421', above: '#b5a4c5', below: '#86acd0' };
+  const rectPts = (r) => [[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]];
+  function poly(g, pts, X, Y) { g.beginPath(); pts.forEach((p, k) => k ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); g.closePath(); }
+  /** is this XY under a visible floor higher than z (so whatever is at z is hidden from above)? */
+  const coveredAbove = (plan, x, y, z) => plan.visible.some((r) => r.floorZ > z + EPS && r.rects.some((q) => x > q[0] && x < q[2] && y > q[1] && y < q[3]));
+  /** the visible floor at an XY, if any, with the ceiling of its room */
+  const floorAt = (plan, x, y) => plan.visible.find((r) => r.rects.some((q) => x > q[0] && x < q[2] && y > q[1] && y < q[3])) || null;
+  const ceilingOf = (rec) => (Number.isFinite(rec.room.ceilingZ) ? rec.room.ceilingZ : rec.floorZ + (rec.room.ceiling || 2.5));
+  /**
+   * A vertical connection at the cut: the area it occupies at its width, where
+   * it climbs or descends, and its far landing.
+   *   visible       solid, at its width (stairs show a line every half metre)
+   *   above the cut faint and dashed: its continuation overhead
+   *   hidden below  a dashed outline over the floor that covers it
+   *   ladder        its footprint outlined, its hatch a dark square (solid
+   *                 when the hatch is in the floor you look at, dashed when it
+   *                 is overhead) - never painted like a room
+   * The far landing is outlined in both directions: violet above, blue below.
+   */
   function drawConnections(g, b, o, plan, X, Y, S) {
     for (const c of b.connectors || []) {
-      const lo = Math.min(...c.path.map((p) => p[2])); if (lo > o.cutZ + EPS && !o.ghost) continue;
-      for (const area of connectionAreas(c, o.cutZ, plan.visible.map((r) => r.floorZ))) {
-        g.save(); exclude(g, b, union(plan.visible.filter((r) => r.floorZ > area.z + EPS).flatMap((r) => r.rects)), X, Y, S);
-        g.globalAlpha *= area.above ? 0.22 : 1; g.setLineDash(area.above ? [5, 4] : []);
-        g.beginPath(); area.pts.forEach((p, k) => k ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); g.closePath();
-        if (o.layer !== 'walls') { g.fillStyle = c.kind === 'ladder' ? '#d6bd84' : '#c8b69a'; g.fill(); }
-        if (o.layer !== 'floors') { g.strokeStyle = '#705b3e'; g.lineWidth = Math.max(1, S * 0.06); g.stroke(); }
+      const zs = c.path.map((p) => p[2]), lo = Math.min(...zs), hi = Math.max(...zs);
+      if (lo > o.cutZ + EPS && !o.ghost) continue;
+      const far = c.landings[0][2] <= o.cutZ + EPS && c.landings[1][2] > o.cutZ + EPS ? 1 : c.landings[1][2] <= o.cutZ + EPS && c.landings[0][2] > o.cutZ + EPS ? 0
+        : Math.abs(c.landings[0][2] - o.cutZ) <= Math.abs(c.landings[1][2] - o.cutZ) ? 1 : 0;
+      const farZ = c.landings[far][2], farUp = farZ > c.landings[1 - far][2];
+      if (c.kind === 'ladder') {
+        if (o.layer === 'walls' || o.layer === undefined) {
+          const foot = reservedOf(c).flatMap((v) => v.rects), hole = (b.holes || []).find((h) => h.connector === c.id) || null;
+          g.save(); g.strokeStyle = INK.edge; g.lineWidth = Math.max(1, S * 0.05);
+          for (const r of foot) { poly(g, rectPts(r), X, Y); g.stroke(); }
+          if (hole) {
+            const open = hi <= o.cutZ + EPS;          // the hatch is in the floor you see
+            poly(g, rectPts(hole.rect), X, Y);
+            if (open) { g.fillStyle = INK.hatch; g.fill(); }
+            g.setLineDash(open ? [] : [3, 3]); g.strokeStyle = farUp ? INK.above : INK.below; g.stroke(); g.setLineDash([]);
+            // rungs
+            const r = hole.rect, n = 3; g.strokeStyle = open ? '#8d7a5b' : INK.edge; g.lineWidth = 1; g.beginPath();
+            for (let k = 1; k <= n; k++) { const y = r[1] + (r[3] - r[1]) * k / (n + 1); g.moveTo(X(r[0] + 0.06), Y(y)); g.lineTo(X(r[2] - 0.06), Y(y)); }
+            g.stroke();
+          }
+          g.restore();
+        }
+      } else for (const area of connectionAreas(c, o.cutZ, plan.visible.map((r) => r.floorZ))) {
+        const cx = area.pts.reduce((n, p) => n + p[0], 0) / area.pts.length, cy = area.pts.reduce((n, p) => n + p[1], 0) / area.pts.length;
+        // a piece is in view while it is inside the room you look into: below
+        // that room's ceiling and not under a floor nearer the cut
+        if (piecesOf(c)) { const rec = floorAt(plan, cx, cy); area.above = rec ? area.z >= ceilingOf(rec) - EPS && area.z > o.cutZ + EPS : area.z > o.cutZ + EPS; }
+        const hidden = !area.above && coveredAbove(plan, cx, cy, area.z);
+        g.save(); poly(g, area.pts, X, Y);
+        if (area.above || hidden) {
+          if (o.layer !== 'floors') { g.globalAlpha *= area.above ? 0.35 : 0.6; g.setLineDash(area.above ? [5, 4] : [2, 3]); g.strokeStyle = area.above ? INK.above : INK.below; g.lineWidth = Math.max(1, S * 0.05); g.stroke(); }
+        } else {
+          if (o.layer !== 'walls') { g.fillStyle = INK[c.kind] || INK.ramp; g.fill(); }
+          if (o.layer !== 'floors') {
+            g.strokeStyle = INK.edge; g.lineWidth = Math.max(1, S * 0.05); g.stroke();
+            if (c.kind === 'stair' && S >= 8 && !piecesOf(c)) {
+              // a line across the flight every half metre: it reads as a stair without modelling steps
+              const p = area.pts, len = Math.hypot(p[1][0] - p[0][0], p[1][1] - p[0][1]), n = Math.floor(len / 0.5);
+              g.lineWidth = 1; g.strokeStyle = 'rgba(80,64,42,0.55)'; g.beginPath();
+              for (let k = 1; k <= n; k++) { const t = k * 0.5 / len, a = [p[0][0] + (p[1][0] - p[0][0]) * t, p[0][1] + (p[1][1] - p[0][1]) * t], d = [p[3][0] + (p[2][0] - p[3][0]) * t, p[3][1] + (p[2][1] - p[3][1]) * t]; g.moveTo(X(a[0]), Y(a[1])); g.lineTo(X(d[0]), Y(d[1])); }
+              g.stroke();
+            }
+          }
+        }
         g.restore();
       }
       if (o.layer === 'floors') continue;
-      for (const [k, p] of c.landings.entries()) {
-        const higher = p[2] > o.cutZ + EPS;
-        if (higher && o.focus !== false) {
-          const surface = (b.surfaces || []).find((s) => s.id === (k ? c.to : c.from));
-          if (surface) { g.save(); g.strokeStyle = '#b5a4c5'; g.setLineDash([4, 4]); g.lineWidth = 1; for (const r of surface.rects) g.strokeRect(X(r[0]), Y(r[1]), (r[2] - r[0]) * S, (r[3] - r[1]) * S); g.restore(); }
-        }
-        if (S >= 5) {
-          g.save(); g.fillStyle = higher ? '#bfa6d0' : '#765a2f'; g.beginPath(); g.arc(X(p[0]),Y(p[1]),3,0,Math.PI*2); g.fill(); g.restore();
-          const sameXY = c.landings.every((q) => Math.hypot(q[0]-p[0],q[1]-p[1]) < EPS);
-          tag(g,zLabel(p[2]),X(p[0])+(sameXY && !k ? -6 : 6),Y(p[1])-8,sameXY && !k ? 'right' : 'left');
-        }
+      // the far landing, in either direction
+      const dest = (b.surfaces || []).find((s) => s.id === (far ? c.to : c.from));
+      if (dest && o.focus !== false && Math.abs(farZ - o.cutZ) > EPS) {
+        g.save(); g.strokeStyle = farUp ? INK.above : INK.below; g.setLineDash([4, 3]); g.lineWidth = Math.max(1, S * 0.05);
+        const inset = c.kind === 'ladder' ? 0.08 : 0;
+        for (const r of dest.rects) g.strokeRect(X(r[0] + inset), Y(r[1] + inset), (r[2] - r[0] - 2 * inset) * S, (r[3] - r[1] - 2 * inset) * S);
+        g.restore();
+        if (S >= 5 && c.kind !== 'ladder') { const r = dest.rects[0]; tag(g, (farUp ? '↑ ' : '↓ ') + 'landing ' + zLabel(farZ), X((r[0] + r[2]) / 2), Y(r[1]) - 4, 'center', farUp ? INK.above : INK.below); }
       }
       if (S >= 5) {
+        // one label per connection: what it is, and the two heights it joins
         const a = c.path[0], d = c.path[c.path.length - 1];
-        const segments = c.path.slice(1).map((p,k) => ({ a:c.path[k], b:p, run:Math.hypot(p[0]-c.path[k][0],p[1]-c.path[k][1]) })).sort((a,b) => b.run-a.run);
-        const segment = segments[0], mx = X((segment.a[0]+segment.b[0])/2), my = Y((segment.a[1]+segment.b[1])/2);
-        g.save(); g.fillStyle = '#473a29'; g.font = '11px system-ui'; g.textAlign = 'center';
-        if (segment.run > EPS) {
-          const ux = (segment.b[0]-segment.a[0])/segment.run, uy = (segment.b[1]-segment.a[1])/segment.run;
-          g.strokeStyle = '#705b3e'; g.lineWidth = 1.5; g.beginPath();
-          g.moveTo(mx-ux*7,my-uy*7); g.lineTo(mx+ux*7,my+uy*7);
-          const tip = c.direction === 'reverse' ? -1 : 1;
-          for (const sign of c.direction === 'both' ? [-1,1] : [tip]) {
-            g.moveTo(mx+ux*2*sign-uy*4,my+uy*2*sign+ux*4); g.lineTo(mx+ux*7*sign,my+uy*7*sign); g.lineTo(mx+ux*2*sign+uy*4,my+uy*2*sign-ux*4);
-          }
+        const segments = c.path.slice(1).map((p, k) => ({ a: c.path[k], b: p, run: Math.hypot(p[0] - c.path[k][0], p[1] - c.path[k][1]) })).sort((p, q) => q.run - p.run);
+        const segment = segments[0], mid = c.kind === 'ladder' ? [a[0], a[1]] : [(segment.a[0] + segment.b[0]) / 2, (segment.a[1] + segment.b[1]) / 2];
+        const mx = X(mid[0]), my = Y(mid[1]);
+        g.save(); g.font = '11px system-ui';
+        if (segment.run > EPS && c.kind !== 'ladder') {
+          const ux = (segment.b[0] - segment.a[0]) / segment.run, uy = (segment.b[1] - segment.a[1]) / segment.run, climbs = segment.b[2] > segment.a[2] ? 1 : -1;
+          g.strokeStyle = '#473a29'; g.lineWidth = 1.5; g.beginPath();
+          g.moveTo(mx - ux * 7, my - uy * 7); g.lineTo(mx + ux * 7, my + uy * 7);
+          // the arrow points uphill
+          g.moveTo(mx + ux * 2 * climbs - uy * 4, my + uy * 2 * climbs + ux * 4); g.lineTo(mx + ux * 7 * climbs, my + uy * 7 * climbs); g.lineTo(mx + ux * 2 * climbs + uy * 4, my + uy * 2 * climbs - ux * 4);
           g.stroke();
         }
-        tag(g,c.kind + ' ' + zLabel(a[2]) + ' → ' + zLabel(d[2]),mx,my+21,'center'); g.restore();
+        tag(g, c.kind + ' ' + zLabel(a[2]) + ' → ' + zLabel(d[2]), mx, my + (c.kind === 'ladder' ? -12 : 21), 'center'); g.restore();
+      }
+    }
+  }
+  /** unselected opportunities (connection zones), for inspection: dashed areas, one label each */
+  function drawZones(g, b, o, X, Y, S) {
+    const zones = (b.connectionZones || []).filter((z) => z.state !== 'connected' && Math.abs(z.floorZ - o.cutZ) < EPS + (o.exact ? 0 : 1e9) && z.floorZ <= o.cutZ + EPS);
+    const placed = [];
+    for (const z of zones) {
+      g.save(); g.strokeStyle = z.direction === 'up' ? INK.above : INK.below; g.setLineDash([3, 3]); g.lineWidth = 1;
+      for (const r of z.rects) g.strokeRect(X(r[0]), Y(r[1]), (r[2] - r[0]) * S, (r[3] - r[1]) * S);
+      g.restore();
+      if (S >= 5) {
+        // labels never sit on top of each other: shift down until clear
+        const r = TG.bbox(z.rects), text = (z.direction === 'up' ? '↑ ' : '↓ ') + z.type + (z.shape && z.shape !== 'shaft' ? ' · ' + z.shape : '') + ' ' + zLabel(z.targetZ - z.floorZ);
+        g.save(); g.font = '11px system-ui'; const w = g.measureText(text).width + 6; g.restore();
+        let x = X((r[0] + r[2]) / 2), y = Y((r[1] + r[3]) / 2) + 4;
+        while (placed.some((p) => Math.abs(p[0] - x) < (p[2] + w) / 2 && Math.abs(p[1] - y) < 15)) y += 15;
+        placed.push([x, y, w]);
+        tag(g, text, x, y, 'center', z.direction === 'up' ? INK.above : INK.below);
       }
     }
   }
@@ -148,6 +230,7 @@
       }
       g.restore();
     }
+    if (o.zones && o.layer !== 'floors') drawZones(g, b, { ...o, cutZ: height }, X, Y, S);
     drawConnections(g, b, { ...o, cutZ: height }, plan, X, Y, S); g.restore(); return plan;
   }
   function draw(g, b, o) {
