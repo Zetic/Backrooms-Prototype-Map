@@ -40,7 +40,7 @@ ground zero retains the original seed. The flat generator remains available.
 | --- | --- | --- |
 | Reference spacing | 16 m | Accommodates existing tall street/neighborhood halls and slabs |
 | Journey region | 4 × 4 cells, 512 × 512 m | One journey per region per adjacent pair |
-| Shared fill territory | 80 × 72 m | Four 4 m rises with ramps no steeper than 1:4 |
+| Shared fill territory | 56 × 48 m | Four 4 m rises with ramps no steeper than 1:4 |
 | Ordinary envelope | Reference −0.25 m to +15.5 m | Conservative room/slab reservation |
 | Shared envelope | Lower reference −0.25 m to upper reference +3 m | Protects rooms, ramps, stacked pocket and atrium |
 
@@ -68,6 +68,26 @@ portal is on a different XY edge and Z, reached through the rooms and ramps.
 At +14 m the stacked pocket still belongs to the lower home band; its ceiling
 occupies +16 m space, but it has no upper network portal. Only the authored
 arrival at +16 m supplies that connection. Occupancy never implies connectivity.
+
+### Compact populated atrium
+
+The world variant now claims **2,688 m² instead of 5,760 m²**, a 53.3% reduction.
+Both reference floors contain connected enclosed room networks around the
+authored vertical journey. These use the existing `warren` filler pipeline,
+with 2.4 m clear ceilings and real internal openings into the entrance/gallery
+and arrival. The four ramps, intermediate rooms, stacked pocket and atrium
+remain part of the same shared owner, with exactly two external band portals.
+
+Infill excludes the existing room/slab, ramp headroom and void volumes that
+intersect its floor height. It can fit underneath an elevated gallery when
+there is enough clearance. It cannot occupy the atrium or a ramp's reserved
+space. Neighboring territories still stay outside the full shared envelope;
+this change fills out the template itself. Some solid mass between rooms is
+intentional, as with ordinary enclosed fills.
+
+The preview above hides other floors to show the usable reference-floor plans.
+The standalone M1 lab fixture retains its minimal authored geometry; the world
+requests the populated form through `ELEV.generate({ ..., infill: true })`.
 
 ## Ownership, reservations and caches
 
@@ -143,10 +163,15 @@ fills exclude accidental seam cuts.
 
 - 6,000 journey placements across 100 seeds: deterministic ownership, negative
   regions, adjacent-pair separation and both bands' border clearance.
-- 60 complete journeys across three seeds: 34,724 reachable rooms, destination
+- 100 compact populated atriums in both directions: real 1 m walker access
+  through the rooms and doors on both reference floors, exact headroom/void
+  exclusion, deterministic exports, and a single shared owner. At least 55%
+  of each reference-floor claim is walkable room area; rooms, ramps and the
+  atrium together account for at least 90% of claimed XY across all heights.
+- 60 complete journeys across three seeds: all rooms reachable, destination
   first generation, exact tiling, shared voids and occupancy without a portal.
-- Full three-band regions for seeds 7 and 99: 20,061 and 19,125 reachable rooms,
-  respectively, with over 4,800 horizontal connections each.
+- Full three-band regions for seeds 7 and 99: all rooms reachable, with over
+  1,000 horizontal connections each.
 - Identical canonical exports after reversed generation, remote exploration,
   cell/build eviction and whole-band eviction with one-entry caches. All
   exported physical volumes fit their planned 3D envelopes.

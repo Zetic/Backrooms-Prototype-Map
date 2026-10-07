@@ -4,7 +4,7 @@
 (function (root) {
   'use strict';
   const BR = root.BR, E = BR.ELEV, C = BR.WORLD_CFG.cell;
-  const CFG = { spacing: 16, regionCells: 4, fillWidth: 80, fillDepth: 72, ceilingLimit: 15.5,
+  const CFG = { spacing: 16, regionCells: 4, fillWidth: 56, fillDepth: 48, ceilingLimit: 15.5,
     limits: { bands: 4, transitions: 64, claims: 256 } };
   const clone = (x) => JSON.parse(JSON.stringify(x));
   const bandId = (n) => 'band:' + n;
@@ -97,7 +97,7 @@
     }
     transition(p) {
       return BR.World.lru(this.transitions, p.id, this.limits.transitions, () => {
-        const b = E.generate({ seed: p.seed, rise: CFG.spacing, site: { w: CFG.fillWidth, h: CFG.fillDepth }, fillId: p.id });
+        const b = E.generate({ seed: p.seed, rise: CFG.spacing, site: { w: CFG.fillWidth, h: CFG.fillDepth }, fillId: p.id, infill: true });
         placeBlueprint(b, p.lower * CFG.spacing, p.lower, p.upper);
         const result = E.validate(b);
         if (result.errors.length) throw new Error(p.id + ': ' + result.errors.join('; '));

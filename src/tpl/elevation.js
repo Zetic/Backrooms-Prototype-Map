@@ -207,6 +207,52 @@
     return op;
   }
 
+  /** Populate the shared owner's spare space at a reference elevation. The
+   * existing filler pipeline supplies enclosed rooms and 1 m walkable joins;
+   * only volumes intersecting this floor's slab/headroom are excluded. */
+  function populateBand(b, band, seed, attachments) {
+    const z = b.bands.find((v) => v.id === band).elevation, ceiling = 2.4;
+    const mask = new TG.Raster(Math.round(b.site.w * 2), Math.round(b.site.h * 2), 1);
+    for (const v of b.volumes) if (v.z0 < z + ceiling - EPS && z - E.SLAB < v.z1 - EPS)
+      for (const q of v.rects) mask.fill(q.map((n) => Math.round(n * 2)), 0);
+    const rects = TG.rectsWhere(mask, (v) => v === 1).map((q) => q.map((n) => n / 2));
+    const bb = TG.bbox(rects), site = { rects }, prefix = 'infill:' + band + ':';
+    const connections = attachments.map((a, i) => {
+      const q = TG.bbox(b.rooms.find((r) => r.id === a.room).rects), horizontal = a.side === 'N' || a.side === 'S';
+      const line = a.side === 'N' ? q[1] : a.side === 'S' ? q[3] : a.side === 'W' ? q[0] : q[2];
+      return { id: String(i), side: TG.opposite(a.side), at: a.at - bb[horizontal ? 0 : 1],
+        line: line - bb[horizontal ? 1 : 0], width: a.width, kind: 'opening', route: true };
+    });
+    const f = BR.FILL.generate({ filler: 'warren', seed, site, connections });
+    if (f.error || f.meta.issues.length) throw new Error('terraced infill: ' + (f.error || f.meta.issues.join('; ')));
+    const id = (v) => v == null ? null : prefix + v;
+    const pt = (p) => { p[0] += bb[0]; p[1] += bb[1]; };
+    const rr = (q) => { q[0] += bb[0]; q[2] += bb[0]; q[1] += bb[1]; q[3] += bb[1]; };
+    for (const r of f.rooms) {
+      r.id = id(r.id); r.rects.forEach(rr); r.floorZ = z; r.ceiling = ceiling; r.ceilingZ = round(z + ceiling); r.band = band;
+      r.tags.push('vertical-infill'); b.rooms.push(r); b.graph.nodes.push(r.id);
+    }
+    for (const w of f.walls) {
+      w.id = id(w.id); w.rooms = w.rooms.map(id); pt(w.a); pt(w.b); w.floorZ = z; w.ceilingZ = round(z + ceiling); b.walls.push(w);
+    }
+    for (const o of f.openings) {
+      o.id = id(o.id); o.wall = id(o.wall); o.rooms = o.rooms.map(id); pt(o.a); pt(o.b); o.floorZ = z;
+      if (o.swingInto) o.swingInto = id(o.swingInto);
+      // Filler portals become internal doors to the authored core, never new
+      // world entrances. Their coincident core opening cuts both wall faces.
+      delete o.portal; b.openings.push(o);
+    }
+    b.columns = b.columns || [];
+    for (const c of f.columns) { c.id = id(c.id); c.room = id(c.room); rr(c.rect); c.floorZ = z; b.columns.push(c); }
+    for (const [a, c, kind, op] of f.graph.edges) if (a !== 'outside' && c !== 'outside') b.graph.edges.push([id(a), id(c), kind, id(op)]);
+    for (const p of f.portals) {
+      const a = attachments[Number(p.connection)], other = id(p.room);
+      const op = b.openings.find((o) => o.id === id(p.opening));
+      op.rooms = op.rooms.map((r) => r || a.room);
+      opening(b, a.room, a.side, a.at, a.width, other);
+    }
+  }
+
   /** A shared multi-band fill. Four ramps and intervening rooms wrap an atrium;
    * the last ramp passes above/below the ground gallery. A compact side pocket
    * in the upward example crosses the neighboring band's elevation WITHOUT a
@@ -272,9 +318,16 @@
     }
     const ramps = b.connectors.filter((c) => c.kind === 'ramp');
     b.route = [point([4, 36, 0]), point([4, 19, 0]), ...clone(ramps[0].path), point([23, 19, 2]), ...clone(ramps[1].path), point([23, 2, 4]), ...clone(ramps[2].path), point([4, 2, 6]), ...clone(ramps[3].path), point([4, 29, 8]), point([0, 29, 8])];
+    if (spec.infill) {
+      const east = (rid) => ({ room: rid, side: 'E', at: y(28), width: y(30) - y(28) });
+      populateBand(b, 'ground', BR.hash4(seed, 0xe1f1, 0, 0), [east('entry'), { room: 'gallery', side: 'N', at: x(3), width: x(5) - x(3) }]);
+      populateBand(b, dest, BR.hash4(seed, 0xe1f1, 1, 0), [east('arrival')]);
+      b.meta.program.push('connected reference-floor infill');
+    }
     if (rng.f() < 0.5) {
       const rp = (p) => { p[0] = round(W - p[0]); }, rr = (r) => { const a = r[0]; r[0] = round(W - r[2]); r[2] = round(W - a); };
       for (const r of b.rooms) r.rects.forEach(rr);
+      for (const c of b.columns || []) rr(c.rect);
       for (const w of b.walls.concat(b.openings)) { rp(w.a); rp(w.b); }
       for (const p of b.portals) if (p.side === 'W' || p.side === 'E') p.side = TG.opposite(p.side);
       for (const c of b.connectors) { c.path.forEach(rp); c.landings.forEach(rp); c.reservation.rects.forEach(rr); }
