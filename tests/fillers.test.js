@@ -109,6 +109,27 @@ function contract(b, spec) {
   if (wk.stuck.length) bad.push('nowhere to stand behind ' + wk.stuck.join(', '));
   if (wk.pieces > 1 && !FILL.fillers[b.filler].pieces) bad.push('the connections open onto ' + wk.pieces + ' separate floors');
   for (const k of ['furniture', 'materials', 'lights']) if (k in b) bad.push('has ' + k);
+  // curves: each replaces stair-step pieces of its room's exterior walls, no
+  // opening among them, and keeps close to the steps it replaces
+  if (!!b.curves !== !!b.outline) bad.push('curves without an outline, or the other way round');
+  for (const c of b.curves || []) {
+    const A = c.pts[0], Z = c.pts[c.pts.length - 1], L0 = c.line[0], L1 = c.line[c.line.length - 1];
+    if (Math.hypot(A[0] - L0[0], A[1] - L0[1]) > 1e-6 || Math.hypot(Z[0] - L1[0], Z[1] - L1[1]) > 1e-6) { bad.push('curve ' + c.id + ' does not start and end on its walls'); continue; }
+    for (let k = 1; k < c.line.length; k++) {
+      const p = c.line[k - 1], q = c.line[k], horiz = Math.abs(p[1] - q[1]) < 1e-9;
+      if (!horiz && Math.abs(p[0] - q[0]) > 1e-9) { bad.push('curve ' + c.id + ' replaces a slanted piece'); break; }
+      const lo = horiz ? Math.min(p[0], q[0]) : Math.min(p[1], q[1]), hi = horiz ? Math.max(p[0], q[0]) : Math.max(p[1], q[1]), at = horiz ? p[1] : p[0];
+      const on = b.walls.filter((w) => w.kind === 'exterior' && w.rooms.indexOf(c.room) >= 0 && (Math.abs(w.a[1] - w.b[1]) < 1e-9) === horiz && Math.abs((horiz ? w.a[1] : w.a[0]) - at) < 1e-9 &&
+        Math.min(horiz ? w.a[0] : w.a[1], horiz ? w.b[0] : w.b[1]) <= lo + 1e-9 && Math.max(horiz ? w.a[0] : w.a[1], horiz ? w.b[0] : w.b[1]) >= hi - 1e-9);
+      if (!on.length) { bad.push('curve ' + c.id + ' replaces a piece that is not its room\'s exterior wall'); break; }
+      if (b.openings.some((o) => on.some((w) => w.id === o.wall) && Math.min(horiz ? o.a[0] : o.a[1], horiz ? o.b[0] : o.b[1]) < hi - 1e-9 && Math.max(horiz ? o.a[0] : o.a[1], horiz ? o.b[0] : o.b[1]) > lo + 1e-9)) { bad.push('curve ' + c.id + ' runs over an opening'); break; }
+    }
+    const dist = (x, y) => Math.min(...c.line.slice(1).map((q, k) => {
+      const p = c.line[k], dx = q[0] - p[0], dy = q[1] - p[1], t = Math.max(0, Math.min(1, ((x - p[0]) * dx + (y - p[1]) * dy) / (dx * dx + dy * dy || 1)));
+      return Math.hypot(x - p[0] - t * dx, y - p[1] - t * dy);
+    }));
+    if (c.pts.some(([x, y]) => dist(x, y) > 0.8)) bad.push('curve ' + c.id + ' strays from its steps');
+  }
   return bad;
 }
 

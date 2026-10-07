@@ -57,14 +57,35 @@
       g.strokeStyle = TH.siteLine; g.lineWidth = 1; g.setLineDash([4, 4]);
       g.stroke(); g.setLineDash([]);
     }
-    // ---- floors
-    if (floors) for (const rm of b.rooms) {
-      if (!onLv(rm)) continue;
-      g.fillStyle = TH.floor[floorKey(rm)] || TH.floor._;
-      g.beginPath();
-      for (const r of rm.rects) g.rect(Math.round(X(r[0])), Math.round(Y(r[1])), Math.round(X(r[2])) - Math.round(X(r[0])), Math.round(Y(r[3])) - Math.round(Y(r[1])));
-      g.fill();
-      if (o.highlight === rm.id) { g.fillStyle = o.theme === 'blueprint' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.4)'; g.fill(); }
+    // ---- floors (inside the smoothed outline when stair-step walls are drawn
+    // as curves: what the curves cut off is left out, what they take in is
+    // filled with the room's floor)
+    const outline = (b.outline || []).find(onLv), curves = (b.curves || []).filter(onLv);
+    const poly = (pts) => pts.forEach((p, k) => (k ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))));
+    if (floors) {
+      if (outline) {
+        g.save();
+        g.beginPath();
+        for (const ring of outline.rings) { poly(ring); g.closePath(); }
+        g.clip('evenodd');
+      }
+      for (const rm of b.rooms) {
+        if (!onLv(rm)) continue;
+        g.fillStyle = TH.floor[floorKey(rm)] || TH.floor._;
+        g.beginPath();
+        for (const r of rm.rects) g.rect(Math.round(X(r[0])), Math.round(Y(r[1])), Math.round(X(r[2])) - Math.round(X(r[0])), Math.round(Y(r[3])) - Math.round(Y(r[1])));
+        g.fill();
+        if (o.highlight === rm.id) { g.fillStyle = o.theme === 'blueprint' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.4)'; g.fill(); }
+      }
+      if (outline) {
+        for (const c of curves) {
+          const rm = rooms.get(c.room);
+          g.fillStyle = (rm && TH.floor[floorKey(rm)]) || TH.floor._;
+          g.beginPath(); poly(c.pts.concat(c.line.slice().reverse())); g.closePath(); g.fill();
+          g.strokeStyle = g.fillStyle; g.lineWidth = 1.5; g.stroke();     // no seam where it meets the room's own floor
+        }
+        g.restore();
+      }
     }
     if (!walls) { g.restore(); return; }
     // ---- verticals (stairs / lifts): a tread pattern in the room
@@ -98,7 +119,10 @@
       g.lineWidth = Math.max(kind === 'exterior' ? 2 : 1, (kind === 'exterior' ? 0.3 : 0.15) * S);
       g.beginPath();
       for (const q of runs[kind]) { g.moveTo(X(q[0]), Y(q[1])); g.lineTo(X(q[2]), Y(q[3])); }
+      if (kind === 'exterior') for (const c of curves) poly(c.pts);
+      g.lineJoin = 'round';
       g.stroke();
+      g.lineJoin = 'miter';
     }
     g.lineCap = 'butt';
     // ---- openings
@@ -152,13 +176,15 @@
 
   /**
    * Wall runs of one level with their openings cut out (windows included; a
-   * 'false' door is drawn on a wall, so it leaves no gap):
+   * 'false' door is drawn on a wall, so it leaves no gap), and the stair-step
+   * pieces a curve replaces:
    * { exterior: [[x0, y0, x1, y1]], interior: [...] } in site metres.
    */
   function wallRuns(b, lv) {
     lv = lv || 0;
-    const out = { exterior: [], interior: [] }, byWall = new Map();
+    const out = { exterior: [], interior: [] }, byWall = new Map(), cuts = [];
     for (const op of b.openings) { if (!byWall.has(op.wall)) byWall.set(op.wall, []); byWall.get(op.wall).push(op); }
+    for (const c of b.curves || []) if ((c.level || 0) === lv) for (let k = 1; k < c.line.length; k++) cuts.push([c.line[k - 1], c.line[k]]);
     for (const w of b.walls) {
       if ((w.level || 0) !== lv || w.kind === 'open') continue;
       const horiz = w.a[1] === w.b[1], list = out[w.kind === 'exterior' ? 'exterior' : 'interior'];
@@ -167,7 +193,13 @@
       const gaps = (byWall.get(w.id) || []).filter((op) => op.kind !== 'false').map((op) => {
         const a = horiz ? op.a[0] : op.a[1], bb = horiz ? op.b[0] : op.b[1];
         return [Math.min(a, bb), Math.max(a, bb)];
-      }).sort((p, q) => p[0] - q[0]);
+      });
+      for (const [p, q] of cuts) {
+        if (horiz ? Math.abs(p[1] - c) > 1e-6 || Math.abs(q[1] - c) > 1e-6 : Math.abs(p[0] - c) > 1e-6 || Math.abs(q[0] - c) > 1e-6) continue;
+        const a = horiz ? Math.min(p[0], q[0]) : Math.min(p[1], q[1]), bb = horiz ? Math.max(p[0], q[0]) : Math.max(p[1], q[1]);
+        if (bb > s0 && a < s1) gaps.push([a, bb]);
+      }
+      gaps.sort((p, q) => p[0] - q[0]);
       const seg = (p, q) => { if (q - p > 1e-6) list.push(horiz ? [p, c, q, c] : [c, p, c, q]); };
       let t = s0;
       for (const gp of gaps) { seg(t, gp[0]); t = Math.max(t, gp[1]); }

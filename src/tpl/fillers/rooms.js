@@ -12,8 +12,8 @@
  *                         all into one sprawling space
  *   tiny_doors  enclosed  4-8 m blob rooms behind thick walls, joined only by
  *                         1 m doors; mostly a tree
- *   stepped     mixed     one big, mostly rectangular room whose outline
- *                         climbs in square steps along one or two sides
+ *   curved      mixed     one big, mostly rectangular room with one or two
+ *                         sides curving in or out
  *   sliver      enclosed  one very long room 1.5-3 m wide with a nub on one
  *                         side, solid or a couple of small rooms round it
  *   nested      enclosed  two or more ring corridors one inside the other
@@ -27,7 +27,7 @@
  * and sliver want 10 m), so they fit the small sites the world mostly has.
  *
  * Weights: enclosed 6 (tiny_doors 3, sliver, nested, repetition 1 each),
- * mixed 4 (big_rooms 2, stepped, gallery 1 each).
+ * mixed 4 (big_rooms 2, curved, gallery 1 each).
  *
  * Thick walls: tiny_doors, nested and repetition keep 0.5-1 m of solid
  * between their rooms and cut a 1 m throat through it where two rooms join
@@ -305,10 +305,10 @@
     }
   });
 
-  // ------------------------------------------------------------ stepped room
+  // ------------------------------------------------------------ curved room
   FILL.register({
-    id: 'stepped', name: 'Stepped big room', feel: 'mixed', weight: 1,
-    blurb: 'One big, mostly rectangular room whose outline climbs in square 1-2 m steps along one or two of its sides, like a staircase in plan; now and then a small room in the solid by the steps.',
+    id: 'curved', name: 'Curved big room', feel: 'mixed', weight: 1,
+    blurb: 'One big, mostly rectangular room with one or two sides curving: a slope easing across, the solid bowing in, the room bowing out, or a wave; now and then a small room in the solid by the curve.',
     doors: { opening: 0.7, door: 0.3 }, loops: 0.1,
     fits: (S) => Math.min(...dims(S)) >= 16,
     site: { w: [8, 34], h: [8, 30] },
@@ -318,51 +318,43 @@
       const zw = Math.min(TG.rw(I), rng.int(56, 64)), zh = Math.min(TG.rh(I), rng.int(52, 64));
       const zx = I[0] + rng.int(0, TG.rw(I) - zw), zy = I[1] + rng.int(0, TG.rh(I) - zh), zone = [zx, zy, zx + zw, zy + zh];
       const short = Math.min(zw, zh);
-      // square steps, 1 m on a small site and up to 2 m on a big one
-      const s = short < 30 ? 2 : short < 46 ? rng.int(2, 3) : rng.int(3, 4);
-      const BW = Math.ceil(zw / s), BH = Math.ceil(zh / s), NB = BW * BH;
-      const blk = (bx, by) => [zx + bx * s, zy + by * s, Math.min(zone[2], zx + bx * s + s), Math.min(zone[3], zy + by * s + s)];
-      // which sides step (0 N, 1 E, 2 S, 3 W): one, mostly a long one; two meeting at a corner; or two facing
+      // the outline is worked out per 0.5 m cell and drawn as a curve
+      const s = 1, BW = zw, BH = zh, NB = BW * BH;
+      const blk = (bx, by) => [zx + bx, zy + by, zx + bx + 1, zy + by + 1];
+      // which sides curve (0 N, 1 E, 2 S, 3 W): one, mostly a long one; two meeting at a corner; or two facing
       const longNS = BW >= BH, one = rng.f() < 0.7 ? (longNS ? 0 : 1) + (rng.f() < 0.5 ? 2 : 0) : rng.int(0, 3);
       const pick = rng.weighted({ one: 0.4, corner: 0.45, facing: 0.15 });
       const sides = pick === 'one' ? [one] : pick === 'corner' ? [one, (one + (rng.f() < 0.5 ? 1 : 3)) % 4] : [one, (one + 2) % 4];
-      // a side's depth profile in blocks: a staircase up (ramp), up and down
-      // again (peak) or down and up (valley), each tread 1-3 blocks long
+      // a side's depth along it, in cells: a slope easing from one depth to
+      // the other (ramp), the solid bowing in (bay), the room bowing out
+      // between two deep ends (apse) or two bays (wave)
+      const ease = (t) => t * t * (3 - 2 * t), bell = (t) => Math.pow(Math.sin(Math.PI * t), 2);
       const profile = (n, D) => {
-        const kind = rng.weighted({ ramp: 0.4, peak: 0.35, valley: 0.25 });
-        for (; D >= 1; D--) {
-          let lv = [];
-          for (let d = 0; d <= D; d++) lv.push(d);
-          if (kind === 'peak') lv = lv.concat(lv.slice(0, -1).reverse());
-          if (kind === 'valley') lv = lv.slice().reverse().concat(lv.slice(1));
-          if (lv.length > n) continue;
-          const tr = Math.max(1, Math.min(3, Math.floor(n / (lv.length + 1))));
-          const hold = lv.map(() => Math.max(1, tr + (rng.f() < 0.35 ? (rng.f() < 0.5 ? -1 : 1) : 0)));
-          let sum = hold.reduce((a, b) => a + b, 0);
-          for (let k = 0; sum > n && k < 200; k++) { const j = rng.int(0, hold.length - 1); if (hold[j] > 1) { hold[j]--; sum--; } }
-          if (sum > n) continue;
-          // what is left goes to the flat runs at the two ends
-          const rest = n - sum, a = rng.int(0, rest);
-          hold[0] += a; hold[hold.length - 1] += rest - a;
-          const p = [];
-          lv.forEach((d, j) => { for (let k = 0; k < hold[j]; k++) p.push(d); });
-          return rng.f() < 0.5 ? p.reverse() : p;
-        }
-        return new Array(n).fill(0);
+        const kind = rng.weighted({ ramp: 0.35, bay: 0.3, apse: 0.2, wave: 0.15 });
+        const a = Math.round(n * rng.range(0.05, 0.3)), b = Math.max(a + Math.round(n * 0.4), Math.round(n * rng.range(0.7, 0.95)));
+        const f = (t) => {
+          const u = Math.min(1, Math.max(0, (t - a) / Math.max(1, b - a)));
+          return kind === 'ramp' ? ease(u) : kind === 'bay' ? bell(u) : kind === 'apse' ? 1 - bell(u) * (t >= a && t <= b ? 1 : 0) : bell((2 * u) % 1) * (u < 1 ? 1 : 0);
+        };
+        // a bay is at least 2.5 times as wide as it is deep, so it stays a soft bow, never a spike
+        if (kind === 'bay' || kind === 'wave') D = Math.max(3, Math.min(D, Math.round((b - a) / (kind === 'wave' ? 5 : 2.5))));
+        const p = [];
+        for (let t = 0; t < n; t++) p.push(Math.round(D * f(t + 0.5)));
+        return rng.f() < 0.5 ? p.reverse() : p;
       };
       const prof = [null, null, null, null];
       for (const sd of sides) {
         const n = sd % 2 === 0 ? BW : BH, cross = sd % 2 === 0 ? BH : BW;
-        // steps deep enough to read, the room keeping the rest: up to 40% of its depth, a quarter each when two sides face
-        const Dmax = Math.max(2, Math.min(6, Math.floor(cross * (pick === 'facing' ? 0.25 : 0.4))));
-        prof[sd] = profile(n, rng.int(Math.max(2, Dmax - 1), Dmax));
+        // deep enough to read, the room keeping the rest: up to 40% of its depth, a quarter each when two sides face
+        const Dmax = Math.max(4, Math.floor(cross * (pick === 'facing' ? 0.25 : 0.4)));
+        prof[sd] = profile(n, rng.int(Math.max(4, Math.round(Dmax * 0.6)), Dmax));
       }
       const cut = new Uint8Array(NB);
       for (let by = 0; by < BH; by++) for (let bx = 0; bx < BW; bx++) {
         cut[by * BW + bx] = (prof[0] && by < prof[0][bx]) || (prof[2] && BH - 1 - by < prof[2][bx]) ||
           (prof[3] && bx < prof[3][by]) || (prof[1] && BW - 1 - bx < prof[1][by]) ? 1 : 0;
       }
-      // each connection that lands in the steps keeps a way in: the shortest run of blocks to the room
+      // each connection that lands in the cut keeps a way in: the shortest run of cells to the room
       for (const c of P.conns) {
         const q = TG.rinter(c.landing, zone);
         if (!q) continue;
@@ -383,10 +375,10 @@
         }
         for (let b = end; b >= 0; b = prev[b]) cut[b] = 0;
       }
-      const v = P.add('hall', ['stepped']);
+      const v = P.add('hall', ['curved']);
       P.paint(zone, v);
       for (let b = 0; b < NB; b++) if (cut[b]) { const bx = b % BW; P.recolor(blk(bx, (b - bx) / BW), v, VOID); }
-      // now and then a small room in the solid by the steps
+      // now and then a small room in the solid by the curve
       const edge = [];
       for (const i of P.cells(v)) {
         const x = i % W, y = (i - x) / W;

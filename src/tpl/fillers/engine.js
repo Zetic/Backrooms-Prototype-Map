@@ -24,7 +24,9 @@
  *               tree of openings between rooms, then a few loops
  *   6. furnish  the filler's partitions and columns, each kept only if
  *               the 1 m walker still reaches every floor cell
- *   7. output   metres, site frame (+x right, +y down)
+ *   7. curves   a wall that steps on a slant is drawn as a smooth curve
+ *               (drawing only: the raster stays the truth)
+ *   8. output   metres, site frame (+x right, +y down)
  *
  * Cells a layout leaves unbuilt are solid: the mass between rooms that gives
  * the Backrooms its enclosed feel. All geometry is integer kit units
@@ -1013,6 +1015,138 @@
     return b;
   }
 
+  // ============================================================ curves
+  /**
+   * Stair-step walls drawn as curves. The floor is a 0.5 m raster, so a wall
+   * on a slant comes out as a staircase. Where the edge between floor and
+   * solid steps three or more times the same way in a row (every other run
+   * at most 1.5 m, the rest at most 5 m), the steps are drawn as one smooth
+   * curve through their middles, easing in from the straight wall at either
+   * end. Points where rooms meet, the ends of openings and partitions, and
+   * the cells round columns are pinned and never move; steps within 1 m of
+   * a column or partition stay as they are. The raster stays the truth: rooms,
+   * walls and the walker are unchanged, and the curve keeps within half a
+   * step of the stairs.
+   * Returns { outline: [rings], curves: [{ room, pts, line }] }, cell units.
+   */
+  const CURVE = { short: 3, long: 10, steps: 3, ease: 2, samples: 4 };
+  function curves(P, J) {
+    const W = P.W, H = P.H, A = P.R.a, W1 = W + 1;
+    const own = (x, y) => (x >= 0 && y >= 0 && x < W && y < H ? A[y * W + x] : VOID);
+    const pin = new Uint8Array(W1 * (H + 1));
+    const pinAt = (x, y) => { if (x >= 0 && y >= 0 && x <= W && y <= H) pin[y * W1 + x] = 1; };
+    for (const op of J.ops) {
+      const w = J.walls[op.wall];
+      if (w.kind === 'exterior') for (const s of [op.s0, op.s1]) if (w.o === 'h') pinAt(s, w.c); else pinAt(w.c, s);
+    }
+    for (const p of P.partitions) for (const s of [p.s0, p.s1]) if (p.o === 'h') pinAt(s, p.c); else pinAt(p.c, s);
+    for (const c of P.columns) for (let y = c.rect[1] - 1; y <= c.rect[3] + 1; y++) for (let x = c.rect[0] - 1; x <= c.rect[2] + 1; x++) pinAt(x, y);
+    // a point where two rooms meet (an interior wall ends on the outline)
+    const meet = (x, y) => {
+      let a = VOID;
+      for (const v of [own(x - 1, y - 1), own(x, y - 1), own(x - 1, y), own(x, y)]) if (v >= 0) { if (a >= 0 && v !== a) return true; a = v; }
+      return false;
+    };
+    // directed unit edges between floor and solid, floor on the right (y down)
+    const EA = [], EB = [], ED = [], EC = [], from = new Int32Array(W1 * (H + 1) * 2).fill(-1);
+    const DX = [1, 0, -1, 0], DY = [0, 1, 0, -1];                // E S W N
+    const add = (x0, y0, d, cell) => {
+      const a = y0 * W1 + x0, k = EA.length;
+      EA.push(a); EB.push(a + DY[d] * W1 + DX[d]); ED.push(d); EC.push(cell);
+      from[2 * a + (from[2 * a] < 0 ? 0 : 1)] = k;
+    };
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      if (A[i] < 0) continue;
+      if (own(x, y - 1) < 0) add(x, y, 0, i);
+      if (own(x + 1, y) < 0) add(x + 1, y, 1, i);
+      if (own(x, y + 1) < 0) add(x + 1, y + 1, 2, i);
+      if (own(x - 1, y) < 0) add(x, y + 1, 3, i);
+    }
+    // where two floor cells touch only at a corner, the ring turns right, round its own cell
+    const NE = EA.length, next = new Int32Array(NE), ringOf = new Int32Array(NE).fill(-1);
+    for (let k = 0; k < NE; k++) {
+      const f0 = from[2 * EB[k]], f1 = from[2 * EB[k] + 1];
+      next[k] = f1 < 0 || ((ED[f0] - ED[k] + 4) % 4 === 1) ? f0 : f1;
+    }
+    const outline = [], out = [], G2 = (p) => [p[0], p[1]];
+    for (let e0 = 0; e0 < NE; e0++) {
+      if (ringOf[e0] >= 0) continue;
+      // corners (and pinned points) with their turn: 1 right, -1 left, 0 straight or pinned
+      const ring = [], V = [];
+      for (let e = e0; ringOf[e] < 0; e = next[e]) { ringOf[e] = outline.length; ring.push(e); }
+      for (let k = 0; k < ring.length; k++) {
+        const e = ring[k], p = ring[(k + ring.length - 1) % ring.length], a = EA[e], x = a % W1, y = (a - x) / W1;
+        const dt = (ED[e] - ED[p] + 4) % 4, t = dt === 1 ? 1 : dt === 3 ? -1 : 0, pinned = pin[a] || meet(x, y);
+        if (t !== 0 || pinned) V.push({ x, y, t: pinned ? 0 : t, cell: EC[e] });
+      }
+      const n = V.length, seg = (k) => { const a = V[((k % n) + n) % n], b = V[(((k + 1) % n) + n) % n]; return { a, b, len: Math.abs(b.x - a.x) + Math.abs(b.y - a.y), dx: Math.sign(b.x - a.x), dy: Math.sign(b.y - a.y) }; };
+      // a step touching the cells round a column, or a partition, stays a step
+      const near = (s) => {
+        const x0 = Math.min(s.a.x, s.b.x), x1 = Math.max(s.a.x, s.b.x), y0 = Math.min(s.a.y, s.b.y), y1 = Math.max(s.a.y, s.b.y), d = 1;
+        return P.columns.some((c) => c.rect[0] <= x1 + d && c.rect[2] >= x0 - d && c.rect[1] <= y1 + d && c.rect[3] >= y0 - d) ||
+          P.partitions.some((p) => (p.o === 'h' ? p.c >= y0 - d && p.c <= y1 + d && p.s0 <= x1 + d && p.s1 >= x0 - d : p.c >= x0 - d && p.c <= x1 + d && p.s0 <= y1 + d && p.s1 >= y0 - d));
+      };
+      const alt = (k) => { const s = seg(k); return s.len <= CURVE.long && s.a.t !== 0 && s.b.t !== 0 && s.a.t === -s.b.t && !near(s); };
+      // start on a segment that is not part of a staircase (a closed ring always has one)
+      let r0 = -1;
+      for (let k = 0; k < n; k++) if (!alt(k)) { r0 = k; break; }
+      const pts = V.map((v) => [v.x, v.y]);
+      if (r0 < 0) { outline.push(pts); continue; }
+      const mark = new Uint8Array(n);
+      for (let k = 1; k <= n; k++) {
+        if (!alt(r0 + k)) continue;
+        let m = k;
+        while (m + 1 <= n && alt(r0 + m + 1)) m++;
+        // the run k..m: every other segment a short riser, three or more of them
+        for (let q = 0; q < 2; q++) {
+          let i = k;
+          while (i <= m) {
+            let j = i;
+            while (j <= m && !((j - k) % 2 === q && seg(r0 + j).len > CURVE.short)) j++;
+            let risers = 0;
+            for (let t = i; t < j; t++) if ((t - k) % 2 === q) risers++;
+            if (risers >= CURVE.steps) for (let t = i; t < j; t++) mark[(r0 + t) % n] = 1;
+            i = j + 1;
+          }
+        }
+        k = m;
+      }
+      // each marked chain becomes one curve
+      const ringPts = [];
+      for (let k = 1; k <= n; k++) {
+        const s0 = (r0 + k) % n;
+        if (!mark[s0]) { ringPts.push(pts[s0]); continue; }
+        let m = k;
+        while (m + 1 <= n && mark[(r0 + m + 1) % n]) m++;
+        const a = r0 + k, b = r0 + m, line = [];
+        for (let t = a; t <= b + 1; t++) line.push(pts[t % n]);
+        // control points: two on the wall leading in, the middle of every step, two on the wall leading out
+        const li = seg(a - 1), lq = seg(b + 1), di = Math.min(CURVE.ease, li.len / 4), dq = Math.min(CURVE.ease, lq.len / 4);
+        const Ca = line[0], Cb = line[line.length - 1];
+        const Q = [[Ca[0] - li.dx * 2 * di, Ca[1] - li.dy * 2 * di], [Ca[0] - li.dx * di, Ca[1] - li.dy * di]];
+        for (let t = a; t <= b; t++) { const s = seg(t); Q.push([(s.a.x + s.b.x) / 2, (s.a.y + s.b.y) / 2]); }
+        Q.push([Cb[0] + lq.dx * dq, Cb[1] + lq.dy * dq], [Cb[0] + lq.dx * 2 * dq, Cb[1] + lq.dy * 2 * dq]);
+        // a quadratic B-spline: tangent to the walls at both ends, through the middle of each control leg
+        const curve = [G2(Q[0])];
+        let cur = Q[0];
+        for (let i = 1; i < Q.length - 1; i++) {
+          const c = Q[i], end = i === Q.length - 2 ? Q[Q.length - 1] : [(c[0] + Q[i + 1][0]) / 2, (c[1] + Q[i + 1][1]) / 2];
+          for (let s = 1; s <= CURVE.samples; s++) {
+            const t = s / CURVE.samples, u = 1 - t;
+            curve.push([u * u * cur[0] + 2 * u * t * c[0] + t * t * end[0], u * u * cur[1] + 2 * u * t * c[1] + t * t * end[1]]);
+          }
+          cur = end;
+        }
+        out.push({ room: A[V[a % n].cell], pts: curve, line: [G2(Q[0])].concat(line, [G2(Q[Q.length - 1])]) });
+        for (const p of curve) ringPts.push(p);
+        k = m + 1;                                     // the wall leading out starts on the curve
+      }
+      outline.push(ringPts);
+    }
+    return { outline, curves: out };
+  }
+
   // ============================================================ output
   function output(spec, S, P, J, F, seed) {
     const W = P.W, m = (v) => Math.round(v * G * 1000) / 1000, id = (v) => (v >= 0 ? 'r' + v : null);
@@ -1058,7 +1192,12 @@
     for (const p of J.portals) graph.edges.push([id(p.room), 'outside', p.conn.kind, 'o' + p.opening]);
     const built = P.R.a.reduce((s, v) => s + (v >= 0 ? 1 : 0), 0);
     const bigFloor = rooms.reduce((s, r) => s + (r.area >= 80 ? r.area : 0), 0);
-    return {
+    const cv = curves(P, J), mp = (p) => [m(p[0]), m(p[1])];
+    const smooth = cv.curves.length ? {
+      outline: [{ level: 0, rings: cv.outline.map((r) => r.map(mp)) }],
+      curves: cv.curves.map((c, k) => ({ id: 'c' + k, level: 0, room: id(c.room), pts: c.pts.map(mp), line: c.line.map(mp) }))
+    } : {};
+    return Object.assign({
       schema: FILL.SCHEMA, filler: F.id, name: F.name, feel: F.feel, seed, grid: G,
       site: { w: S.w, h: S.h, rects: S.rects },
       connections: J.portals.map((p) => ({ id: p.conn.id, side: p.conn.side, at: m(p.conn.s0), width: m(p.conn.s1 - p.conn.s0), line: m(p.conn.line), kind: p.conn.kind, route: p.conn.route })),
@@ -1068,9 +1207,9 @@
       meta: {
         rooms: rooms.length, built: Math.round((built / S.area) * 1000) / 1000,
         openFloor: Math.round((bigFloor / Math.max(1, built * G * G)) * 1000) / 1000,
-        partitions: P.partitions.length, columns: P.columns.length
+        partitions: P.partitions.length, columns: P.columns.length, curves: cv.curves.length
       }
-    };
+    }, smooth);
   }
 
   FILL.generate = generate;
