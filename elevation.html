@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elevation Lab · Backrooms</title>
+<style>
+  :root { color-scheme: dark; --bg:#242321; --panel:#1b1a18; --text:#e9e3d6; --muted:#a39d92; --accent:#e5cc9b; --line:#403d37; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:13px/1.45 ui-sans-serif,system-ui,sans-serif; }
+  a { color:var(--accent); }
+  header { padding:14px 20px; background:var(--panel); border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; align-items:baseline; gap:8px 20px; }
+  h1 { margin:0; font-size:18px; font-weight:500; color:var(--accent); }
+  header nav { margin-left:auto; display:flex; gap:18px; }
+  header p { flex-basis:100%; margin:0; color:var(--muted); }
+  main { display:grid; grid-template-columns:270px minmax(0,1fr); min-height:calc(100vh - 91px); }
+  aside { padding:18px; background:var(--panel); border-right:1px solid var(--line); }
+  label.field { display:flex; flex-direction:column; gap:5px; margin-bottom:13px; }
+  select,input,button { color:var(--text); background:#302f2c; border:1px solid #565047; border-radius:5px; padding:7px 8px; font:inherit; min-width:0; }
+  select { width:100%; }
+  button { cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button:disabled { opacity:.5; cursor:default; }
+  .row { display:flex; gap:8px; align-items:center; }
+  .row label { min-width:0; flex:1; }
+  .row input { width:100%; }
+  .checks { display:flex; flex-direction:column; gap:8px; margin:17px 0; }
+  .checks label { display:flex; gap:8px; align-items:center; }
+  input[type=checkbox] { accent-color:var(--accent); }
+  .muted { color:var(--muted); }
+  .small { font-size:12px; }
+  #capabilities { padding:13px 0; border-top:1px solid var(--line); }
+  #status { margin-top:12px; overflow-wrap:anywhere; }
+  .good { color:#8fc28a; } .bad { color:#e0705f; } .warn { color:#e2b45f; }
+  #workspace { min-width:0; padding:16px 20px; }
+  #floorbar { display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center; margin-bottom:10px; }
+  #floorbar label { display:flex; align-items:center; gap:8px; }
+  #floor { width:auto; max-width:100%; }
+  #summary { color:var(--muted); font-variant-numeric:tabular-nums; }
+  #planwrap { position:relative; background:#2a2926; }
+  #plan { display:block; width:100%; height:clamp(340px,57vh,650px); }
+  #hover { position:absolute; left:12px; bottom:12px; padding:5px 9px; background:#1b1a18; color:var(--text); border-radius:4px; max-width:calc(100% - 24px); pointer-events:none; }
+  #hover:empty { display:none; }
+  #profile { width:100%; height:180px; display:block; }
+  h2 { margin:18px 0 6px; font-size:13px; font-weight:500; }
+  .tablewrap { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:12px; }
+  th,td { padding:7px 8px; text-align:left; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:400; }
+  td { font-variant-numeric:tabular-nums; }
+  #rooms button { border:0; padding:0; color:var(--accent); background:none; text-align:left; }
+  #error { display:none; padding:20px; color:#e0705f; background:var(--panel); }
+  #note { margin:12px 0 0; }
+  @media(max-width:780px) { main { grid-template-columns:1fr; } aside { border-right:0; border-bottom:1px solid var(--line); } .controls { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 12px; } .checks { flex-direction:row; flex-wrap:wrap; } #workspace { padding:14px 12px; } header { padding:12px; } header nav { margin-left:0; } }
+  @media(max-width:420px) { .controls { grid-template-columns:1fr; } #floorbar label { width:100%; } #floor { flex:1; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Elevation lab</h1>
+  <nav><a href="index.html">Map</a><a href="workbench.html">Templates</a><a href="docs/elevation.md">Implementation plan</a></nav>
+  <p>Stable bands, local floors, and shared vertical territory. Experimental layouts for the future 3D generator.</p>
+</header>
+<main>
+  <aside>
+    <div class="controls">
+      <label class="field">Template<select id="template" aria-label="Template"></select></label>
+      <label class="field">Connection<select id="connection"><option value="none">Potential only</option><option value="up" selected>Upward</option><option value="down">Downward</option></select></label>
+      <label class="field">Seed<div class="row"><input id="seed" type="number" min="0" max="4294967295" step="1" value="7" aria-label="Seed"><button id="next" type="button">Next</button></div></label>
+      <div class="row"><label class="field">Width (m)<input id="width" type="number" min="1" max="128" step="0.5" value="40"></label><label class="field">Depth (m)<input id="depth" type="number" min="1" max="128" step="0.5" value="36"></label></div>
+    </div>
+    <div class="checks">
+      <label><input id="ghost" type="checkbox" checked> Ghost other floors</label>
+      <label><input id="territories" type="checkbox"> Band reservations</label>
+      <label><input id="labels" type="checkbox" checked> Room labels</label>
+    </div>
+    <div id="capabilities" class="small"></div>
+    <button id="export" type="button">Download elevation JSON</button>
+    <div id="status" class="small" role="status" aria-live="polite"></div>
+    <p id="note" class="muted small">The infinite map remains flat in this milestone. Band landings are ready for later world matching; occupying a band does not create an entrance into it.</p>
+  </aside>
+  <section id="workspace" aria-label="Elevation inspection">
+    <div id="floorbar"><label>Floor<select id="floor" aria-label="Floor elevation"></select></label><span id="summary"></span></div>
+    <div id="error" role="alert"></div>
+    <div id="planwrap"><canvas id="plan" role="img" aria-label="Floor plan with vertical routes and neighboring floors"></canvas><div id="hover"></div></div>
+    <h2>Main route · elevation along the journey</h2>
+    <canvas id="profile" role="img" aria-label="Elevation profile from the entrance to the destination"></canvas>
+    <div class="muted small">Solid floors belong to the selected elevation; faint floors overlap in plan. The profile follows the main route, while side pockets appear in the room list.</div>
+    <h2>Rooms and floor surfaces</h2>
+    <div class="tablewrap"><table><thead><tr><th>Room</th><th>Floor</th><th>Clear height</th><th>Home band</th></tr></thead><tbody id="rooms"></tbody></table></div>
+    <h2>Physical connections</h2>
+    <div class="tablewrap"><table><thead><tr><th>Type</th><th>From</th><th>To</th><th>Width</th><th>Travel</th></tr></thead><tbody id="links"></tbody></table></div>
+  </section>
+</main>
+<script src="src/core.js"></script>
+<script src="src/tpl/grid.js"></script>
+<script src="src/tpl/framework.js"></script>
+<script src="src/tpl/catalogue.js"></script>
+<script src="src/tpl/house.js"></script>
+<script src="src/tpl/room.js"></script>
+<script src="src/tpl/composite.js"></script>
+<script src="src/tpl/neighborhood.js"></script>
+<script src="src/tpl/park.js"></script>
+<script src="src/tpl/zone.js"></script>
+<script src="src/tpl/archetypes/house.js"></script>
+<script src="src/tpl/archetypes/room.js"></script>
+<script src="src/tpl/archetypes/neighborhood.js"></script>
+<script src="src/tpl/archetypes/park.js"></script>
+<script src="src/tpl/archetypes/lone.js"></script>
+<script src="src/tpl/fillers/engine.js"></script>
+<script src="src/tpl/fillers/kit.js"></script>
+<script src="src/tpl/fillers/pool.js"></script>
+<script src="src/tpl/fillers/corridors.js"></script>
+<script src="src/tpl/fillers/halls.js"></script>
+<script src="src/tpl/fillers/rooms.js"></script>
+<script src="src/tpl/fillers/architectural.js"></script>
+<script src="src/tpl/render2d.js"></script>
+<script src="src/tpl/elevation.js"></script>
+<script src="src/tpl/elevation-view.js"></script>
+<script src="src/elevation-lab.js"></script>
+</body>
+</html>

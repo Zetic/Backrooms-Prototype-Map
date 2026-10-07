@@ -1,0 +1,2484 @@
+{
+  "schema": "br.elevation/0.1",
+  "kind": "exploration-fill",
+  "engine": "elevation",
+  "archetype": "terraced_atrium",
+  "name": "Terraced atrium",
+  "seed": 7,
+  "approach": "S",
+  "grid": 0.5,
+  "fillId": "fill:terraced_atrium:7",
+  "site": {
+    "w": 40,
+    "h": 36,
+    "rects": [
+      [
+        0,
+        0,
+        40,
+        36
+      ]
+    ]
+  },
+  "bands": [
+    {
+      "id": "ground",
+      "elevation": 0
+    },
+    {
+      "id": "upper",
+      "elevation": 8
+    }
+  ],
+  "rooms": [
+    {
+      "id": "entry",
+      "type": "room",
+      "name": "Ground entrance",
+      "zone": "circulation",
+      "rects": [
+        [
+          32,
+          24,
+          40,
+          36
+        ]
+      ],
+      "floorZ": 0,
+      "ceiling": 2.8,
+      "ceilingZ": 2.8,
+      "band": "ground",
+      "tags": [
+        "backrooms",
+        "vertical-exploration"
+      ],
+      "area": 96,
+      "level": 0
+    },
+    {
+      "id": "gallery",
+      "type": "room",
+      "name": "Ground gallery",
+      "zone": "circulation",
+      "rects": [
+        [
+          32,
+          16,
+          40,
+          24
+        ]
+      ],
+      "floorZ": 0,
+      "ceiling": 2.8,
+      "ceilingZ": 2.8,
+      "band": "ground",
+      "tags": [
+        "backrooms",
+        "vertical-exploration"
+      ],
+      "area": 64,
+      "level": 0
+    },
+    {
+      "id": "middle",
+      "type": "room",
+      "name": "Intermediate hall",
+      "zone": "circulation",
+      "rects": [
+        [
+          12,
+          16,
+          20,
+          24
+        ]
+      ],
+      "floorZ": 2,
+      "ceiling": 2.6,
+      "ceilingZ": 4.6,
+      "band": "ground",
+      "tags": [
+        "backrooms",
+        "vertical-exploration"
+      ],
+      "area": 64,
+      "level": 1
+    },
+    {
+      "id": "side",
+      "type": "room",
+      "name": "Side rooms",
+      "zone": "circulation",
+      "rects": [
+        [
+          7,
+          16,
+          12,
+          24
+        ]
+      ],
+      "floorZ": 2,
+      "ceiling": 2.6,
+      "ceilingZ": 4.6,
+      "band": "ground",
+      "tags": [
+        "backrooms",
+        "vertical-exploration"
+      ],
+      "area": 40,
+      "level": 1
+    },
+    {
+      "id": "turn",
+      "type": "room",
+      "name": "Turning gallery",
+      "zone": "circulation",
+      "rects": [
+        [
+          12,
+          0,
+          20,
+          4
+        ]
+      ],
+      "floorZ": 4,
+      "ceiling": 2.3,
+      "ceilingZ": 6.3,
+      "band": "ground",
+      "tags": [
+        "backrooms",
+        "vertical-exploration"
+      ],
+      "area": 32,
+      "level": 2
+    },
+    {
+      "id": "pocket",
+      "type": "room",
+      "name": "Compact pocket",
+      "zone": "circulation",
+      "rects": [
+        [
+          7,
+          0,
+          12,
+          4
+        ]
+      ],
+      "floorZ": 4,
+      "ceiling": 2.25,
+      "ceilingZ": 6.25,
+      "band": "ground",
+      "tags": [
+        "backrooms",
+        "vertical-exploration"
+      ],
+      "area": 20,
+      "level": 2
+    },
+    {
+      "id": "overlook",
+      "type": "room",
+      "name": "Atrium overlook",
+      "zone": "circulation",
+      "rects": [
+        [
+          32,
+          0,
+          40,
+          12
+        ]
+      ],
+      "floorZ": 6,
+      "ceiling": 2.8,
+      "ceilingZ": 8.8,
+      "band": "ground",
+      "tags": [
+        "backrooms",
+        "vertical-exploration"
+      ],
+      "area": 96,
+      "level": 3
+    },
+    {
+      "id": "arrival",
+      "type": "room",
+      "name": "Upper band arrival",
+      "zone": "circulation",
+      "rects": [
+        [
+          32,
+          24,
+          40,
+          36
+        ]
+      ],
+      "floorZ": 8,
+      "ceiling": 2.8,
+      "ceilingZ": 10.8,
+      "band": "upper",
+      "tags": [
+        "backrooms",
+        "vertical-exploration"
+      ],
+      "area": 96,
+      "level": 5
+    },
+    {
+      "id": "stack",
+      "type": "room",
+      "name": "Stacked pocket",
+      "zone": "circulation",
+      "rects": [
+        [
+          7,
+          0,
+          12,
+          4
+        ]
+      ],
+      "floorZ": 7,
+      "ceiling": 2.25,
+      "ceilingZ": 9.25,
+      "band": "ground",
+      "tags": [
+        "backrooms",
+        "vertical-exploration"
+      ],
+      "area": 20,
+      "level": 4
+    }
+  ],
+  "walls": [
+    {
+      "id": "w0",
+      "level": 0,
+      "floorZ": 0,
+      "ceilingZ": 2.8,
+      "kind": "exterior",
+      "a": [
+        40,
+        16
+      ],
+      "b": [
+        32,
+        16
+      ],
+      "rooms": [
+        null,
+        "gallery"
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w1",
+      "level": 0,
+      "floorZ": 0,
+      "ceilingZ": 2.8,
+      "kind": "interior",
+      "a": [
+        40,
+        24
+      ],
+      "b": [
+        32,
+        24
+      ],
+      "rooms": [
+        "gallery",
+        "entry"
+      ],
+      "thickness": 0.15
+    },
+    {
+      "id": "w2",
+      "level": 0,
+      "floorZ": 0,
+      "ceilingZ": 2.8,
+      "kind": "exterior",
+      "a": [
+        40,
+        36
+      ],
+      "b": [
+        32,
+        36
+      ],
+      "rooms": [
+        "entry",
+        null
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w3",
+      "level": 0,
+      "floorZ": 0,
+      "ceilingZ": 2.8,
+      "kind": "exterior",
+      "a": [
+        40,
+        16
+      ],
+      "b": [
+        40,
+        24
+      ],
+      "rooms": [
+        null,
+        "gallery"
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w4",
+      "level": 0,
+      "floorZ": 0,
+      "ceilingZ": 2.8,
+      "kind": "exterior",
+      "a": [
+        40,
+        24
+      ],
+      "b": [
+        40,
+        36
+      ],
+      "rooms": [
+        null,
+        "entry"
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w5",
+      "level": 0,
+      "floorZ": 0,
+      "ceilingZ": 2.8,
+      "kind": "exterior",
+      "a": [
+        32,
+        16
+      ],
+      "b": [
+        32,
+        24
+      ],
+      "rooms": [
+        "gallery",
+        null
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w6",
+      "level": 0,
+      "floorZ": 0,
+      "ceilingZ": 2.8,
+      "kind": "exterior",
+      "a": [
+        32,
+        24
+      ],
+      "b": [
+        32,
+        36
+      ],
+      "rooms": [
+        "entry",
+        null
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w7",
+      "level": 1,
+      "floorZ": 2,
+      "ceilingZ": 4.6,
+      "kind": "exterior",
+      "a": [
+        20,
+        16
+      ],
+      "b": [
+        12,
+        16
+      ],
+      "rooms": [
+        null,
+        "middle"
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w8",
+      "level": 1,
+      "floorZ": 2,
+      "ceilingZ": 4.6,
+      "kind": "exterior",
+      "a": [
+        12,
+        16
+      ],
+      "b": [
+        7,
+        16
+      ],
+      "rooms": [
+        null,
+        "side"
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w9",
+      "level": 1,
+      "floorZ": 2,
+      "ceilingZ": 4.6,
+      "kind": "exterior",
+      "a": [
+        20,
+        24
+      ],
+      "b": [
+        12,
+        24
+      ],
+      "rooms": [
+        "middle",
+        null
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w10",
+      "level": 1,
+      "floorZ": 2,
+      "ceilingZ": 4.6,
+      "kind": "exterior",
+      "a": [
+        12,
+        24
+      ],
+      "b": [
+        7,
+        24
+      ],
+      "rooms": [
+        "side",
+        null
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w11",
+      "level": 1,
+      "floorZ": 2,
+      "ceilingZ": 4.6,
+      "kind": "exterior",
+      "a": [
+        20,
+        16
+      ],
+      "b": [
+        20,
+        24
+      ],
+      "rooms": [
+        null,
+        "middle"
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w12",
+      "level": 1,
+      "floorZ": 2,
+      "ceilingZ": 4.6,
+      "kind": "interior",
+      "a": [
+        12,
+        16
+      ],
+      "b": [
+        12,
+        24
+      ],
+      "rooms": [
+        "middle",
+        "side"
+      ],
+      "thickness": 0.15
+    },
+    {
+      "id": "w13",
+      "level": 1,
+      "floorZ": 2,
+      "ceilingZ": 4.6,
+      "kind": "exterior",
+      "a": [
+        7,
+        16
+      ],
+      "b": [
+        7,
+        24
+      ],
+      "rooms": [
+        "side",
+        null
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w14",
+      "level": 2,
+      "floorZ": 4,
+      "ceilingZ": 6.3,
+      "kind": "exterior",
+      "a": [
+        20,
+        0
+      ],
+      "b": [
+        12,
+        0
+      ],
+      "rooms": [
+        null,
+        "turn"
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w15",
+      "level": 2,
+      "floorZ": 4,
+      "ceilingZ": 6.25,
+      "kind": "exterior",
+      "a": [
+        12,
+        0
+      ],
+      "b": [
+        7,
+        0
+      ],
+      "rooms": [
+        null,
+        "pocket"
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w16",
+      "level": 2,
+      "floorZ": 4,
+      "ceilingZ": 6.3,
+      "kind": "exterior",
+      "a": [
+        20,
+        4
+      ],
+      "b": [
+        12,
+        4
+      ],
+      "rooms": [
+        "turn",
+        null
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w17",
+      "level": 2,
+      "floorZ": 4,
+      "ceilingZ": 6.25,
+      "kind": "exterior",
+      "a": [
+        12,
+        4
+      ],
+      "b": [
+        7,
+        4
+      ],
+      "rooms": [
+        "pocket",
+        null
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w18",
+      "level": 2,
+      "floorZ": 4,
+      "ceilingZ": 6.3,
+      "kind": "exterior",
+      "a": [
+        20,
+        0
+      ],
+      "b": [
+        20,
+        4
+      ],
+      "rooms": [
+        null,
+        "turn"
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w19",
+      "level": 2,
+      "floorZ": 4,
+      "ceilingZ": 6.3,
+      "kind": "interior",
+      "a": [
+        12,
+        0
+      ],
+      "b": [
+        12,
+        4
+      ],
+      "rooms": [
+        "turn",
+        "pocket"
+      ],
+      "thickness": 0.15
+    },
+    {
+      "id": "w20",
+      "level": 2,
+      "floorZ": 4,
+      "ceilingZ": 6.25,
+      "kind": "exterior",
+      "a": [
+        7,
+        0
+      ],
+      "b": [
+        7,
+        4
+      ],
+      "rooms": [
+        "pocket",
+        null
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w21",
+      "level": 3,
+      "floorZ": 6,
+      "ceilingZ": 8.8,
+      "kind": "exterior",
+      "a": [
+        40,
+        0
+      ],
+      "b": [
+        32,
+        0
+      ],
+      "rooms": [
+        null,
+        "overlook"
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w22",
+      "level": 3,
+      "floorZ": 6,
+      "ceilingZ": 8.8,
+      "kind": "exterior",
+      "a": [
+        40,
+        12
+      ],
+      "b": [
+        32,
+        12
+      ],
+      "rooms": [
+        "overlook",
+        null
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w23",
+      "level": 3,
+      "floorZ": 6,
+      "ceilingZ": 8.8,
+      "kind": "exterior",
+      "a": [
+        40,
+        0
+      ],
+      "b": [
+        40,
+        12
+      ],
+      "rooms": [
+        null,
+        "overlook"
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w24",
+      "level": 3,
+      "floorZ": 6,
+      "ceilingZ": 8.8,
+      "kind": "exterior",
+      "a": [
+        32,
+        0
+      ],
+      "b": [
+        32,
+        12
+      ],
+      "rooms": [
+        "overlook",
+        null
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w25",
+      "level": 4,
+      "floorZ": 7,
+      "ceilingZ": 9.25,
+      "kind": "exterior",
+      "a": [
+        12,
+        0
+      ],
+      "b": [
+        7,
+        0
+      ],
+      "rooms": [
+        null,
+        "stack"
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w26",
+      "level": 4,
+      "floorZ": 7,
+      "ceilingZ": 9.25,
+      "kind": "exterior",
+      "a": [
+        12,
+        4
+      ],
+      "b": [
+        7,
+        4
+      ],
+      "rooms": [
+        "stack",
+        null
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w27",
+      "level": 4,
+      "floorZ": 7,
+      "ceilingZ": 9.25,
+      "kind": "exterior",
+      "a": [
+        12,
+        0
+      ],
+      "b": [
+        12,
+        4
+      ],
+      "rooms": [
+        null,
+        "stack"
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w28",
+      "level": 4,
+      "floorZ": 7,
+      "ceilingZ": 9.25,
+      "kind": "exterior",
+      "a": [
+        7,
+        0
+      ],
+      "b": [
+        7,
+        4
+      ],
+      "rooms": [
+        "stack",
+        null
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w29",
+      "level": 5,
+      "floorZ": 8,
+      "ceilingZ": 10.8,
+      "kind": "exterior",
+      "a": [
+        40,
+        24
+      ],
+      "b": [
+        32,
+        24
+      ],
+      "rooms": [
+        null,
+        "arrival"
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w30",
+      "level": 5,
+      "floorZ": 8,
+      "ceilingZ": 10.8,
+      "kind": "exterior",
+      "a": [
+        40,
+        36
+      ],
+      "b": [
+        32,
+        36
+      ],
+      "rooms": [
+        "arrival",
+        null
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w31",
+      "level": 5,
+      "floorZ": 8,
+      "ceilingZ": 10.8,
+      "kind": "exterior",
+      "a": [
+        40,
+        24
+      ],
+      "b": [
+        40,
+        36
+      ],
+      "rooms": [
+        null,
+        "arrival"
+      ],
+      "thickness": 0.3
+    },
+    {
+      "id": "w32",
+      "level": 5,
+      "floorZ": 8,
+      "ceilingZ": 10.8,
+      "kind": "exterior",
+      "a": [
+        32,
+        24
+      ],
+      "b": [
+        32,
+        36
+      ],
+      "rooms": [
+        "arrival",
+        null
+      ],
+      "thickness": 0.3
+    }
+  ],
+  "openings": [
+    {
+      "id": "o0",
+      "wall": "w1",
+      "level": 0,
+      "floorZ": 0,
+      "kind": "opening",
+      "a": [
+        37,
+        24
+      ],
+      "b": [
+        35,
+        24
+      ],
+      "width": 2,
+      "height": 2.2,
+      "rooms": [
+        "entry",
+        "gallery"
+      ]
+    },
+    {
+      "id": "o1",
+      "wall": "w12",
+      "level": 1,
+      "floorZ": 2,
+      "kind": "opening",
+      "a": [
+        12,
+        18
+      ],
+      "b": [
+        12,
+        20
+      ],
+      "width": 2,
+      "height": 2.2,
+      "rooms": [
+        "middle",
+        "side"
+      ]
+    },
+    {
+      "id": "o2",
+      "wall": "w19",
+      "level": 2,
+      "floorZ": 4,
+      "kind": "opening",
+      "a": [
+        12,
+        1
+      ],
+      "b": [
+        12,
+        3
+      ],
+      "width": 2,
+      "height": 2.2,
+      "rooms": [
+        "turn",
+        "pocket"
+      ]
+    },
+    {
+      "id": "o3",
+      "wall": "w5",
+      "level": 0,
+      "floorZ": 0,
+      "kind": "opening",
+      "a": [
+        32,
+        18
+      ],
+      "b": [
+        32,
+        20
+      ],
+      "width": 2,
+      "height": 2.2,
+      "rooms": [
+        "gallery",
+        null
+      ]
+    },
+    {
+      "id": "o4",
+      "wall": "w11",
+      "level": 1,
+      "floorZ": 2,
+      "kind": "opening",
+      "a": [
+        20,
+        18
+      ],
+      "b": [
+        20,
+        20
+      ],
+      "width": 2,
+      "height": 2.2,
+      "rooms": [
+        "middle",
+        null
+      ]
+    },
+    {
+      "id": "o5",
+      "wall": "w7",
+      "level": 1,
+      "floorZ": 2,
+      "kind": "opening",
+      "a": [
+        18,
+        16
+      ],
+      "b": [
+        16,
+        16
+      ],
+      "width": 2,
+      "height": 2.2,
+      "rooms": [
+        "middle",
+        null
+      ]
+    },
+    {
+      "id": "o6",
+      "wall": "w16",
+      "level": 2,
+      "floorZ": 4,
+      "kind": "opening",
+      "a": [
+        18,
+        4
+      ],
+      "b": [
+        16,
+        4
+      ],
+      "width": 2,
+      "height": 2.2,
+      "rooms": [
+        "turn",
+        null
+      ]
+    },
+    {
+      "id": "o7",
+      "wall": "w18",
+      "level": 2,
+      "floorZ": 4,
+      "kind": "opening",
+      "a": [
+        20,
+        1
+      ],
+      "b": [
+        20,
+        3
+      ],
+      "width": 2,
+      "height": 2.2,
+      "rooms": [
+        "turn",
+        null
+      ]
+    },
+    {
+      "id": "o8",
+      "wall": "w24",
+      "level": 3,
+      "floorZ": 6,
+      "kind": "opening",
+      "a": [
+        32,
+        1
+      ],
+      "b": [
+        32,
+        3
+      ],
+      "width": 2,
+      "height": 2.2,
+      "rooms": [
+        "overlook",
+        null
+      ]
+    },
+    {
+      "id": "o9",
+      "wall": "w22",
+      "level": 3,
+      "floorZ": 6,
+      "kind": "opening",
+      "a": [
+        37,
+        12
+      ],
+      "b": [
+        35,
+        12
+      ],
+      "width": 2,
+      "height": 2.2,
+      "rooms": [
+        "overlook",
+        null
+      ]
+    },
+    {
+      "id": "o10",
+      "wall": "w29",
+      "level": 5,
+      "floorZ": 8,
+      "kind": "opening",
+      "a": [
+        37,
+        24
+      ],
+      "b": [
+        35,
+        24
+      ],
+      "width": 2,
+      "height": 2.2,
+      "rooms": [
+        "arrival",
+        null
+      ]
+    },
+    {
+      "id": "o11",
+      "wall": "w24",
+      "level": 3,
+      "floorZ": 6,
+      "kind": "window",
+      "a": [
+        32,
+        5
+      ],
+      "b": [
+        32,
+        10
+      ],
+      "width": 5,
+      "rooms": [
+        "overlook",
+        null
+      ],
+      "sill": 1.1,
+      "head": 2.2
+    },
+    {
+      "id": "o12",
+      "wall": "w2",
+      "level": 0,
+      "floorZ": 0,
+      "kind": "opening",
+      "a": [
+        37,
+        36
+      ],
+      "b": [
+        35,
+        36
+      ],
+      "width": 2,
+      "height": 2.2,
+      "rooms": [
+        "entry",
+        null
+      ],
+      "portal": "p0"
+    },
+    {
+      "id": "o13",
+      "wall": "w31",
+      "level": 5,
+      "floorZ": 8,
+      "kind": "opening",
+      "a": [
+        40,
+        28
+      ],
+      "b": [
+        40,
+        30
+      ],
+      "width": 2,
+      "height": 2.2,
+      "rooms": [
+        "arrival",
+        null
+      ],
+      "portal": "p1"
+    }
+  ],
+  "portals": [
+    {
+      "id": "p0",
+      "opening": "o12",
+      "room": "entry",
+      "role": "both",
+      "kind": "opening",
+      "side": "S",
+      "width": 2,
+      "clear": 1.2,
+      "main": true,
+      "state": "landing",
+      "band": "ground",
+      "tags": [
+        "band-landing"
+      ],
+      "floorZ": 0,
+      "level": 0,
+      "at": [
+        36,
+        36,
+        0
+      ]
+    },
+    {
+      "id": "p1",
+      "opening": "o13",
+      "room": "arrival",
+      "role": "both",
+      "kind": "opening",
+      "side": "E",
+      "width": 2,
+      "clear": 1.2,
+      "main": false,
+      "state": "landing",
+      "band": "upper",
+      "tags": [
+        "band-landing"
+      ],
+      "floorZ": 8,
+      "level": 5,
+      "at": [
+        40,
+        29,
+        8
+      ]
+    }
+  ],
+  "verticals": [],
+  "holes": [
+    {
+      "id": "pocket:ladder:ceiling",
+      "connector": "pocket:ladder",
+      "surface": "s:pocket",
+      "face": "ceiling",
+      "rect": [
+        7.5,
+        0.5,
+        8,
+        1
+      ]
+    },
+    {
+      "id": "pocket:ladder:floor",
+      "connector": "pocket:ladder",
+      "surface": "s:stack",
+      "face": "floor",
+      "rect": [
+        7.5,
+        0.5,
+        8,
+        1
+      ]
+    }
+  ],
+  "connectors": [
+    {
+      "id": "ramp:1",
+      "kind": "ramp",
+      "from": "s:gallery",
+      "to": "s:middle",
+      "state": "connected",
+      "direction": "both",
+      "width": 2,
+      "clearance": 2.2,
+      "architecture": {
+        "slab": 0.25,
+        "sideWalls": {
+          "height": 2.2,
+          "thickness": 0.15
+        },
+        "ceiling": true
+      },
+      "landings": [
+        [
+          32,
+          19,
+          0
+        ],
+        [
+          20,
+          19,
+          2
+        ]
+      ],
+      "path": [
+        [
+          32,
+          19,
+          0
+        ],
+        [
+          20,
+          19,
+          2
+        ]
+      ],
+      "reservation": {
+        "id": "volume:ramp:1",
+        "kind": "connector",
+        "rects": [
+          [
+            20,
+            18,
+            32,
+            20
+          ]
+        ],
+        "z0": -0.25,
+        "z1": 4.2
+      }
+    },
+    {
+      "id": "ramp:2",
+      "kind": "ramp",
+      "from": "s:middle",
+      "to": "s:turn",
+      "state": "connected",
+      "direction": "both",
+      "width": 2,
+      "clearance": 2.2,
+      "architecture": {
+        "slab": 0.25,
+        "sideWalls": {
+          "height": 2.2,
+          "thickness": 0.15
+        },
+        "ceiling": true
+      },
+      "landings": [
+        [
+          17,
+          16,
+          2
+        ],
+        [
+          17,
+          4,
+          4
+        ]
+      ],
+      "path": [
+        [
+          17,
+          16,
+          2
+        ],
+        [
+          17,
+          4,
+          4
+        ]
+      ],
+      "reservation": {
+        "id": "volume:ramp:2",
+        "kind": "connector",
+        "rects": [
+          [
+            16,
+            4,
+            18,
+            16
+          ]
+        ],
+        "z0": 1.75,
+        "z1": 6.2
+      }
+    },
+    {
+      "id": "ramp:3",
+      "kind": "ramp",
+      "from": "s:turn",
+      "to": "s:overlook",
+      "state": "connected",
+      "direction": "both",
+      "width": 2,
+      "clearance": 2.2,
+      "architecture": {
+        "slab": 0.25,
+        "sideWalls": {
+          "height": 2.2,
+          "thickness": 0.15
+        },
+        "ceiling": true
+      },
+      "landings": [
+        [
+          20,
+          2,
+          4
+        ],
+        [
+          32,
+          2,
+          6
+        ]
+      ],
+      "path": [
+        [
+          20,
+          2,
+          4
+        ],
+        [
+          32,
+          2,
+          6
+        ]
+      ],
+      "reservation": {
+        "id": "volume:ramp:3",
+        "kind": "connector",
+        "rects": [
+          [
+            20,
+            1,
+            32,
+            3
+          ]
+        ],
+        "z0": 3.75,
+        "z1": 8.2
+      }
+    },
+    {
+      "id": "ramp:4",
+      "kind": "ramp",
+      "from": "s:overlook",
+      "to": "s:arrival",
+      "state": "connected",
+      "direction": "both",
+      "width": 2,
+      "clearance": 2.2,
+      "architecture": {
+        "slab": 0.25,
+        "sideWalls": {
+          "height": 2.2,
+          "thickness": 0.15
+        },
+        "ceiling": true
+      },
+      "landings": [
+        [
+          36,
+          12,
+          6
+        ],
+        [
+          36,
+          24,
+          8
+        ]
+      ],
+      "path": [
+        [
+          36,
+          12,
+          6
+        ],
+        [
+          36,
+          24,
+          8
+        ]
+      ],
+      "reservation": {
+        "id": "volume:ramp:4",
+        "kind": "connector",
+        "rects": [
+          [
+            35,
+            12,
+            37,
+            24
+          ]
+        ],
+        "z0": 5.75,
+        "z1": 10.2
+      }
+    },
+    {
+      "id": "pocket:ladder",
+      "kind": "ladder",
+      "from": "s:pocket",
+      "to": "s:stack",
+      "state": "connected",
+      "direction": "both",
+      "width": 0.5,
+      "clearance": 1.8,
+      "landings": [
+        [
+          8.25,
+          1,
+          4
+        ],
+        [
+          8.25,
+          1,
+          7
+        ]
+      ],
+      "path": [
+        [
+          8.25,
+          1,
+          4
+        ],
+        [
+          7.75,
+          0.75,
+          4
+        ],
+        [
+          7.75,
+          0.75,
+          7
+        ],
+        [
+          8.25,
+          1,
+          7
+        ]
+      ],
+      "reservation": {
+        "id": "volume:pocket:ladder",
+        "kind": "connector",
+        "rects": [
+          [
+            7.5,
+            0.5,
+            8.5,
+            1.5
+          ]
+        ],
+        "z0": 3.75,
+        "z1": 8.8
+      }
+    }
+  ],
+  "voids": [
+    {
+      "id": "atrium",
+      "kind": "void",
+      "rects": [
+        [
+          20,
+          4,
+          32,
+          16
+        ]
+      ],
+      "z0": -0.25,
+      "z1": 11
+    }
+  ],
+  "route": [
+    [
+      36,
+      36,
+      0
+    ],
+    [
+      36,
+      19,
+      0
+    ],
+    [
+      32,
+      19,
+      0
+    ],
+    [
+      20,
+      19,
+      2
+    ],
+    [
+      17,
+      19,
+      2
+    ],
+    [
+      17,
+      16,
+      2
+    ],
+    [
+      17,
+      4,
+      4
+    ],
+    [
+      17,
+      2,
+      4
+    ],
+    [
+      20,
+      2,
+      4
+    ],
+    [
+      32,
+      2,
+      6
+    ],
+    [
+      36,
+      2,
+      6
+    ],
+    [
+      36,
+      12,
+      6
+    ],
+    [
+      36,
+      24,
+      8
+    ],
+    [
+      36,
+      29,
+      8
+    ],
+    [
+      40,
+      29,
+      8
+    ]
+  ],
+  "graph": {
+    "nodes": [
+      "outside",
+      "entry",
+      "gallery",
+      "middle",
+      "side",
+      "turn",
+      "pocket",
+      "overlook",
+      "arrival",
+      "stack"
+    ],
+    "edges": [
+      [
+        "gallery",
+        "middle",
+        "ramp",
+        "ramp:1"
+      ],
+      [
+        "middle",
+        "turn",
+        "ramp",
+        "ramp:2"
+      ],
+      [
+        "turn",
+        "overlook",
+        "ramp",
+        "ramp:3"
+      ],
+      [
+        "overlook",
+        "arrival",
+        "ramp",
+        "ramp:4"
+      ],
+      [
+        "pocket",
+        "stack",
+        "ladder",
+        "pocket:ladder"
+      ],
+      [
+        "entry",
+        "gallery",
+        "opening",
+        "o0"
+      ],
+      [
+        "middle",
+        "side",
+        "opening",
+        "o1"
+      ],
+      [
+        "turn",
+        "pocket",
+        "opening",
+        "o2"
+      ],
+      [
+        "entry",
+        "outside",
+        "opening",
+        "o12"
+      ],
+      [
+        "arrival",
+        "outside",
+        "opening",
+        "o13"
+      ]
+    ]
+  },
+  "meta": {
+    "plan": {
+      "type": "terraced_atrium"
+    },
+    "score": 100,
+    "terms": {},
+    "mutations": [],
+    "issues": [],
+    "autoDoors": [],
+    "program": [
+      "vertical exploration",
+      "reserved atrium",
+      "compact stacked pocket"
+    ]
+  },
+  "levels": [
+    {
+      "index": 0,
+      "elevation": 0,
+      "height": 2.8,
+      "band": "ground"
+    },
+    {
+      "index": 1,
+      "elevation": 2,
+      "height": 2.6,
+      "band": "ground"
+    },
+    {
+      "index": 2,
+      "elevation": 4,
+      "height": 2.3,
+      "band": "ground"
+    },
+    {
+      "index": 3,
+      "elevation": 6,
+      "height": 2.8,
+      "band": "ground"
+    },
+    {
+      "index": 4,
+      "elevation": 7,
+      "height": 2.25,
+      "band": "ground"
+    },
+    {
+      "index": 5,
+      "elevation": 8,
+      "height": 2.8,
+      "band": "upper"
+    }
+  ],
+  "footprint": [
+    {
+      "level": 0,
+      "rects": [
+        [
+          32,
+          24,
+          40,
+          36
+        ],
+        [
+          32,
+          16,
+          40,
+          24
+        ]
+      ]
+    },
+    {
+      "level": 1,
+      "rects": [
+        [
+          12,
+          16,
+          20,
+          24
+        ],
+        [
+          7,
+          16,
+          12,
+          24
+        ]
+      ]
+    },
+    {
+      "level": 2,
+      "rects": [
+        [
+          12,
+          0,
+          20,
+          4
+        ],
+        [
+          7,
+          0,
+          12,
+          4
+        ]
+      ]
+    },
+    {
+      "level": 3,
+      "rects": [
+        [
+          32,
+          0,
+          40,
+          12
+        ]
+      ]
+    },
+    {
+      "level": 4,
+      "rects": [
+        [
+          7,
+          0,
+          12,
+          4
+        ]
+      ]
+    },
+    {
+      "level": 5,
+      "rects": [
+        [
+          32,
+          24,
+          40,
+          36
+        ]
+      ]
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "s:entry",
+      "room": "entry",
+      "owner": "fill:terraced_atrium:7",
+      "band": "ground",
+      "rects": [
+        [
+          32,
+          24,
+          40,
+          36
+        ]
+      ],
+      "floorZ": 0,
+      "ceilingZ": 2.8,
+      "slab": 0.25
+    },
+    {
+      "id": "s:gallery",
+      "room": "gallery",
+      "owner": "fill:terraced_atrium:7",
+      "band": "ground",
+      "rects": [
+        [
+          32,
+          16,
+          40,
+          24
+        ]
+      ],
+      "floorZ": 0,
+      "ceilingZ": 2.8,
+      "slab": 0.25
+    },
+    {
+      "id": "s:middle",
+      "room": "middle",
+      "owner": "fill:terraced_atrium:7",
+      "band": "ground",
+      "rects": [
+        [
+          12,
+          16,
+          20,
+          24
+        ]
+      ],
+      "floorZ": 2,
+      "ceilingZ": 4.6,
+      "slab": 0.25
+    },
+    {
+      "id": "s:side",
+      "room": "side",
+      "owner": "fill:terraced_atrium:7",
+      "band": "ground",
+      "rects": [
+        [
+          7,
+          16,
+          12,
+          24
+        ]
+      ],
+      "floorZ": 2,
+      "ceilingZ": 4.6,
+      "slab": 0.25
+    },
+    {
+      "id": "s:turn",
+      "room": "turn",
+      "owner": "fill:terraced_atrium:7",
+      "band": "ground",
+      "rects": [
+        [
+          12,
+          0,
+          20,
+          4
+        ]
+      ],
+      "floorZ": 4,
+      "ceilingZ": 6.3,
+      "slab": 0.25
+    },
+    {
+      "id": "s:pocket",
+      "room": "pocket",
+      "owner": "fill:terraced_atrium:7",
+      "band": "ground",
+      "rects": [
+        [
+          7,
+          0,
+          12,
+          4
+        ]
+      ],
+      "floorZ": 4,
+      "ceilingZ": 6.25,
+      "slab": 0.25
+    },
+    {
+      "id": "s:overlook",
+      "room": "overlook",
+      "owner": "fill:terraced_atrium:7",
+      "band": "ground",
+      "rects": [
+        [
+          32,
+          0,
+          40,
+          12
+        ]
+      ],
+      "floorZ": 6,
+      "ceilingZ": 8.8,
+      "slab": 0.25
+    },
+    {
+      "id": "s:arrival",
+      "room": "arrival",
+      "owner": "fill:terraced_atrium:7",
+      "band": "upper",
+      "rects": [
+        [
+          32,
+          24,
+          40,
+          36
+        ]
+      ],
+      "floorZ": 8,
+      "ceilingZ": 10.8,
+      "slab": 0.25
+    },
+    {
+      "id": "s:stack",
+      "room": "stack",
+      "owner": "fill:terraced_atrium:7",
+      "band": "ground",
+      "rects": [
+        [
+          7,
+          0,
+          12,
+          4
+        ]
+      ],
+      "floorZ": 7,
+      "ceilingZ": 9.25,
+      "slab": 0.25
+    }
+  ],
+  "volumes": [
+    {
+      "id": "volume:s:entry",
+      "kind": "room",
+      "rects": [
+        [
+          32,
+          24,
+          40,
+          36
+        ]
+      ],
+      "z0": -0.25,
+      "z1": 2.8
+    },
+    {
+      "id": "volume:s:gallery",
+      "kind": "room",
+      "rects": [
+        [
+          32,
+          16,
+          40,
+          24
+        ]
+      ],
+      "z0": -0.25,
+      "z1": 2.8
+    },
+    {
+      "id": "volume:s:middle",
+      "kind": "room",
+      "rects": [
+        [
+          12,
+          16,
+          20,
+          24
+        ]
+      ],
+      "z0": 1.75,
+      "z1": 4.6
+    },
+    {
+      "id": "volume:s:side",
+      "kind": "room",
+      "rects": [
+        [
+          7,
+          16,
+          12,
+          24
+        ]
+      ],
+      "z0": 1.75,
+      "z1": 4.6
+    },
+    {
+      "id": "volume:s:turn",
+      "kind": "room",
+      "rects": [
+        [
+          12,
+          0,
+          20,
+          4
+        ]
+      ],
+      "z0": 3.75,
+      "z1": 6.3
+    },
+    {
+      "id": "volume:s:pocket",
+      "kind": "room",
+      "rects": [
+        [
+          7,
+          0,
+          12,
+          4
+        ]
+      ],
+      "z0": 3.75,
+      "z1": 6.25
+    },
+    {
+      "id": "volume:s:overlook",
+      "kind": "room",
+      "rects": [
+        [
+          32,
+          0,
+          40,
+          12
+        ]
+      ],
+      "z0": 5.75,
+      "z1": 8.8
+    },
+    {
+      "id": "volume:s:arrival",
+      "kind": "room",
+      "rects": [
+        [
+          32,
+          24,
+          40,
+          36
+        ]
+      ],
+      "z0": 7.75,
+      "z1": 10.8
+    },
+    {
+      "id": "volume:s:stack",
+      "kind": "room",
+      "rects": [
+        [
+          7,
+          0,
+          12,
+          4
+        ]
+      ],
+      "z0": 6.75,
+      "z1": 9.25
+    },
+    {
+      "id": "volume:ramp:1",
+      "kind": "connector",
+      "rects": [
+        [
+          20,
+          18,
+          32,
+          20
+        ]
+      ],
+      "z0": -0.25,
+      "z1": 4.2
+    },
+    {
+      "id": "volume:ramp:2",
+      "kind": "connector",
+      "rects": [
+        [
+          16,
+          4,
+          18,
+          16
+        ]
+      ],
+      "z0": 1.75,
+      "z1": 6.2
+    },
+    {
+      "id": "volume:ramp:3",
+      "kind": "connector",
+      "rects": [
+        [
+          20,
+          1,
+          32,
+          3
+        ]
+      ],
+      "z0": 3.75,
+      "z1": 8.2
+    },
+    {
+      "id": "volume:ramp:4",
+      "kind": "connector",
+      "rects": [
+        [
+          35,
+          12,
+          37,
+          24
+        ]
+      ],
+      "z0": 5.75,
+      "z1": 10.2
+    },
+    {
+      "id": "volume:pocket:ladder",
+      "kind": "connector",
+      "rects": [
+        [
+          7.5,
+          0.5,
+          8.5,
+          1.5
+        ]
+      ],
+      "z0": 3.75,
+      "z1": 8.8
+    },
+    {
+      "id": "atrium",
+      "kind": "void",
+      "rects": [
+        [
+          20,
+          4,
+          32,
+          16
+        ]
+      ],
+      "z0": -0.25,
+      "z1": 11
+    }
+  ],
+  "bandTerritories": [
+    {
+      "band": "ground",
+      "elevation": 0,
+      "owner": "fill:terraced_atrium:7",
+      "rects": [
+        [
+          32,
+          24,
+          40,
+          36
+        ],
+        [
+          32,
+          16,
+          40,
+          24
+        ],
+        [
+          20,
+          18,
+          32,
+          20
+        ],
+        [
+          20,
+          4,
+          32,
+          16
+        ]
+      ]
+    },
+    {
+      "band": "upper",
+      "elevation": 8,
+      "owner": "fill:terraced_atrium:7",
+      "rects": [
+        [
+          32,
+          0,
+          40,
+          12
+        ],
+        [
+          32,
+          24,
+          40,
+          36
+        ],
+        [
+          7,
+          0,
+          12,
+          4
+        ],
+        [
+          20,
+          1,
+          32,
+          3
+        ],
+        [
+          35,
+          12,
+          37,
+          24
+        ],
+        [
+          7.5,
+          0.5,
+          8.5,
+          1.5
+        ],
+        [
+          20,
+          4,
+          32,
+          16
+        ]
+      ]
+    }
+  ],
+  "navigation": {
+    "nodes": [
+      "s:entry",
+      "s:gallery",
+      "s:middle",
+      "s:side",
+      "s:turn",
+      "s:pocket",
+      "s:overlook",
+      "s:arrival",
+      "s:stack"
+    ],
+    "edges": [
+      {
+        "from": "s:entry",
+        "to": "s:gallery",
+        "kind": "opening",
+        "opening": "o0",
+        "direction": "both",
+        "connected": true,
+        "status": "connected"
+      },
+      {
+        "from": "s:middle",
+        "to": "s:side",
+        "kind": "opening",
+        "opening": "o1",
+        "direction": "both",
+        "connected": true,
+        "status": "connected"
+      },
+      {
+        "from": "s:turn",
+        "to": "s:pocket",
+        "kind": "opening",
+        "opening": "o2",
+        "direction": "both",
+        "connected": true,
+        "status": "connected"
+      },
+      {
+        "from": "s:gallery",
+        "to": "s:middle",
+        "kind": "ramp",
+        "connector": "ramp:1",
+        "direction": "both",
+        "connected": true,
+        "status": "connected"
+      },
+      {
+        "from": "s:middle",
+        "to": "s:turn",
+        "kind": "ramp",
+        "connector": "ramp:2",
+        "direction": "both",
+        "connected": true,
+        "status": "connected"
+      },
+      {
+        "from": "s:turn",
+        "to": "s:overlook",
+        "kind": "ramp",
+        "connector": "ramp:3",
+        "direction": "both",
+        "connected": true,
+        "status": "connected"
+      },
+      {
+        "from": "s:overlook",
+        "to": "s:arrival",
+        "kind": "ramp",
+        "connector": "ramp:4",
+        "direction": "both",
+        "connected": true,
+        "status": "connected"
+      },
+      {
+        "from": "s:pocket",
+        "to": "s:stack",
+        "kind": "ladder",
+        "connector": "pocket:ladder",
+        "direction": "both",
+        "connected": true,
+        "status": "connected"
+      }
+    ],
+    "complete": true
+  },
+  "capabilities": {
+    "up": {
+      "supported": true,
+      "selected": true,
+      "candidates": [
+        {
+          "id": "up:s:arrival",
+          "kind": "ladder",
+          "surface": "s:arrival",
+          "landing": [
+            32,
+            35,
+            33,
+            36
+          ],
+          "hatch": [
+            32.5,
+            35,
+            33,
+            35.5
+          ],
+          "at": [
+            32.25,
+            35.5,
+            8
+          ],
+          "state": "supported",
+          "variant": "ladder-hatch"
+        }
+      ],
+      "connections": [
+        "ramp:1",
+        "ramp:2",
+        "ramp:3",
+        "ramp:4"
+      ]
+    },
+    "down": {
+      "supported": true,
+      "selected": false,
+      "candidates": [
+        {
+          "id": "down:s:entry",
+          "kind": "ladder",
+          "surface": "s:entry",
+          "landing": [
+            32,
+            29.5,
+            33,
+            30.5
+          ],
+          "hatch": [
+            32.5,
+            29.5,
+            33,
+            30
+          ],
+          "at": [
+            32.25,
+            30,
+            0
+          ],
+          "state": "supported",
+          "variant": "ladder-hatch"
+        }
+      ]
+    }
+  }
+}
