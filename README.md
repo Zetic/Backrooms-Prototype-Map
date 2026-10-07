@@ -94,6 +94,7 @@ route profiles and `br.elevation/0.1` JSON export remain available. The main map
 uses band controls, a continuous cut height, and template-specific inspection.
 [Elevation world planning, reservations and export](docs/elevation-world.md).
 [Elevation design, data contract, and milestones](docs/elevation.md).
+[Agent handoff and current implementation context](CONTEXT.md).
 
 ## Controls (`index.html`)
 

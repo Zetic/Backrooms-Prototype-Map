@@ -1,5 +1,10 @@
 # Elevation implementation plan
 
+Updated 2026-10-07 after milestone 1 was merged in
+[PR #16](https://github.com/Zetic/Backrooms-Prototype-Map/pull/16).
+For the next agent's repository entry points and implementation context, read
+[the handoff](../CONTEXT.md).
+
 ## Goal
 
 Generate architectural elevation data that a later Unreal Engine generator can
@@ -29,6 +34,15 @@ rather than replacing them with unconstrained three-dimensional noise.
   minimum fallback; larger templates can provide authored exploration variants.
   Supporting a direction does not imply selecting it on every instance, or
   guaranteeing both directions simultaneously in an arbitrary cramped layout.
+- Vertical chains should combine templates and include horizontal exploration
+  between successive connections. A ramp-heavy or ladder-heavy influence can
+  guide a journey, while individual layouts and connection choices vary. An
+  authored multi-floor house remains valid; its top can connect to a different
+  template rather than repeating the house through the whole stack.
+- Reserve what the geometry and its clearance actually need. Large empty
+  reservation boxes and padding filled with repetitive identical rooms are not
+  substitutes for an interesting template. Intentional tall rooms and protected
+  voids remain valid, but their extent must follow the design.
 
 ## Three invariants
 
@@ -69,7 +83,7 @@ openings, levels, footprints, and room graph, and adds:
 
 `levels[]` in this export group actual floor elevations for local inspection.
 They are neither world bands nor compulsory story numbers. A compact internal
-floor can have a display slice while remaining part of its home band.
+floor can have a local floor entry while remaining part of its home band.
 Use `navigation` for elevation reachability. The retained renderer-compatible
 room graph has a single legacy `outside` node and must not be used to infer
 connections between otherwise separate bands.
@@ -83,6 +97,32 @@ Connection states are distinct: supported, selected, and connected. A capability
 is supported; a request selects it; a matched destination and reserved route
 make it connected. Occupancy sections and external band landings alone do not
 create traversal edges into an ungenerated world network.
+
+### Connection zones: next contract addition
+
+A connection zone describes the area available for a vertical connection.
+It does not need individual risers, treads, railings, detailed meshes or props.
+The generated variant still needs enough spatial data to connect its actual
+endpoints and reserve its occupied space and clearance.
+
+The following is a proposed contract for milestone 2, not an existing exported
+field. Choose final field names during implementation and keep the two concepts
+distinct: an available zone and a selected physical connector.
+
+| Zone information | Purpose |
+| --- | --- |
+| Identity and owner | Associate the area with its template/fill and retain ownership across heights |
+| Footprint/area | XY extent available to place the connection, including bends or landings as needed |
+| Entry and exit | Locations and actual floor elevations; bind to real surfaces when connected |
+| Allowed/preferred types | Permit ladders, stairs, ramps or a mixed selection; express a preference without forcing an invalid type |
+| Required width and clearance | Ensure a realizable route fits the area and its surroundings |
+| Capability/selection state | An unused opportunity creates no hole or traversal edge; a connected variant has a destination and reservation |
+
+Template preferences and later journey influences should use these same
+opportunities. Small templates can keep a ladder fallback; larger templates
+should gain appropriate alternatives. A zone's allocated area is not itself a
+walkable floor, a room, or a claim that its entire XY footprint is blocked at
+every height.
 
 ## Planning order for the eventual world
 
@@ -106,6 +146,24 @@ Generate only needed bands/chunks and include band identity in cache keys.
 This plan supersedes the initial atrium demonstration. The spatial contract,
 optional ladder variants, band wrapper and exact portal validation remain;
 the atrium generator, world placement policy and associated previews are removed.
+
+### Implementation status
+
+| System | Current state |
+| --- | --- |
+| Explicit room floors/ceilings, surfaces, graph and prism reservations | Implemented through the elevation adapter |
+| Continuous cutaway and actual local floor selection | Implemented in milestone 1 |
+| Generated local vertical connections | Ladder/hatch variants only, selected in the elevation lab |
+| Ramp/stair footprint drawing | Generic full-width XYZ path projection exists; it does not generate these connections |
+| Physical ramp checks | Existing validation/test fixture covers slope, width, landings and reservations |
+| Template connection zones and ramp/stair variants | Next milestone; not implemented |
+| New authored multi-floor layouts and broad local floor variation | Later milestone; existing source-template levels are preserved |
+| World connections between reference bands | None after atrium removal; bands are separate horizontal networks |
+| Sloped reservations allowing structures beneath high ramp sections | Planned; the current connector contract uses a single reservation prism |
+
+Old abstract stair annotations in source templates are not proof of a physical
+vertical connection. The adapter reports differing-floor legacy links as
+unresolved until actual connector geometry is authored.
 
 ### Milestone 1 — Cutaway presentation (implemented)
 
@@ -140,7 +198,7 @@ an existing circular-hall filler with its optional ladder variant.
 
 ![Cutaway heights and local exact-floor inspection](cutaway-preview.png)
 
-### Milestone 2 — Simple connection zones
+### Milestone 2 — Simple connection zones (next)
 
 Give vertical connections a simple footprint/area, entrance and exit locations,
 endpoint floor heights, and allowed/preferred connection types. Templates can
@@ -153,6 +211,32 @@ follow the slope. A high section may have usable space below it if clearance
 permits. Keep floor/ceiling cutouts explicit; occupying upper space never creates
 an entrance by itself. The milestone-1 renderer consumes these areas without
 introducing extra floor slices along the slope.
+
+Start with a small, inspectable selection of existing templates/fillers that
+demonstrates ladder, stair and ramp options. Keep the all-template ladder
+fallback and make new variants available in the workshop/lab, with JSON export.
+Avoid creating another large demonstration fill just to exercise the contract.
+World-scale chains and coordinated multi-band territory planning remain later
+work.
+
+Acceptance criteria:
+
+- Zones describe a usable area and endpoint heights without step-level detail.
+- Selected types fit their areas, width, height change and headroom. Preferences
+  cannot override physical constraints; reject or choose a valid alternative.
+- Both endpoints meet real floor surfaces. Required doors and floor/ceiling
+  cutouts exist, and navigation follows the physical connection.
+- The map/lab draw the occupied footprint at its width and show destination
+  context for both upward and downward travel; they do not treat reservation
+  areas as newly generated rooms.
+- Ramp reservations follow the slope closely enough to permit a valid room
+  under a high section while rejecting one that intersects the low section or
+  its clearance. Update export, placement, reservation checks and consumers
+  together if a connector gains multiple reservation volumes.
+- Sloped paths add no intermediate floor entries. Authored endpoint floors can
+  have arbitrary elevations, without rounding them onto a 2 m vertical grid.
+- Preserve deterministic generation, the source blueprint, existing flat tiling
+  and portal matching, and the compact up/down option for all template families.
 
 ### Milestone 3 — Template floors and authored vertical patterns
 
@@ -211,6 +295,32 @@ The compact adapter's default upward landing moves above a tall host ceiling if
 8 m would intersect it. An explicitly requested rise stays exact and is rejected
 if it conflicts. The future world planner must negotiate destination constraints
 before selecting a template, rather than silently moving a reference band.
+
+## Known presentation issues and follow-up
+
+The empty-lot up/down screenshots expose a visual asymmetry at a 0 m cut:
+
+- Going down cuts the host's floor. The lower landing is covered by the ground
+  floor except at the hatch; clipping can leave disconnected corner strokes.
+- Going up cuts the host's ceiling, so the host floor stays intact. The renderer
+  paints the whole ladder reservation footprint and adds a dashed outline for
+  the landing above. The gold square can look like a room on the host floor.
+- Extra destination outlines currently apply to landings above the cut. Lower
+  destinations do not receive the same cue. Endpoint labels can overlap on
+  compact footprints.
+
+Occlusion should continue to reflect the actual floors. A recommended
+presentation follow-up is to make the connection footprint, hatch and hidden
+destination legible in both directions, without painting reserved space as an
+extra room or exposing a hidden lower floor as a solid surface. This follow-up
+has been identified but is not implemented.
+
+The different endpoint heights in those screenshots are a separate placement
+rule: default down is -8 m; default up clears the host ceiling plus the 0.25 m
+slab and another 0.25 m allowance, so a tall host can produce +10.9 m. Neither
+number defines a universal story height or world-band spacing. The future
+planner must negotiate real endpoint heights; it must not silently move a
+matched destination to copy this standalone fallback behavior.
 
 ## Open tuning decisions
 
