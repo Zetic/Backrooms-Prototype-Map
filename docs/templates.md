@@ -218,6 +218,10 @@ Each mutation is tagged in the output (`wrong:*`), so a client can play it up.
   huge), plus favourites and "needs work";
 * sorting by engine, name, health or size.
 
+The *Fillers (Backrooms)* group lists the filler pool (docs/fillers.md).
+Fillers use the site and connection controls; they have no score, so their
+cards and side panel show what they built instead.
+
 *Check health* builds every listed template on 12 seeds. Each one then shows
 a coloured dot, its average score, how often it found no layout, and its
 most common rejection. Use it after editing many recipes.
@@ -230,7 +234,8 @@ most common rejection. Use it after editing many recipes.
 * **Gallery:** one card per listed template.
 
 **Site controls:** archetype-size or fixed W×D, a shape (rect, L, U, notched,
-random), the main side and the wrongness level.
+random), the main side and the wrongness level (templates), and the
+connections, by count or exactly (fillers).
 
 **View options:**
 

@@ -132,8 +132,10 @@
         <div class="g2"><span>Site</span><select id="siteSize"><option value="archetype">archetype size</option><option value="fixed">fixed</option></select>
           <input id="sw" class="small" type="number" min="1" step="0.5" title="width along the main side (m)"><span>×</span><input id="sh" class="small" type="number" min="1" step="0.5" title="depth (m)">
           <select id="shape" title="site shape"><option value="rect">rect</option><option value="L">L-shape</option><option value="U">U-shape</option><option value="notched">notched</option><option value="random">random</option></select></div>
-        <div class="g2"><span>Main side</span><select id="approach"><option value="S">south</option><option value="N">north</option><option value="E">east</option><option value="W">west</option><option value="mix">mixed</option></select></div>
-        <div class="g2"><span>Wrongness</span><select id="wrong"><option value="">archetype</option><option value="0">off</option><option value="0.5">some</option><option value="1">lots</option></select></div>
+        <div class="g2" title="templates only"><span>Main side</span><select id="approach"><option value="S">south</option><option value="N">north</option><option value="E">east</option><option value="W">west</option><option value="mix">mixed</option></select></div>
+        <div class="g2" title="templates only"><span>Wrongness</span><select id="wrong"><option value="">archetype</option><option value="0">off</option><option value="0.5">some</option><option value="1">lots</option></select></div>
+        <div class="g2" title="fillers only: the openings the world's connection graph gives the site"><span>Connections</span><select id="nconn"><option value="0">none</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
+          <input id="connx" type="text" placeholder="or exactly: S 4 1.5; E 10 2" spellcheck="false" title="side, at (m along that side), width (m); separated by ;" style="width:190px"></div>
         <div class="g2">
           <label class="tg"><input type="checkbox" id="o-labels"> labels</label>
           <label class="tg"><input type="checkbox" id="o-dims"> sizes</label>
@@ -182,11 +184,27 @@
 <script src="src/tpl/room.js"></script>
 <script src="src/tpl/archetypes/house.js"></script>
 <script src="src/tpl/archetypes/room.js"></script>
+<script src="src/tpl/fillers/engine.js"></script>
+<script src="src/tpl/fillers/pool.js"></script>
 <script src="src/tpl/render2d.js"></script>
 <script>
 (function () {
   'use strict';
-  const TPL = BR.TPL, TG = BR.TG, $ = (id) => document.getElementById(id);
+  const TPL = BR.TPL, TG = BR.TG, FILL = BR.FILL, $ = (id) => document.getElementById(id);
+  // Fillers sit in the library next to the templates. They are not POIs, so they
+  // stay out of TPL.archetypes; here they are entries 'filler:<id>', plus
+  // 'filler:pool' for the weighted pick the world makes.
+  const FILLERS = {
+    'filler:pool': { id: 'filler:pool', filler: null, engine: 'filler', name: 'Pool pick (weighted)', category: 'filler', feel: 'pool', site: { w: [8, 36], h: [8, 32] },
+      blurb: 'Each seed picks a filler by weight among those that fit the site: 70 / 20 / 10 enclosed / mixed / open.' }
+  };
+  for (const F of FILL.list()) FILLERS['filler:' + F.id] = { id: 'filler:' + F.id, filler: F.id, engine: 'filler', name: F.name, category: 'filler', feel: F.feel, weight: F.weight, site: F.site, blurb: F.blurb };
+  const entry = (id) => TPL.archetypes[id] || FILLERS[id];
+  const entries = () => TPL.listArchetypes().concat(Object.values(FILLERS));
+  const isFiller = (id) => !!FILLERS[id];
+  const isFillerB = (b) => b && b.schema === FILL.SCHEMA;
+  const engineName = (e) => (e === 'filler' ? 'Fillers (Backrooms)' : (TPL.engines[e] && TPL.engines[e].name) || e);
+  const pct = (v) => Math.round((v || 0) * 100) + '%';
   const ORIGINAL = {};
   for (const a of TPL.listArchetypes()) ORIGINAL[a.id] = JSON.parse(JSON.stringify(a));
   const SIZES = ['tiny', 'small', 'medium', 'large', 'huge'];
@@ -199,7 +217,7 @@
 
   // ---------------------------------------------------------------- state
   const state = {
-    mode: 'seeds', arch: 'ranch', seed: 1, count: 12, siteSize: 'archetype', sw: 24, sh: 14, shape: 'rect', approach: 'S', wrong: '',
+    mode: 'seeds', arch: 'ranch', seed: 1, count: 12, siteSize: 'archetype', sw: 24, sh: 14, shape: 'rect', approach: 'S', wrong: '', nconn: 2, connx: '',
     labels: true, dims: false, tags: false, portals: true, graph: false, blue: false, crop: true,
     q: '', engines: '', sizes: '', fav: false, bad: false, sort: 'engine', cmp: '', detail: null
   };
@@ -210,10 +228,10 @@
       state[k] = BOOL.indexOf(k) >= 0 ? v === '1' : typeof state[k] === 'number' ? +v : v;
     }
   } catch (e) { /* bad hash */ }
-  if (!TPL.archetypes[state.arch]) state.arch = TPL.listArchetypes()[0].id;
+  if (!entry(state.arch)) state.arch = TPL.listArchetypes()[0].id;
   state.count = [4, 6, 12, 24, 48].reduce((b, c) => (Math.abs(c - state.count) < Math.abs(b - state.count) ? c : b), 12);
   const favs = new Set(store.get('fav', []));
-  const cmpSet = () => new Set(state.cmp ? state.cmp.split(',').filter((x) => TPL.archetypes[x]) : []);
+  const cmpSet = () => new Set(state.cmp ? state.cmp.split(',').filter((x) => entry(x)) : []);
   function saveHash() {
     const p = new URLSearchParams();
     for (const k in state) { const v = state[k]; if (v === null || v === '' || v === undefined) continue; p.set(k, typeof v === 'boolean' ? (v ? '1' : '0') : String(v)); }
@@ -230,9 +248,19 @@
     const ch = state.siteSize === 'fixed' ? snap(state.sh) : snap(r.range(S.h[0], S.h[1]));
     return { rects: TPL.siteShape(cw, ch, state.shape, r, approach) };
   }
-  const settingsKey = () => [state.siteSize, state.sw, state.sh, state.shape, state.approach, state.wrong].join('|');
+  const settingsKey = () => [state.siteSize, state.sw, state.sh, state.shape, state.approach, state.wrong, state.nconn, state.connx].join('|');
+  /** a filler's connections: typed exactly, or sampled along the outline */
+  function connsFor(site, seed) {
+    const txt = state.connx.trim();
+    if (txt) return txt.split(';').map((p) => p.trim().split(/\s+/)).filter((p) => p.length >= 2).map((p, k) => ({ id: 'c' + k, side: p[0].toUpperCase(), at: +p[1], width: +(p[2] || 1.5) }));
+    return FILL.sampleConnections(site, state.nconn, seed);
+  }
   function specFor(arch, seed) {
     const approach = state.approach === 'mix' ? 'SENW'[seed % 4] : state.approach;
+    if (arch.engine === 'filler') {
+      const site = siteFor(arch, seed, approach);
+      return { filler: arch.filler || undefined, seed, site, connections: connsFor(site, seed) };
+    }
     const s = { archetype: arch.id, seed, approach, site: siteFor(arch, seed, approach) };
     if (state.wrong !== '') s.wrongness = +state.wrong;
     return s;
@@ -242,7 +270,7 @@
     const k = id + '|' + seed + '|' + settingsKey();
     if (cache.has(k)) return cache.get(k);
     let b;
-    try { b = TPL.generate(specFor(TPL.archetypes[id], seed)); } catch (err) { console.error(err); b = { error: String((err && err.message) || err), site: { w: 1, h: 1, rects: [] }, meta: {} }; }
+    try { const A = entry(id); b = A.engine === 'filler' ? FILL.generate(specFor(A, seed)) : TPL.generate(specFor(A, seed)); } catch (err) { console.error(err); b = { error: String((err && err.message) || err), site: { w: 1, h: 1, rects: [] }, meta: {} }; }
     if (cache.size > 3000) cache.delete(cache.keys().next().value);
     cache.set(k, b);
     return b;
@@ -268,14 +296,21 @@
       const stats = { n: 0, ok: 0, score: 0, ms: 0, why: {} };
       healthLeft++;
       for (let s = 1; s <= 12; s++) queue.push(() => {
-        const b = TPL.generate({ archetype: id, seed: s * 101 });
+        const F = isFiller(id), b = F ? FILL.generate(fillerCheckSpec(id, s * 101)) : TPL.generate({ archetype: id, seed: s * 101 });
         stats.n++; stats.ms += b.meta.ms || 0;
-        if (!b.error && !b.meta.issues.some((x) => x.indexOf('ERROR') === 0)) { stats.ok++; stats.score += b.meta.score; }
+        const bad = b.error || (F ? b.meta.issues.length : b.meta.issues.some((x) => x.indexOf('ERROR') === 0));
+        if (!bad) { stats.ok++; stats.score += F ? 100 : b.meta.score; }
         for (const k in b.meta.layoutFailures || {}) stats.why[k] = (stats.why[k] || 0) + b.meta.layoutFailures[k];
         if (stats.n === 12) { health.set(id, stats); healthLeft--; renderLibItem(id); if (!healthLeft && (state.sort === 'health' || state.bad)) renderLib(); }
       });
     }
     kick();
+  }
+  /** a standard check for a filler: a rect site from its typical range, 1-4 connections */
+  function fillerCheckSpec(id, seed) {
+    const A = FILLERS[id], r = new BR.Rng(BR.hash4(seed, TG.hashStr(id), 0x6865, 0));
+    const site = { w: snap(r.range(A.site.w[0], A.site.w[1])), h: snap(r.range(A.site.h[0], A.site.h[1])) };
+    return { filler: A.filler || undefined, seed, site, connections: FILL.sampleConnections(site, r.int(1, 4), seed) };
   }
   function healthOf(id) {
     const h = health.get(id);
@@ -288,13 +323,13 @@
   // ---------------------------------------------------------------- library
   function filtered() {
     const q = state.q.trim().toLowerCase(), eng = state.engines ? state.engines.split(',') : [], sz = state.sizes ? state.sizes.split(',') : [];
-    const L = TPL.listArchetypes().filter((a) => {
+    const L = entries().filter((a) => {
       if (eng.length && eng.indexOf(a.engine) < 0) return false;
       if (sz.length && sz.indexOf(TPL.sizeClass(a)) < 0) return false;
       if (state.fav && !favs.has(a.id)) return false;
       if (state.bad) { const h = healthOf(a.id); if (!h || h.cls === 'g') return false; }
       if (!q) return true;
-      const hay = [a.id, a.name, a.engine, a.category, a.blurb, a.layout, a.room, TPL.sizeClass(a)].join(' ').toLowerCase();
+      const hay = [a.id, a.name, a.engine, a.category, a.blurb, a.layout, a.room, a.feel, TPL.sizeClass(a)].join(' ').toLowerCase();
       return q.split(/\s+/).every((w) => hay.indexOf(w) >= 0);
     });
     const by = state.sort;
@@ -307,9 +342,9 @@
     return L;
   }
   function renderChips() {
-    const engines = [...new Set(TPL.listArchetypes().map((a) => a.engine))];
+    const engines = [...new Set(entries().map((a) => a.engine))];
     const eng = state.engines ? state.engines.split(',') : [], sz = state.sizes ? state.sizes.split(',') : [];
-    $('fEngine').innerHTML = engines.map((e) => '<button class="chip' + (eng.indexOf(e) >= 0 ? ' on' : '') + '" data-e="' + esc(e) + '">' + esc((TPL.engines[e] && TPL.engines[e].name) || e) + '</button>').join('');
+    $('fEngine').innerHTML = engines.map((e) => '<button class="chip' + (eng.indexOf(e) >= 0 ? ' on' : '') + '" data-e="' + esc(e) + '">' + esc(engineName(e)) + '</button>').join('');
     $('fSize').innerHTML = SIZES.map((s) => '<button class="chip' + (sz.indexOf(s) >= 0 ? ' on' : '') + '" data-s="' + s + '">' + s + '</button>').join('');
     $('fFav').classList.toggle('on', state.fav); $('fBad').classList.toggle('on', state.bad);
     $('sort').value = state.sort;
@@ -330,25 +365,26 @@
 
   function itemHTML(a) {
     const h = healthOf(a.id), C = cmpSet();
-    const st = h ? '<span class="dot ' + h.cls + '"></span>' + h.avg.toFixed(0) + ' avg · ' + Math.round(h.fail * 100) + '% no layout · ' + h.ms.toFixed(0) + ' ms' + (h.fail > 0 && h.top ? ' · ' + esc(h.top) : '')
+    const st = h && a.engine === 'filler' ? '<span class="dot ' + h.cls + '"></span>' + Math.round((1 - h.fail) * 100) + '% clean · ' + h.ms.toFixed(1) + ' ms'
+      : h ? '<span class="dot ' + h.cls + '"></span>' + h.avg.toFixed(0) + ' avg · ' + Math.round(h.fail * 100) + '% no layout · ' + h.ms.toFixed(0) + ' ms' + (h.fail > 0 && h.top ? ' · ' + esc(h.top) : '')
       : esc(a.blurb || a.engine);
     return '<input type="checkbox" class="cmp" title="add to Compare (c)"' + (C.has(a.id) ? ' checked' : '') + '>' +
       '<span class="star' + (favs.has(a.id) ? ' on' : '') + '" title="favourite (f)">' + (favs.has(a.id) ? '★' : '☆') + '</span>' +
       '<span class="nm" title="' + esc(a.id) + '">' + esc(a.name || a.id) + (a.id.indexOf('custom:') === 0 ? ' <span class="k">(edited)</span>' : '') + '</span>' +
-      '<span class="sz">' + TPL.sizeClass(a) + '</span><span class="st">' + st + '</span>';
+      '<span class="sz">' + (a.engine === 'filler' ? esc(a.feel) : TPL.sizeClass(a)) + '</span><span class="st">' + st + '</span>';
   }
   function renderLib() {
     const L = filtered(), lib = $('lib');
-    $('libcount').textContent = L.length + ' of ' + TPL.listArchetypes().length;
+    $('libcount').textContent = L.length + ' of ' + entries().length;
     let html = '', grp = null;
     for (const a of L) {
-      if (state.sort === 'engine' && a.engine !== grp) { grp = a.engine; html += '<div class="grp">' + esc((TPL.engines[grp] && TPL.engines[grp].name) || grp) + '</div>'; }
+      if (state.sort === 'engine' && a.engine !== grp) { grp = a.engine; html += '<div class="grp">' + esc(engineName(grp)) + '</div>'; }
       html += '<div class="it' + (a.id === state.arch ? ' on' : '') + '" data-id="' + esc(a.id) + '">' + itemHTML(a) + '</div>';
     }
     lib.innerHTML = html || '<div class="empty">No templates match.</div>';
   }
   function renderLibItem(id) {
-    for (const el of $('lib').querySelectorAll('.it')) if (el.dataset.id === id) el.innerHTML = itemHTML(TPL.archetypes[id]);
+    for (const el of $('lib').querySelectorAll('.it')) if (el.dataset.id === id) el.innerHTML = itemHTML(entry(id));
   }
   $('lib').addEventListener('click', (e) => {
     const it = e.target.closest('.it');
@@ -373,6 +409,7 @@
   function bind() {
     $('seed').value = state.seed; $('count').value = String(state.count); $('siteSize').value = state.siteSize; $('sw').value = state.sw; $('sh').value = state.sh;
     $('shape').value = state.shape; $('approach').value = state.approach; $('wrong').value = state.wrong;
+    $('nconn').value = String(state.nconn); $('connx').value = state.connx;
     for (const k of VIEWOPTS) $('o-' + k).checked = state[k];
     $('sw').disabled = $('sh').disabled = state.siteSize !== 'fixed';
     for (const b of $('modes').children) b.classList.toggle('on', b.dataset.m === state.mode);
@@ -390,6 +427,8 @@
   on('shape', 'change', () => { state.shape = $('shape').value; refresh(); });
   on('approach', 'change', () => { state.approach = $('approach').value; refresh(); });
   on('wrong', 'change', () => { state.wrong = $('wrong').value; refresh(); });
+  on('nconn', 'change', () => { state.nconn = +$('nconn').value; refresh(); });
+  on('connx', 'change', () => { state.connx = $('connx').value; refresh(); });
   for (const k of VIEWOPTS) on('o-' + k, 'change', () => { state[k] = $('o-' + k).checked; saveHash(); redrawAll(); if (detailB) drawDetail(); });
   window.addEventListener('keydown', (e) => {
     const typing = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT';
@@ -436,9 +475,10 @@
     visible.length = 0;
     const view = $('view');
     view.innerHTML = '';
-    const A = TPL.archetypes[state.arch];
+    const A = entry(state.arch);
     if (state.mode === 'gallery') $('info').innerHTML = '<h2>Gallery</h2><span class="k">' + filtered().length + ' templates on seed ' + state.seed + ' · the list filters choose which · click a card to open its seeds</span>';
     else if (state.mode === 'compare') $('info').innerHTML = '<h2>Compare</h2><span class="k">' + cmpSet().size + ' selected · tick ☐ in the list or press <kbd>c</kbd> · seeds ' + state.seed + '–' + (state.seed + Math.min(state.count, 8) - 1) + '</span>';
+    else if (A.engine === 'filler') $('info').innerHTML = '<h2>' + esc(A.name) + '</h2><span class="k">filler · ' + esc(A.feel) + (A.weight ? ' · weight ' + A.weight : '') + ' · typical site ' + A.site.w.join('–') + ' × ' + A.site.h.join('–') + ' m · site and connections apply, main side and wrongness do not</span><span class="k">' + esc(A.blurb) + '</span>';
     else $('info').innerHTML = '<h2>' + esc(A.name || A.id) + '</h2><span class="k">' + esc(A.engine) + ' · ' + TPL.sizeClass(A) + ' · site ' + (A.site ? A.site.w.join('–') + ' × ' + A.site.h.join('–') + ' m' : '?') + '</span><span class="k">' + esc(A.blurb || '') + '</span><button id="edit" title="Edit this recipe">Edit recipe</button>';
     if ($('edit')) $('edit').addEventListener('click', openEditor);
     if (state.mode === 'seeds') {
@@ -452,7 +492,7 @@
       if (!ids.length) view.innerHTML = '<div class="empty">Tick the ☐ box next to templates in the list (or press <kbd>c</kbd> on the selected one) to compare them here, row by row, on the same seeds and the same site.</div>';
       const n = Math.min(state.count, 8);
       for (const id of ids) {
-        const a = TPL.archetypes[id], row = document.createElement('div'), h = healthOf(id);
+        const a = entry(id), row = document.createElement('div'), h = healthOf(id);
         row.className = 'row';
         row.innerHTML = '<div class="rowhead"><b>' + esc(a.name || id) + '</b><span class="k">' + esc(a.engine) + ' · ' + TPL.sizeClass(a) + (h ? ' · <span class="dot ' + h.cls + '"></span>' + h.avg.toFixed(0) + ' avg, ' + Math.round(h.fail * 100) + '% no layout' : '') + '</span><button class="open" style="margin-left:auto">Open seeds</button><button class="rm" title="remove from Compare">✕</button></div>';
         const strip = document.createElement('div');
@@ -478,7 +518,7 @@
   /** what to frame: the site, or the footprint plus a margin */
   function frameOf(b) {
     const site = [0, 0, b.site.w, b.site.h];
-    if (!state.crop || !b.footprint) return site;
+    if (!state.crop || !b.footprint || isFillerB(b)) return site;      // a filler's solid is part of the picture
     const bb = [Infinity, Infinity, -Infinity, -Infinity];
     for (const f of b.footprint) for (const r of f.rects) { bb[0] = Math.min(bb[0], r[0]); bb[1] = Math.min(bb[1], r[1]); bb[2] = Math.max(bb[2], r[2]); bb[3] = Math.max(bb[3], r[3]); }
     if (!isFinite(bb[0])) return site;
@@ -502,7 +542,7 @@
       g.fillStyle = state.blue ? '#0d2640' : '#2a2926'; g.fillRect(0, 0, f.W, f.H);
       g.fillStyle = 'rgba(224,112,95,0.25)';
       for (const r of b.site.rects) g.fillRect(f.ox + r[0] * f.s, f.oy + r[1] * f.s, (r[2] - r[0]) * f.s, (r[3] - r[1]) * f.s);
-      l1.innerHTML = '<span class="bad">no layout</span>';
+      l1.innerHTML = '<span class="bad">' + (isFillerB(b) ? 'refused' : 'no layout') + '</span>';
       const top = Object.entries(b.meta.layoutFailures || {}).sort((p, q) => q[1] - p[1]).slice(0, 2);
       l2.innerHTML = '<span class="bad">' + esc(b.error) + '</span>' + (top.length ? '<br>' + top.map(([k, n]) => esc(k) + ' ' + n).join(', ') : '');
       return;
@@ -510,6 +550,13 @@
     const f = fit(cv, frameOf(b), 8);
     g.fillStyle = state.blue ? '#0d2640' : '#2a2926'; g.fillRect(0, 0, f.W, f.H);
     TPL.drawBuilding(g, b, drawOpts({ scale: f.s, ox: f.ox, oy: f.oy }));
+    if (isFillerB(b)) {
+      const m = b.meta, bad = m.issues.length;
+      l1.innerHTML = (bad ? '<span class="bad">' + bad + ' problem(s)</span>' : '<span class="good">ok</span>') + ' · ' + m.ms.toFixed(1) + ' ms';
+      l2.innerHTML = '<span class="pill">' + esc(b.name) + '</span><span class="pill">' + esc(b.feel) + '</span>' + m.rooms + ' rooms · built ' + pct(m.built) + ' · open floor ' + pct(m.openFloor) + ' · ' + b.portals.length + ' conn' +
+        (bad ? '<br><span class="bad">' + esc(m.issues[0]) + '</span>' : '');
+      return;
+    }
     const m = b.meta, sc = m.score, cls = sc >= 90 ? 'good' : sc >= 75 ? '' : sc >= 60 ? 'warn' : 'bad';
     const hard = m.issues.filter((x) => x.indexOf('ERROR') === 0).length;
     const area = b.rooms.reduce((s, r) => s + r.area, 0);
@@ -521,18 +568,22 @@
   window.addEventListener('resize', () => { clearTimeout(redrawAll._t); redrawAll._t = setTimeout(() => { redrawAll(); if (detailB) drawDetail(); }, 120); });
   function summary() {
     const bs = visible.filter((v) => v.b).map((v) => v.b), ok = bs.filter((b) => !b.error);
-    const avg = (f) => (ok.length ? ok.reduce((s, b) => s + f(b), 0) / ok.length : 0);
-    const terms = {}, plans = {};
-    for (const b of ok) { plans[b.meta.plan.type] = (plans[b.meta.plan.type] || 0) + 1; for (const k in b.meta.terms) terms[k] = (terms[k] || 0) + b.meta.terms[k] / ok.length; }
-    const errs = ok.reduce((s, b) => s + b.meta.issues.filter((x) => x.indexOf('ERROR') === 0).length, 0);
+    const tp = ok.filter((b) => !isFillerB(b)), fl = ok.filter(isFillerB);
+    const avg = (L, f) => (L.length ? L.reduce((s, b) => s + f(b), 0) / L.length : 0);
+    const terms = {}, plans = {}, picks = {};
+    for (const b of tp) { plans[b.meta.plan.type] = (plans[b.meta.plan.type] || 0) + 1; for (const k in b.meta.terms) terms[k] = (terms[k] || 0) + b.meta.terms[k] / tp.length; }
+    for (const b of fl) picks[b.name] = (picks[b.name] || 0) + 1;
+    const errs = tp.reduce((s, b) => s + b.meta.issues.filter((x) => x.indexOf('ERROR') === 0).length, 0) + fl.reduce((s, b) => s + b.meta.issues.length, 0);
     const busy = queue.length ? ' <span class="k">· working… ' + queue.length + ' left' + (healthLeft ? ' (health check)' : '') + '</span>' : '';
     $('summary').innerHTML = [
       '<span><b>' + bs.length + '</b>/' + visible.length + ' built' + busy + '</span>',
-      '<span>no layout <b class="' + (bs.length - ok.length ? 'bad' : '') + '">' + (bs.length - ok.length) + '</b></span>',
-      '<span>avg score <b>' + avg((b) => b.meta.score).toFixed(1) + '</b></span>',
-      '<span>avg <b>' + avg((b) => b.meta.ms).toFixed(0) + '</b> ms</span>',
-      state.mode === 'seeds' ? '<span>plans ' + Object.entries(plans).map(([k, v]) => '<b>' + esc(k) + '</b> ' + v).join(' · ') + '</span>' : '',
-      '<span>penalties ' + Object.entries(terms).sort((p, q) => q[1] - p[1]).slice(0, 4).map(([k, v]) => esc(k) + ' <b>' + v.toFixed(1) + '</b>').join(' · ') + '</span>',
+      '<span>' + (fl.length && !tp.length ? 'refused' : 'no layout') + ' <b class="' + (bs.length - ok.length ? 'bad' : '') + '">' + (bs.length - ok.length) + '</b></span>',
+      tp.length ? '<span>avg score <b>' + avg(tp, (b) => b.meta.score).toFixed(1) + '</b></span>' : '',
+      '<span>avg <b>' + avg(ok, (b) => b.meta.ms).toFixed(fl.length && !tp.length ? 1 : 0) + '</b> ms</span>',
+      fl.length ? '<span>built <b>' + pct(avg(fl, (b) => b.meta.built)) + '</b> of the site · open floor <b>' + pct(avg(fl, (b) => b.meta.openFloor)) + '</b></span>' : '',
+      fl.length && Object.keys(picks).length > 1 ? '<span>' + Object.entries(picks).sort((p, q) => q[1] - p[1]).map(([k, v]) => esc(k) + ' <b>' + v + '</b>').join(' · ') + '</span>' : '',
+      state.mode === 'seeds' && tp.length ? '<span>plans ' + Object.entries(plans).map(([k, v]) => '<b>' + esc(k) + '</b> ' + v).join(' · ') + '</span>' : '',
+      tp.length ? '<span>penalties ' + Object.entries(terms).sort((p, q) => q[1] - p[1]).slice(0, 4).map(([k, v]) => esc(k) + ' <b>' + v.toFixed(1) + '</b>').join(' · ') + '</span>' : '',
       errs ? '<span class="bad">' + errs + ' validation error(s)</span>' : ''
     ].join('');
   }
@@ -556,7 +607,7 @@
   on('ddown', 'click', () => {
     if (!detailB) return;
     const blob = new Blob([JSON.stringify(detailB, null, 1)], { type: 'application/json' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = String(detailB.archetype).replace(':', '_') + '_' + detailB.seed + '.json'; a.click();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = String(detailB.archetype || detailB.filler).replace(':', '_') + '_' + detailB.seed + '.json'; a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   });
   function flash(id, text) { const b = $(id), t = b.textContent; b.textContent = text; setTimeout(() => (b.textContent = t), 900); }
@@ -603,7 +654,7 @@
     });
   })();
   function sidePanel() {
-    const b = detailB, body = $('dbody'), A = TPL.archetypes[detailId];
+    const b = detailB, body = $('dbody'), A = entry(detailId);
     $('dtitle').textContent = (A ? A.name || A.id : detailId) + ' · seed ' + detailSeed;
     if (!b || b.error) {
       const w = b ? Object.entries(b.meta.layoutFailures || {}).sort((p, q) => q[1] - p[1]) : [];
@@ -612,7 +663,9 @@
       return;
     }
     const m = b.meta;
-    $('dsub').innerHTML = 'plan <b>' + esc(m.plan.type) + '</b> · site ' + b.site.w + '×' + b.site.h + ' m · main side ' + b.approach + ' · score <b>' + m.score + '</b> · ' + m.ms + ' ms<br>layout #' + m.chosen + ' · ' + m.candidates + ' layouts drawn, ' + m.resolved + ' resolved, ' + m.valid + ' valid' +
+    if (isFillerB(b) && tab !== 'rooms' && tab !== 'portals' && tab !== 'json') { fillerPanel(b, A, body); return; }
+    if (isFillerB(b)) fillerPanel(b, A, null);
+    else $('dsub').innerHTML = 'plan <b>' + esc(m.plan.type) + '</b> · site ' + b.site.w + '×' + b.site.h + ' m · main side ' + b.approach + ' · score <b>' + m.score + '</b> · ' + m.ms + ' ms<br>layout #' + m.chosen + ' · ' + m.candidates + ' layouts drawn, ' + m.resolved + ' resolved, ' + m.valid + ' valid' +
       (m.mutations.length ? '<br>' + m.mutations.map((k) => '<span class="pill w">' + esc(mutLabel(b, k)) + '</span>').join('') : '');
     if (tab === 'score') {
       const rows = Object.entries(m.terms).sort((p, q) => q[1] - p[1]).map(([k, v]) => '<tr><td>' + esc(k) + '</td><td class="n">−' + v.toFixed(1) + '</td></tr>').join('');
@@ -625,6 +678,10 @@
         b.rooms.map((r) => '<tr><td>' + esc(r.name) + (b.levels.length > 1 ? ' <span class="k">L' + r.level + '</span>' : '') + (r.parent ? ' <span class="k">(' + esc(r.parent) + ')</span>' : '') + '</td><td class="n">' + r.area.toFixed(1) + '</td><td class="n">' + r.ceiling + '</td><td class="k">' + esc(r.tags.join(', ')) + '</td></tr>').join('') + '</table>' +
         '<p><span class="k">openings</span> ' + Object.entries(op).map(([k, v]) => esc(k) + ' ' + v).join(' · ') + '</p>' +
         ((b.verticals || []).length ? '<p><span class="k">verticals</span> ' + b.verticals.map((v) => esc(v.kind) + (v.dead ? ' (leads nowhere)' : '') + ': ' + v.rooms.join(' → ')).join('; ') + '</p>' : '');
+    } else if (tab === 'portals' && isFillerB(b)) {
+      body.innerHTML = '<table><tr><th>portal</th><th>connection</th><th>kind</th><th>side</th><th class="n">width</th></tr>' +
+        b.portals.map((p) => '<tr><td>' + esc(p.id) + ' <span class="k">' + esc((b.rooms.find((r) => r.id === p.room) || {}).name || p.room) + '</span></td><td>' + esc(p.connection) + ' <span class="k">' + esc((p.tags || []).join(', ')) + '</span></td><td>' + esc(p.kind) + '</td><td>' + esc(p.side) + '</td><td class="n">' + p.width + '</td></tr>').join('') +
+        '</table><p class="k">One portal per connection, cut exactly where the connection asked. Route or side is carried through from the connection.</p>';
     } else if (tab === 'portals') {
       body.innerHTML = '<table><tr><th>portal</th><th>role</th><th>kind</th><th>side</th><th class="n">width</th><th class="n">clear</th></tr>' +
         b.portals.map((p) => '<tr><td>' + esc(p.id) + ' <span class="k">' + esc((b.rooms.find((r) => r.id === p.room) || {}).name || p.room) + '</span>' + (p.main ? ' <b>main</b>' : '') + '</td><td><span style="color:' + (TPL.ROLE_COLORS[p.role] || '#ccc') + '">' + esc(p.role) + '</span></td><td>' + esc(p.kind) + '</td><td>' + esc(p.side) + '</td><td class="n">' + p.width + '</td><td class="n">' + p.clear + '</td></tr>').join('') +
@@ -635,6 +692,24 @@
       const L = (title, arr) => '<div class="k">' + title + '</div>' + (arr && arr.length ? '<ul>' + arr.map((x) => '<li' + (x.indexOf('ERROR') === 0 ? ' class="bad"' : '') + '>' + esc(x) + '</li>').join('') + '</ul>' : '<p class="k">none</p>');
       body.innerHTML = L('Validation', m.issues) + L('Doors added to keep every room reachable', m.autoDoors);
     } else body.innerHTML = '<pre>' + esc(JSON.stringify(b, null, 1).slice(0, 80000)) + '</pre>';
+  }
+
+  /** the side panel for a filler: what it is, what it built, its problems */
+  function fillerPanel(b, A, body) {
+    const m = b.meta, F = FILL.fillers[b.filler];
+    $('dsub').innerHTML = '<b>' + esc(b.name) + '</b> (' + esc(b.feel) + ')' + (A && A.id === 'filler:pool' ? ' · picked by the pool' : '') + ' · site ' + b.site.w + '×' + b.site.h + ' m · ' + b.portals.length + ' connection(s) · ' + m.ms + ' ms';
+    if (!body) return;
+    if (tab === 'score') {
+      const row = (k, v) => '<tr><td>' + k + '</td><td class="n">' + v + '</td></tr>';
+      body.innerHTML = '<table>' + row('rooms', m.rooms) + row('built (share of the site)', pct(m.built)) + row('open floor (rooms of 80 m² or more)', pct(m.openFloor)) +
+        row('partitions', m.partitions) + row('columns', m.columns) + row('passages carved to join the floor', m.carved + ' m²') + row('extra loops made', m.loops) + row('problems', m.issues.length) + '</table>' +
+        '<p class="k">Fillers have no score: there is no candidate search. The engine checks that every connection is cut where asked and every floor cell can be walked to.</p>';
+    } else if (tab === 'program') {
+      body.innerHTML = F ? '<p>' + esc(F.blurb) + '</p><table><tr><td>feel</td><td>' + esc(F.feel) + '</td></tr><tr><td>pool weight</td><td>' + F.weight + '</td></tr><tr><td>openings</td><td>' + Object.entries(F.doors || {}).map(([k, v]) => esc(k) + ' ' + v).join(' · ') +
+        '</td></tr><tr><td>chance of an extra loop</td><td>' + pct(F.loops) + '</td></tr><tr><td>typical site</td><td>' + F.site.w.join('–') + ' × ' + F.site.h.join('–') + ' m</td></tr></table>' : '';
+    } else {
+      body.innerHTML = '<div class="k">Problems</div>' + (m.issues.length ? '<ul>' + m.issues.map((x) => '<li class="bad">' + esc(x) + '</li>').join('') + '</ul>' : '<p class="k">none</p>');
+    }
   }
 
   // ---------------------------------------------------------------- recipe editor
@@ -677,7 +752,7 @@
   on('ereset', 'click', () => { const base = state.arch.replace(/^custom:/, ''); if (ORIGINAL[base]) $('etext').value = JSON.stringify(ORIGINAL[base], null, 2); });
 
   renderChips(); renderLib(); refresh();
-  if (state.detail) { const parts = String(state.detail).split('@'); if (TPL.archetypes[parts[0]]) setTimeout(() => openDetail(parts[0], +parts[1] || 0), 60); }
+  if (state.detail) { const parts = String(state.detail).split('@'); if (entry(parts[0])) setTimeout(() => openDetail(parts[0], +parts[1] || 0), 60); }
   window.__wb = { state, health, build, runHealth, filtered };
 })();
 </script>

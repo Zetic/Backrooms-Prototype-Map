@@ -37,7 +37,7 @@ storage units).
 
 Open `workbench.html` to:
 
-- search and filter the template library;
+- search and filter the template library, fillers included;
 - run a health check across all templates;
 - see one template over many seeds, compare several side by side, or view
   them all as a gallery;
@@ -55,8 +55,8 @@ For the template-first world, every site no POI claims is built by a
 passage, an enfilade, a cell cluster, a ring, a broken room, a ragged hall or
 a pillar hall. The pool leans enclosed (70 / 20 / 10 enclosed / mixed /
 open), each filler takes about 1 ms, and every connection is honoured
-exactly. Open `fillers.html` to try them. They are not wired into the old
-map.
+exactly. Try them in `workbench.html`, under *Fillers (Backrooms)* in the
+library. They are not wired into the old map.
 
 [Filler pool, contract and pipeline](docs/fillers.md)
 
