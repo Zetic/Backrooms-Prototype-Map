@@ -1,1793 +1,54 @@
 {
   "schema": "br.elevation/0.1",
-  "kind": "exploration-fill",
-  "engine": "elevation",
-  "archetype": "terraced_atrium",
-  "name": "Terraced atrium",
+  "filler": "circular_hall",
+  "name": "Circular hall and wing",
+  "feel": "mixed",
   "seed": 7,
-  "approach": "S",
   "grid": 0.5,
-  "fillId": "fill:terraced_atrium:7",
   "site": {
-    "w": 40,
-    "h": 36,
+    "w": 23,
+    "h": 17,
     "rects": [
       [
         0,
         0,
-        40,
-        36
+        23,
+        17
       ]
     ]
   },
-  "bands": [
+  "connections": [
     {
-      "id": "ground",
-      "elevation": 0
-    },
-    {
-      "id": "upper",
-      "elevation": 8
-    }
-  ],
-  "rooms": [
-    {
-      "id": "entry",
-      "type": "room",
-      "name": "Ground entrance",
-      "zone": "circulation",
-      "rects": [
-        [
-          32,
-          24,
-          40,
-          36
-        ]
-      ],
-      "floorZ": 0,
-      "ceiling": 2.8,
-      "ceilingZ": 2.8,
-      "band": "ground",
-      "tags": [
-        "backrooms",
-        "vertical-exploration"
-      ],
-      "area": 96,
-      "level": 0
-    },
-    {
-      "id": "gallery",
-      "type": "room",
-      "name": "Ground gallery",
-      "zone": "circulation",
-      "rects": [
-        [
-          32,
-          16,
-          40,
-          24
-        ]
-      ],
-      "floorZ": 0,
-      "ceiling": 2.8,
-      "ceilingZ": 2.8,
-      "band": "ground",
-      "tags": [
-        "backrooms",
-        "vertical-exploration"
-      ],
-      "area": 64,
-      "level": 0
-    },
-    {
-      "id": "middle",
-      "type": "room",
-      "name": "Intermediate hall",
-      "zone": "circulation",
-      "rects": [
-        [
-          12,
-          16,
-          20,
-          24
-        ]
-      ],
-      "floorZ": 2,
-      "ceiling": 2.6,
-      "ceilingZ": 4.6,
-      "band": "ground",
-      "tags": [
-        "backrooms",
-        "vertical-exploration"
-      ],
-      "area": 64,
-      "level": 1
-    },
-    {
-      "id": "side",
-      "type": "room",
-      "name": "Side rooms",
-      "zone": "circulation",
-      "rects": [
-        [
-          7,
-          16,
-          12,
-          24
-        ]
-      ],
-      "floorZ": 2,
-      "ceiling": 2.6,
-      "ceilingZ": 4.6,
-      "band": "ground",
-      "tags": [
-        "backrooms",
-        "vertical-exploration"
-      ],
-      "area": 40,
-      "level": 1
-    },
-    {
-      "id": "turn",
-      "type": "room",
-      "name": "Turning gallery",
-      "zone": "circulation",
-      "rects": [
-        [
-          12,
-          0,
-          20,
-          4
-        ]
-      ],
-      "floorZ": 4,
-      "ceiling": 2.3,
-      "ceilingZ": 6.3,
-      "band": "ground",
-      "tags": [
-        "backrooms",
-        "vertical-exploration"
-      ],
-      "area": 32,
-      "level": 2
-    },
-    {
-      "id": "pocket",
-      "type": "room",
-      "name": "Compact pocket",
-      "zone": "circulation",
-      "rects": [
-        [
-          7,
-          0,
-          12,
-          4
-        ]
-      ],
-      "floorZ": 4,
-      "ceiling": 2.25,
-      "ceilingZ": 6.25,
-      "band": "ground",
-      "tags": [
-        "backrooms",
-        "vertical-exploration"
-      ],
-      "area": 20,
-      "level": 2
-    },
-    {
-      "id": "overlook",
-      "type": "room",
-      "name": "Atrium overlook",
-      "zone": "circulation",
-      "rects": [
-        [
-          32,
-          0,
-          40,
-          12
-        ]
-      ],
-      "floorZ": 6,
-      "ceiling": 2.8,
-      "ceilingZ": 8.8,
-      "band": "ground",
-      "tags": [
-        "backrooms",
-        "vertical-exploration"
-      ],
-      "area": 96,
-      "level": 3
-    },
-    {
-      "id": "arrival",
-      "type": "room",
-      "name": "Upper band arrival",
-      "zone": "circulation",
-      "rects": [
-        [
-          32,
-          24,
-          40,
-          36
-        ]
-      ],
-      "floorZ": 8,
-      "ceiling": 2.8,
-      "ceilingZ": 10.8,
-      "band": "upper",
-      "tags": [
-        "backrooms",
-        "vertical-exploration"
-      ],
-      "area": 96,
-      "level": 5
-    },
-    {
-      "id": "stack",
-      "type": "room",
-      "name": "Stacked pocket",
-      "zone": "circulation",
-      "rects": [
-        [
-          7,
-          0,
-          12,
-          4
-        ]
-      ],
-      "floorZ": 7,
-      "ceiling": 2.25,
-      "ceilingZ": 9.25,
-      "band": "ground",
-      "tags": [
-        "backrooms",
-        "vertical-exploration"
-      ],
-      "area": 20,
-      "level": 4
-    }
-  ],
-  "walls": [
-    {
-      "id": "w0",
-      "level": 0,
-      "floorZ": 0,
-      "ceilingZ": 2.8,
-      "kind": "exterior",
-      "a": [
-        40,
-        16
-      ],
-      "b": [
-        32,
-        16
-      ],
-      "rooms": [
-        null,
-        "gallery"
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w1",
-      "level": 0,
-      "floorZ": 0,
-      "ceilingZ": 2.8,
-      "kind": "interior",
-      "a": [
-        40,
-        24
-      ],
-      "b": [
-        32,
-        24
-      ],
-      "rooms": [
-        "gallery",
-        "entry"
-      ],
-      "thickness": 0.15
-    },
-    {
-      "id": "w2",
-      "level": 0,
-      "floorZ": 0,
-      "ceilingZ": 2.8,
-      "kind": "exterior",
-      "a": [
-        40,
-        36
-      ],
-      "b": [
-        32,
-        36
-      ],
-      "rooms": [
-        "entry",
-        null
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w3",
-      "level": 0,
-      "floorZ": 0,
-      "ceilingZ": 2.8,
-      "kind": "exterior",
-      "a": [
-        40,
-        16
-      ],
-      "b": [
-        40,
-        24
-      ],
-      "rooms": [
-        null,
-        "gallery"
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w4",
-      "level": 0,
-      "floorZ": 0,
-      "ceilingZ": 2.8,
-      "kind": "exterior",
-      "a": [
-        40,
-        24
-      ],
-      "b": [
-        40,
-        36
-      ],
-      "rooms": [
-        null,
-        "entry"
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w5",
-      "level": 0,
-      "floorZ": 0,
-      "ceilingZ": 2.8,
-      "kind": "exterior",
-      "a": [
-        32,
-        16
-      ],
-      "b": [
-        32,
-        24
-      ],
-      "rooms": [
-        "gallery",
-        null
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w6",
-      "level": 0,
-      "floorZ": 0,
-      "ceilingZ": 2.8,
-      "kind": "exterior",
-      "a": [
-        32,
-        24
-      ],
-      "b": [
-        32,
-        36
-      ],
-      "rooms": [
-        "entry",
-        null
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w7",
-      "level": 1,
-      "floorZ": 2,
-      "ceilingZ": 4.6,
-      "kind": "exterior",
-      "a": [
-        20,
-        16
-      ],
-      "b": [
-        12,
-        16
-      ],
-      "rooms": [
-        null,
-        "middle"
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w8",
-      "level": 1,
-      "floorZ": 2,
-      "ceilingZ": 4.6,
-      "kind": "exterior",
-      "a": [
-        12,
-        16
-      ],
-      "b": [
-        7,
-        16
-      ],
-      "rooms": [
-        null,
-        "side"
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w9",
-      "level": 1,
-      "floorZ": 2,
-      "ceilingZ": 4.6,
-      "kind": "exterior",
-      "a": [
-        20,
-        24
-      ],
-      "b": [
-        12,
-        24
-      ],
-      "rooms": [
-        "middle",
-        null
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w10",
-      "level": 1,
-      "floorZ": 2,
-      "ceilingZ": 4.6,
-      "kind": "exterior",
-      "a": [
-        12,
-        24
-      ],
-      "b": [
-        7,
-        24
-      ],
-      "rooms": [
-        "side",
-        null
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w11",
-      "level": 1,
-      "floorZ": 2,
-      "ceilingZ": 4.6,
-      "kind": "exterior",
-      "a": [
-        20,
-        16
-      ],
-      "b": [
-        20,
-        24
-      ],
-      "rooms": [
-        null,
-        "middle"
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w12",
-      "level": 1,
-      "floorZ": 2,
-      "ceilingZ": 4.6,
-      "kind": "interior",
-      "a": [
-        12,
-        16
-      ],
-      "b": [
-        12,
-        24
-      ],
-      "rooms": [
-        "middle",
-        "side"
-      ],
-      "thickness": 0.15
-    },
-    {
-      "id": "w13",
-      "level": 1,
-      "floorZ": 2,
-      "ceilingZ": 4.6,
-      "kind": "exterior",
-      "a": [
-        7,
-        16
-      ],
-      "b": [
-        7,
-        24
-      ],
-      "rooms": [
-        "side",
-        null
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w14",
-      "level": 2,
-      "floorZ": 4,
-      "ceilingZ": 6.3,
-      "kind": "exterior",
-      "a": [
-        20,
-        0
-      ],
-      "b": [
-        12,
-        0
-      ],
-      "rooms": [
-        null,
-        "turn"
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w15",
-      "level": 2,
-      "floorZ": 4,
-      "ceilingZ": 6.25,
-      "kind": "exterior",
-      "a": [
-        12,
-        0
-      ],
-      "b": [
-        7,
-        0
-      ],
-      "rooms": [
-        null,
-        "pocket"
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w16",
-      "level": 2,
-      "floorZ": 4,
-      "ceilingZ": 6.3,
-      "kind": "exterior",
-      "a": [
-        20,
-        4
-      ],
-      "b": [
-        12,
-        4
-      ],
-      "rooms": [
-        "turn",
-        null
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w17",
-      "level": 2,
-      "floorZ": 4,
-      "ceilingZ": 6.25,
-      "kind": "exterior",
-      "a": [
-        12,
-        4
-      ],
-      "b": [
-        7,
-        4
-      ],
-      "rooms": [
-        "pocket",
-        null
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w18",
-      "level": 2,
-      "floorZ": 4,
-      "ceilingZ": 6.3,
-      "kind": "exterior",
-      "a": [
-        20,
-        0
-      ],
-      "b": [
-        20,
-        4
-      ],
-      "rooms": [
-        null,
-        "turn"
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w19",
-      "level": 2,
-      "floorZ": 4,
-      "ceilingZ": 6.3,
-      "kind": "interior",
-      "a": [
-        12,
-        0
-      ],
-      "b": [
-        12,
-        4
-      ],
-      "rooms": [
-        "turn",
-        "pocket"
-      ],
-      "thickness": 0.15
-    },
-    {
-      "id": "w20",
-      "level": 2,
-      "floorZ": 4,
-      "ceilingZ": 6.25,
-      "kind": "exterior",
-      "a": [
-        7,
-        0
-      ],
-      "b": [
-        7,
-        4
-      ],
-      "rooms": [
-        "pocket",
-        null
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w21",
-      "level": 3,
-      "floorZ": 6,
-      "ceilingZ": 8.8,
-      "kind": "exterior",
-      "a": [
-        40,
-        0
-      ],
-      "b": [
-        32,
-        0
-      ],
-      "rooms": [
-        null,
-        "overlook"
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w22",
-      "level": 3,
-      "floorZ": 6,
-      "ceilingZ": 8.8,
-      "kind": "exterior",
-      "a": [
-        40,
-        12
-      ],
-      "b": [
-        32,
-        12
-      ],
-      "rooms": [
-        "overlook",
-        null
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w23",
-      "level": 3,
-      "floorZ": 6,
-      "ceilingZ": 8.8,
-      "kind": "exterior",
-      "a": [
-        40,
-        0
-      ],
-      "b": [
-        40,
-        12
-      ],
-      "rooms": [
-        null,
-        "overlook"
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w24",
-      "level": 3,
-      "floorZ": 6,
-      "ceilingZ": 8.8,
-      "kind": "exterior",
-      "a": [
-        32,
-        0
-      ],
-      "b": [
-        32,
-        12
-      ],
-      "rooms": [
-        "overlook",
-        null
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w25",
-      "level": 4,
-      "floorZ": 7,
-      "ceilingZ": 9.25,
-      "kind": "exterior",
-      "a": [
-        12,
-        0
-      ],
-      "b": [
-        7,
-        0
-      ],
-      "rooms": [
-        null,
-        "stack"
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w26",
-      "level": 4,
-      "floorZ": 7,
-      "ceilingZ": 9.25,
-      "kind": "exterior",
-      "a": [
-        12,
-        4
-      ],
-      "b": [
-        7,
-        4
-      ],
-      "rooms": [
-        "stack",
-        null
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w27",
-      "level": 4,
-      "floorZ": 7,
-      "ceilingZ": 9.25,
-      "kind": "exterior",
-      "a": [
-        12,
-        0
-      ],
-      "b": [
-        12,
-        4
-      ],
-      "rooms": [
-        null,
-        "stack"
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w28",
-      "level": 4,
-      "floorZ": 7,
-      "ceilingZ": 9.25,
-      "kind": "exterior",
-      "a": [
-        7,
-        0
-      ],
-      "b": [
-        7,
-        4
-      ],
-      "rooms": [
-        "stack",
-        null
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w29",
-      "level": 5,
-      "floorZ": 8,
-      "ceilingZ": 10.8,
-      "kind": "exterior",
-      "a": [
-        40,
-        24
-      ],
-      "b": [
-        32,
-        24
-      ],
-      "rooms": [
-        null,
-        "arrival"
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w30",
-      "level": 5,
-      "floorZ": 8,
-      "ceilingZ": 10.8,
-      "kind": "exterior",
-      "a": [
-        40,
-        36
-      ],
-      "b": [
-        32,
-        36
-      ],
-      "rooms": [
-        "arrival",
-        null
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w31",
-      "level": 5,
-      "floorZ": 8,
-      "ceilingZ": 10.8,
-      "kind": "exterior",
-      "a": [
-        40,
-        24
-      ],
-      "b": [
-        40,
-        36
-      ],
-      "rooms": [
-        null,
-        "arrival"
-      ],
-      "thickness": 0.3
-    },
-    {
-      "id": "w32",
-      "level": 5,
-      "floorZ": 8,
-      "ceilingZ": 10.8,
-      "kind": "exterior",
-      "a": [
-        32,
-        24
-      ],
-      "b": [
-        32,
-        36
-      ],
-      "rooms": [
-        "arrival",
-        null
-      ],
-      "thickness": 0.3
-    }
-  ],
-  "openings": [
-    {
-      "id": "o0",
-      "wall": "w1",
-      "level": 0,
-      "floorZ": 0,
+      "id": "c1",
+      "side": "N",
+      "at": 7.5,
+      "width": 1.5,
+      "line": 0,
       "kind": "opening",
-      "a": [
-        37,
-        24
-      ],
-      "b": [
-        35,
-        24
-      ],
-      "width": 2,
-      "height": 2.2,
-      "rooms": [
-        "entry",
-        "gallery"
-      ]
+      "route": true
     },
     {
-      "id": "o1",
-      "wall": "w12",
-      "level": 1,
-      "floorZ": 2,
-      "kind": "opening",
-      "a": [
-        12,
-        18
-      ],
-      "b": [
-        12,
-        20
-      ],
-      "width": 2,
-      "height": 2.2,
-      "rooms": [
-        "middle",
-        "side"
-      ]
-    },
-    {
-      "id": "o2",
-      "wall": "w19",
-      "level": 2,
-      "floorZ": 4,
-      "kind": "opening",
-      "a": [
-        12,
-        1
-      ],
-      "b": [
-        12,
-        3
-      ],
-      "width": 2,
-      "height": 2.2,
-      "rooms": [
-        "turn",
-        "pocket"
-      ]
-    },
-    {
-      "id": "o3",
-      "wall": "w5",
-      "level": 0,
-      "floorZ": 0,
-      "kind": "opening",
-      "a": [
-        32,
-        18
-      ],
-      "b": [
-        32,
-        20
-      ],
-      "width": 2,
-      "height": 2.2,
-      "rooms": [
-        "gallery",
-        null
-      ]
-    },
-    {
-      "id": "o4",
-      "wall": "w11",
-      "level": 1,
-      "floorZ": 2,
-      "kind": "opening",
-      "a": [
-        20,
-        18
-      ],
-      "b": [
-        20,
-        20
-      ],
-      "width": 2,
-      "height": 2.2,
-      "rooms": [
-        "middle",
-        null
-      ]
-    },
-    {
-      "id": "o5",
-      "wall": "w7",
-      "level": 1,
-      "floorZ": 2,
-      "kind": "opening",
-      "a": [
-        18,
-        16
-      ],
-      "b": [
-        16,
-        16
-      ],
-      "width": 2,
-      "height": 2.2,
-      "rooms": [
-        "middle",
-        null
-      ]
-    },
-    {
-      "id": "o6",
-      "wall": "w16",
-      "level": 2,
-      "floorZ": 4,
-      "kind": "opening",
-      "a": [
-        18,
-        4
-      ],
-      "b": [
-        16,
-        4
-      ],
-      "width": 2,
-      "height": 2.2,
-      "rooms": [
-        "turn",
-        null
-      ]
-    },
-    {
-      "id": "o7",
-      "wall": "w18",
-      "level": 2,
-      "floorZ": 4,
-      "kind": "opening",
-      "a": [
-        20,
-        1
-      ],
-      "b": [
-        20,
-        3
-      ],
-      "width": 2,
-      "height": 2.2,
-      "rooms": [
-        "turn",
-        null
-      ]
-    },
-    {
-      "id": "o8",
-      "wall": "w24",
-      "level": 3,
-      "floorZ": 6,
-      "kind": "opening",
-      "a": [
-        32,
-        1
-      ],
-      "b": [
-        32,
-        3
-      ],
-      "width": 2,
-      "height": 2.2,
-      "rooms": [
-        "overlook",
-        null
-      ]
-    },
-    {
-      "id": "o9",
-      "wall": "w22",
-      "level": 3,
-      "floorZ": 6,
-      "kind": "opening",
-      "a": [
-        37,
-        12
-      ],
-      "b": [
-        35,
-        12
-      ],
-      "width": 2,
-      "height": 2.2,
-      "rooms": [
-        "overlook",
-        null
-      ]
-    },
-    {
-      "id": "o10",
-      "wall": "w29",
-      "level": 5,
-      "floorZ": 8,
-      "kind": "opening",
-      "a": [
-        37,
-        24
-      ],
-      "b": [
-        35,
-        24
-      ],
-      "width": 2,
-      "height": 2.2,
-      "rooms": [
-        "arrival",
-        null
-      ]
-    },
-    {
-      "id": "o11",
-      "wall": "w24",
-      "level": 3,
-      "floorZ": 6,
-      "kind": "window",
-      "a": [
-        32,
-        5
-      ],
-      "b": [
-        32,
-        10
-      ],
-      "width": 5,
-      "rooms": [
-        "overlook",
-        null
-      ],
-      "sill": 1.1,
-      "head": 2.2
-    },
-    {
-      "id": "o12",
-      "wall": "w2",
-      "level": 0,
-      "floorZ": 0,
-      "kind": "opening",
-      "a": [
-        37,
-        36
-      ],
-      "b": [
-        35,
-        36
-      ],
-      "width": 2,
-      "height": 2.2,
-      "rooms": [
-        "entry",
-        null
-      ],
-      "portal": "p0"
-    },
-    {
-      "id": "o13",
-      "wall": "w31",
-      "level": 5,
-      "floorZ": 8,
-      "kind": "opening",
-      "a": [
-        40,
-        28
-      ],
-      "b": [
-        40,
-        30
-      ],
-      "width": 2,
-      "height": 2.2,
-      "rooms": [
-        "arrival",
-        null
-      ],
-      "portal": "p1"
-    }
-  ],
-  "portals": [
-    {
-      "id": "p0",
-      "opening": "o12",
-      "room": "entry",
-      "role": "both",
-      "kind": "opening",
-      "side": "S",
-      "width": 2,
-      "clear": 1.2,
-      "main": true,
-      "state": "landing",
-      "band": "ground",
-      "tags": [
-        "band-landing"
-      ],
-      "floorZ": 0,
-      "level": 0,
-      "at": [
-        36,
-        36,
-        0
-      ]
-    },
-    {
-      "id": "p1",
-      "opening": "o13",
-      "room": "arrival",
-      "role": "both",
-      "kind": "opening",
+      "id": "c0",
       "side": "E",
-      "width": 2,
-      "clear": 1.2,
-      "main": false,
-      "state": "landing",
-      "band": "upper",
-      "tags": [
-        "band-landing"
-      ],
-      "floorZ": 8,
-      "level": 5,
-      "at": [
-        40,
-        29,
-        8
-      ]
+      "at": 1.5,
+      "width": 1.5,
+      "line": 23,
+      "kind": "opening",
+      "route": false
     }
   ],
-  "verticals": [],
-  "holes": [
-    {
-      "id": "pocket:ladder:ceiling",
-      "connector": "pocket:ladder",
-      "surface": "s:pocket",
-      "face": "ceiling",
-      "rect": [
-        7.5,
-        0.5,
-        8,
-        1
-      ]
-    },
-    {
-      "id": "pocket:ladder:floor",
-      "connector": "pocket:ladder",
-      "surface": "s:stack",
-      "face": "floor",
-      "rect": [
-        7.5,
-        0.5,
-        8,
-        1
-      ]
-    }
-  ],
-  "connectors": [
-    {
-      "id": "ramp:1",
-      "kind": "ramp",
-      "from": "s:gallery",
-      "to": "s:middle",
-      "state": "connected",
-      "direction": "both",
-      "width": 2,
-      "clearance": 2.2,
-      "architecture": {
-        "slab": 0.25,
-        "sideWalls": {
-          "height": 2.2,
-          "thickness": 0.15
-        },
-        "ceiling": true
-      },
-      "landings": [
-        [
-          32,
-          19,
-          0
-        ],
-        [
-          20,
-          19,
-          2
-        ]
-      ],
-      "path": [
-        [
-          32,
-          19,
-          0
-        ],
-        [
-          20,
-          19,
-          2
-        ]
-      ],
-      "reservation": {
-        "id": "volume:ramp:1",
-        "kind": "connector",
-        "rects": [
-          [
-            20,
-            18,
-            32,
-            20
-          ]
-        ],
-        "z0": -0.25,
-        "z1": 4.2
-      }
-    },
-    {
-      "id": "ramp:2",
-      "kind": "ramp",
-      "from": "s:middle",
-      "to": "s:turn",
-      "state": "connected",
-      "direction": "both",
-      "width": 2,
-      "clearance": 2.2,
-      "architecture": {
-        "slab": 0.25,
-        "sideWalls": {
-          "height": 2.2,
-          "thickness": 0.15
-        },
-        "ceiling": true
-      },
-      "landings": [
-        [
-          17,
-          16,
-          2
-        ],
-        [
-          17,
-          4,
-          4
-        ]
-      ],
-      "path": [
-        [
-          17,
-          16,
-          2
-        ],
-        [
-          17,
-          4,
-          4
-        ]
-      ],
-      "reservation": {
-        "id": "volume:ramp:2",
-        "kind": "connector",
-        "rects": [
-          [
-            16,
-            4,
-            18,
-            16
-          ]
-        ],
-        "z0": 1.75,
-        "z1": 6.2
-      }
-    },
-    {
-      "id": "ramp:3",
-      "kind": "ramp",
-      "from": "s:turn",
-      "to": "s:overlook",
-      "state": "connected",
-      "direction": "both",
-      "width": 2,
-      "clearance": 2.2,
-      "architecture": {
-        "slab": 0.25,
-        "sideWalls": {
-          "height": 2.2,
-          "thickness": 0.15
-        },
-        "ceiling": true
-      },
-      "landings": [
-        [
-          20,
-          2,
-          4
-        ],
-        [
-          32,
-          2,
-          6
-        ]
-      ],
-      "path": [
-        [
-          20,
-          2,
-          4
-        ],
-        [
-          32,
-          2,
-          6
-        ]
-      ],
-      "reservation": {
-        "id": "volume:ramp:3",
-        "kind": "connector",
-        "rects": [
-          [
-            20,
-            1,
-            32,
-            3
-          ]
-        ],
-        "z0": 3.75,
-        "z1": 8.2
-      }
-    },
-    {
-      "id": "ramp:4",
-      "kind": "ramp",
-      "from": "s:overlook",
-      "to": "s:arrival",
-      "state": "connected",
-      "direction": "both",
-      "width": 2,
-      "clearance": 2.2,
-      "architecture": {
-        "slab": 0.25,
-        "sideWalls": {
-          "height": 2.2,
-          "thickness": 0.15
-        },
-        "ceiling": true
-      },
-      "landings": [
-        [
-          36,
-          12,
-          6
-        ],
-        [
-          36,
-          24,
-          8
-        ]
-      ],
-      "path": [
-        [
-          36,
-          12,
-          6
-        ],
-        [
-          36,
-          24,
-          8
-        ]
-      ],
-      "reservation": {
-        "id": "volume:ramp:4",
-        "kind": "connector",
-        "rects": [
-          [
-            35,
-            12,
-            37,
-            24
-          ]
-        ],
-        "z0": 5.75,
-        "z1": 10.2
-      }
-    },
-    {
-      "id": "pocket:ladder",
-      "kind": "ladder",
-      "from": "s:pocket",
-      "to": "s:stack",
-      "state": "connected",
-      "direction": "both",
-      "width": 0.5,
-      "clearance": 1.8,
-      "landings": [
-        [
-          8.25,
-          1,
-          4
-        ],
-        [
-          8.25,
-          1,
-          7
-        ]
-      ],
-      "path": [
-        [
-          8.25,
-          1,
-          4
-        ],
-        [
-          7.75,
-          0.75,
-          4
-        ],
-        [
-          7.75,
-          0.75,
-          7
-        ],
-        [
-          8.25,
-          1,
-          7
-        ]
-      ],
-      "reservation": {
-        "id": "volume:pocket:ladder",
-        "kind": "connector",
-        "rects": [
-          [
-            7.5,
-            0.5,
-            8.5,
-            1.5
-          ]
-        ],
-        "z0": 3.75,
-        "z1": 8.8
-      }
-    }
-  ],
-  "voids": [
-    {
-      "id": "atrium",
-      "kind": "void",
-      "rects": [
-        [
-          20,
-          4,
-          32,
-          16
-        ]
-      ],
-      "z0": -0.25,
-      "z1": 11
-    }
-  ],
-  "route": [
-    [
-      36,
-      36,
-      0
-    ],
-    [
-      36,
-      19,
-      0
-    ],
-    [
-      32,
-      19,
-      0
-    ],
-    [
-      20,
-      19,
-      2
-    ],
-    [
-      17,
-      19,
-      2
-    ],
-    [
-      17,
-      16,
-      2
-    ],
-    [
-      17,
-      4,
-      4
-    ],
-    [
-      17,
-      2,
-      4
-    ],
-    [
-      20,
-      2,
-      4
-    ],
-    [
-      32,
-      2,
-      6
-    ],
-    [
-      36,
-      2,
-      6
-    ],
-    [
-      36,
-      12,
-      6
-    ],
-    [
-      36,
-      24,
-      8
-    ],
-    [
-      36,
-      29,
-      8
-    ],
-    [
-      40,
-      29,
-      8
-    ]
-  ],
-  "graph": {
-    "nodes": [
-      "outside",
-      "entry",
-      "gallery",
-      "middle",
-      "side",
-      "turn",
-      "pocket",
-      "overlook",
-      "arrival",
-      "stack"
-    ],
-    "edges": [
-      [
-        "gallery",
-        "middle",
-        "ramp",
-        "ramp:1"
-      ],
-      [
-        "middle",
-        "turn",
-        "ramp",
-        "ramp:2"
-      ],
-      [
-        "turn",
-        "overlook",
-        "ramp",
-        "ramp:3"
-      ],
-      [
-        "overlook",
-        "arrival",
-        "ramp",
-        "ramp:4"
-      ],
-      [
-        "pocket",
-        "stack",
-        "ladder",
-        "pocket:ladder"
-      ],
-      [
-        "entry",
-        "gallery",
-        "opening",
-        "o0"
-      ],
-      [
-        "middle",
-        "side",
-        "opening",
-        "o1"
-      ],
-      [
-        "turn",
-        "pocket",
-        "opening",
-        "o2"
-      ],
-      [
-        "entry",
-        "outside",
-        "opening",
-        "o12"
-      ],
-      [
-        "arrival",
-        "outside",
-        "opening",
-        "o13"
-      ]
-    ]
-  },
-  "meta": {
-    "plan": {
-      "type": "terraced_atrium"
-    },
-    "score": 100,
-    "terms": {},
-    "mutations": [],
-    "issues": [],
-    "autoDoors": [],
-    "program": [
-      "vertical exploration",
-      "reserved atrium",
-      "compact stacked pocket"
-    ]
-  },
   "levels": [
     {
       "index": 0,
       "elevation": 0,
-      "height": 2.8,
+      "height": 2.9,
       "band": "ground"
     },
     {
       "index": 1,
-      "elevation": 2,
-      "height": 2.6,
-      "band": "ground"
-    },
-    {
-      "index": 2,
-      "elevation": 4,
-      "height": 2.3,
-      "band": "ground"
-    },
-    {
-      "index": 3,
-      "elevation": 6,
-      "height": 2.8,
-      "band": "ground"
-    },
-    {
-      "index": 4,
-      "elevation": 7,
-      "height": 2.25,
-      "band": "ground"
-    },
-    {
-      "index": 5,
       "elevation": 8,
-      "height": 2.8,
-      "band": "upper"
+      "height": 2.2,
+      "band": "up"
     }
   ],
   "footprint": [
@@ -1795,16 +56,142 @@
       "level": 0,
       "rects": [
         [
-          32,
-          24,
-          40,
-          36
+          7.5,
+          0,
+          9,
+          16
         ],
         [
-          32,
+          6,
+          1,
+          7.5,
+          16
+        ],
+        [
+          4.5,
+          1.5,
+          6,
+          15.5
+        ],
+        [
+          10,
+          1.5,
+          11.5,
+          15.5
+        ],
+        [
+          15.5,
+          7,
+          22.5,
+          10
+        ],
+        [
+          9,
+          1,
+          10,
+          16
+        ],
+        [
+          3,
+          2.5,
+          4,
+          14.5
+        ],
+        [
+          12,
+          2.5,
+          13,
+          14.5
+        ],
+        [
+          4,
+          2,
+          4.5,
+          15
+        ],
+        [
+          11.5,
+          2,
+          12,
+          15
+        ],
+        [
+          2.5,
+          3,
+          3,
+          14
+        ],
+        [
+          13,
+          3,
+          13.5,
+          14
+        ],
+        [
+          2,
+          3.5,
+          2.5,
+          13.5
+        ],
+        [
+          13.5,
+          3.5,
+          14,
+          13.5
+        ],
+        [
+          1.5,
+          4.5,
+          2,
+          12.5
+        ],
+        [
+          14,
+          4.5,
+          14.5,
+          12.5
+        ],
+        [
+          1,
+          5,
+          1.5,
+          12
+        ],
+        [
+          14.5,
+          5,
+          15,
+          12
+        ],
+        [
+          0.5,
+          6.5,
+          1,
+          10.5
+        ],
+        [
+          15,
+          6.5,
+          15.5,
+          10.5
+        ],
+        [
           16,
-          40,
-          24
+          0.5,
+          22.5,
+          7
+        ],
+        [
+          22.5,
+          1.5,
+          23,
+          3
+        ],
+        [
+          16,
+          10,
+          22.5,
+          16.5
         ]
       ]
     },
@@ -1812,553 +199,5274 @@
       "level": 1,
       "rects": [
         [
-          12,
-          16,
-          20,
-          24
-        ],
-        [
-          7,
-          16,
-          12,
-          24
-        ]
-      ]
-    },
-    {
-      "level": 2,
-      "rects": [
-        [
-          12,
-          0,
-          20,
-          4
-        ],
-        [
-          7,
-          0,
-          12,
-          4
-        ]
-      ]
-    },
-    {
-      "level": 3,
-      "rects": [
-        [
-          32,
-          0,
-          40,
-          12
-        ]
-      ]
-    },
-    {
-      "level": 4,
-      "rects": [
-        [
-          7,
-          0,
-          12,
-          4
-        ]
-      ]
-    },
-    {
-      "level": 5,
-      "rects": [
-        [
-          32,
-          24,
-          40,
-          36
+          3,
+          13.5,
+          4,
+          14.5
         ]
       ]
     }
   ],
+  "rooms": [
+    {
+      "id": "r0",
+      "type": "hall",
+      "name": "hall",
+      "zone": "public",
+      "level": 0,
+      "rects": [
+        [
+          7.5,
+          0,
+          9,
+          16
+        ],
+        [
+          6,
+          1,
+          7.5,
+          16
+        ],
+        [
+          4.5,
+          1.5,
+          6,
+          15.5
+        ],
+        [
+          10,
+          1.5,
+          11.5,
+          15.5
+        ],
+        [
+          15.5,
+          7,
+          22.5,
+          10
+        ],
+        [
+          9,
+          1,
+          10,
+          16
+        ],
+        [
+          3,
+          2.5,
+          4,
+          14.5
+        ],
+        [
+          12,
+          2.5,
+          13,
+          14.5
+        ],
+        [
+          4,
+          2,
+          4.5,
+          15
+        ],
+        [
+          11.5,
+          2,
+          12,
+          15
+        ],
+        [
+          2.5,
+          3,
+          3,
+          14
+        ],
+        [
+          13,
+          3,
+          13.5,
+          14
+        ],
+        [
+          2,
+          3.5,
+          2.5,
+          13.5
+        ],
+        [
+          13.5,
+          3.5,
+          14,
+          13.5
+        ],
+        [
+          1.5,
+          4.5,
+          2,
+          12.5
+        ],
+        [
+          14,
+          4.5,
+          14.5,
+          12.5
+        ],
+        [
+          1,
+          5,
+          1.5,
+          12
+        ],
+        [
+          14.5,
+          5,
+          15,
+          12
+        ],
+        [
+          0.5,
+          6.5,
+          1,
+          10.5
+        ],
+        [
+          15,
+          6.5,
+          15.5,
+          10.5
+        ]
+      ],
+      "area": 201.5,
+      "ceiling": 2.9,
+      "tags": [
+        "backrooms",
+        "large",
+        "architectural",
+        "circle"
+      ],
+      "floorZ": 0,
+      "ceilingZ": 2.9,
+      "band": "ground"
+    },
+    {
+      "id": "r1",
+      "type": "room",
+      "name": "room",
+      "zone": "public",
+      "level": 0,
+      "rects": [
+        [
+          16,
+          0.5,
+          22.5,
+          7
+        ],
+        [
+          22.5,
+          1.5,
+          23,
+          3
+        ]
+      ],
+      "area": 43,
+      "ceiling": 2.7,
+      "tags": [
+        "backrooms",
+        "architectural",
+        "wing-room"
+      ],
+      "floorZ": 0,
+      "ceilingZ": 2.7,
+      "band": "ground"
+    },
+    {
+      "id": "r2",
+      "type": "room",
+      "name": "room 2",
+      "zone": "public",
+      "level": 0,
+      "rects": [
+        [
+          16,
+          10,
+          22.5,
+          16.5
+        ]
+      ],
+      "area": 42.25,
+      "ceiling": 2.4,
+      "tags": [
+        "backrooms",
+        "architectural",
+        "wing-room"
+      ],
+      "floorZ": 0,
+      "ceilingZ": 2.4,
+      "band": "ground"
+    },
+    {
+      "id": "elev:landing:up",
+      "type": "landing",
+      "name": "Upper landing",
+      "zone": "circulation",
+      "floorZ": 8,
+      "ceiling": 2.2,
+      "ceilingZ": 10.2,
+      "band": "up",
+      "rects": [
+        [
+          3,
+          13.5,
+          4,
+          14.5
+        ]
+      ],
+      "area": 1,
+      "tags": [
+        "vertical-landing"
+      ],
+      "level": 1
+    }
+  ],
+  "walls": [
+    {
+      "id": "w0",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        7.5,
+        0
+      ],
+      "b": [
+        9,
+        0
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w1",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        16,
+        0.5
+      ],
+      "b": [
+        22.5,
+        0.5
+      ],
+      "rooms": [
+        null,
+        "r1"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.7
+    },
+    {
+      "id": "w2",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        6,
+        1
+      ],
+      "b": [
+        7.5,
+        1
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w3",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        9,
+        1
+      ],
+      "b": [
+        10,
+        1
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w4",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        4.5,
+        1.5
+      ],
+      "b": [
+        6,
+        1.5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w5",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        10,
+        1.5
+      ],
+      "b": [
+        11.5,
+        1.5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w6",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        22.5,
+        1.5
+      ],
+      "b": [
+        23,
+        1.5
+      ],
+      "rooms": [
+        null,
+        "r1"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.7
+    },
+    {
+      "id": "w7",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        4,
+        2
+      ],
+      "b": [
+        4.5,
+        2
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w8",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        11.5,
+        2
+      ],
+      "b": [
+        12,
+        2
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w9",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        3,
+        2.5
+      ],
+      "b": [
+        4,
+        2.5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w10",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        12,
+        2.5
+      ],
+      "b": [
+        13,
+        2.5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w11",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        2.5,
+        3
+      ],
+      "b": [
+        3,
+        3
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w12",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        13,
+        3
+      ],
+      "b": [
+        13.5,
+        3
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w13",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        22.5,
+        3
+      ],
+      "b": [
+        23,
+        3
+      ],
+      "rooms": [
+        "r1",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.7
+    },
+    {
+      "id": "w14",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        2,
+        3.5
+      ],
+      "b": [
+        2.5,
+        3.5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w15",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        13.5,
+        3.5
+      ],
+      "b": [
+        14,
+        3.5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w16",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        1.5,
+        4.5
+      ],
+      "b": [
+        2,
+        4.5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w17",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        14,
+        4.5
+      ],
+      "b": [
+        14.5,
+        4.5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w18",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        1,
+        5
+      ],
+      "b": [
+        1.5,
+        5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w19",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        14.5,
+        5
+      ],
+      "b": [
+        15,
+        5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w20",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        0.5,
+        6.5
+      ],
+      "b": [
+        1,
+        6.5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w21",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        15,
+        6.5
+      ],
+      "b": [
+        15.5,
+        6.5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w22",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        15.5,
+        7
+      ],
+      "b": [
+        16,
+        7
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w23",
+      "level": 0,
+      "kind": "interior",
+      "a": [
+        16,
+        7
+      ],
+      "b": [
+        22.5,
+        7
+      ],
+      "rooms": [
+        "r1",
+        "r0"
+      ],
+      "thickness": 0.15,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w24",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        15.5,
+        10
+      ],
+      "b": [
+        16,
+        10
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w25",
+      "level": 0,
+      "kind": "interior",
+      "a": [
+        16,
+        10
+      ],
+      "b": [
+        22.5,
+        10
+      ],
+      "rooms": [
+        "r0",
+        "r2"
+      ],
+      "thickness": 0.15,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w26",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        0.5,
+        10.5
+      ],
+      "b": [
+        1,
+        10.5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w27",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        15,
+        10.5
+      ],
+      "b": [
+        15.5,
+        10.5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w28",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        1,
+        12
+      ],
+      "b": [
+        1.5,
+        12
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w29",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        14.5,
+        12
+      ],
+      "b": [
+        15,
+        12
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w30",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        1.5,
+        12.5
+      ],
+      "b": [
+        2,
+        12.5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w31",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        14,
+        12.5
+      ],
+      "b": [
+        14.5,
+        12.5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w32",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        2,
+        13.5
+      ],
+      "b": [
+        2.5,
+        13.5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w33",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        13.5,
+        13.5
+      ],
+      "b": [
+        14,
+        13.5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w34",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        2.5,
+        14
+      ],
+      "b": [
+        3,
+        14
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w35",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        13,
+        14
+      ],
+      "b": [
+        13.5,
+        14
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w36",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        3,
+        14.5
+      ],
+      "b": [
+        4,
+        14.5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w37",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        12,
+        14.5
+      ],
+      "b": [
+        13,
+        14.5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w38",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        4,
+        15
+      ],
+      "b": [
+        4.5,
+        15
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w39",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        11.5,
+        15
+      ],
+      "b": [
+        12,
+        15
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w40",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        4.5,
+        15.5
+      ],
+      "b": [
+        6,
+        15.5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w41",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        10,
+        15.5
+      ],
+      "b": [
+        11.5,
+        15.5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w42",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        6,
+        16
+      ],
+      "b": [
+        10,
+        16
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w43",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        16,
+        16.5
+      ],
+      "b": [
+        22.5,
+        16.5
+      ],
+      "rooms": [
+        "r2",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.4
+    },
+    {
+      "id": "w44",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        0.5,
+        6.5
+      ],
+      "b": [
+        0.5,
+        10.5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w45",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        1,
+        5
+      ],
+      "b": [
+        1,
+        6.5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w46",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        1,
+        10.5
+      ],
+      "b": [
+        1,
+        12
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w47",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        1.5,
+        4.5
+      ],
+      "b": [
+        1.5,
+        5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w48",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        1.5,
+        12
+      ],
+      "b": [
+        1.5,
+        12.5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w49",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        2,
+        3.5
+      ],
+      "b": [
+        2,
+        4.5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w50",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        2,
+        12.5
+      ],
+      "b": [
+        2,
+        13.5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w51",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        2.5,
+        3
+      ],
+      "b": [
+        2.5,
+        3.5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w52",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        2.5,
+        13.5
+      ],
+      "b": [
+        2.5,
+        14
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w53",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        3,
+        2.5
+      ],
+      "b": [
+        3,
+        3
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w54",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        3,
+        14
+      ],
+      "b": [
+        3,
+        14.5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w55",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        4,
+        2
+      ],
+      "b": [
+        4,
+        2.5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w56",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        4,
+        14.5
+      ],
+      "b": [
+        4,
+        15
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w57",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        4.5,
+        1.5
+      ],
+      "b": [
+        4.5,
+        2
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w58",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        4.5,
+        15
+      ],
+      "b": [
+        4.5,
+        15.5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w59",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        6,
+        1
+      ],
+      "b": [
+        6,
+        1.5
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w60",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        6,
+        15.5
+      ],
+      "b": [
+        6,
+        16
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w61",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        7.5,
+        0
+      ],
+      "b": [
+        7.5,
+        1
+      ],
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w62",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        9,
+        0
+      ],
+      "b": [
+        9,
+        1
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w63",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        10,
+        1
+      ],
+      "b": [
+        10,
+        1.5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w64",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        10,
+        15.5
+      ],
+      "b": [
+        10,
+        16
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w65",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        11.5,
+        1.5
+      ],
+      "b": [
+        11.5,
+        2
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w66",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        11.5,
+        15
+      ],
+      "b": [
+        11.5,
+        15.5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w67",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        12,
+        2
+      ],
+      "b": [
+        12,
+        2.5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w68",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        12,
+        14.5
+      ],
+      "b": [
+        12,
+        15
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w69",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        13,
+        2.5
+      ],
+      "b": [
+        13,
+        3
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w70",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        13,
+        14
+      ],
+      "b": [
+        13,
+        14.5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w71",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        13.5,
+        3
+      ],
+      "b": [
+        13.5,
+        3.5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w72",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        13.5,
+        13.5
+      ],
+      "b": [
+        13.5,
+        14
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w73",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        14,
+        3.5
+      ],
+      "b": [
+        14,
+        4.5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w74",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        14,
+        12.5
+      ],
+      "b": [
+        14,
+        13.5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w75",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        14.5,
+        4.5
+      ],
+      "b": [
+        14.5,
+        5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w76",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        14.5,
+        12
+      ],
+      "b": [
+        14.5,
+        12.5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w77",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        15,
+        5
+      ],
+      "b": [
+        15,
+        6.5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w78",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        15,
+        10.5
+      ],
+      "b": [
+        15,
+        12
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w79",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        15.5,
+        6.5
+      ],
+      "b": [
+        15.5,
+        7
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w80",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        15.5,
+        10
+      ],
+      "b": [
+        15.5,
+        10.5
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w81",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        16,
+        0.5
+      ],
+      "b": [
+        16,
+        7
+      ],
+      "rooms": [
+        null,
+        "r1"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.7
+    },
+    {
+      "id": "w82",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        16,
+        10
+      ],
+      "b": [
+        16,
+        16.5
+      ],
+      "rooms": [
+        null,
+        "r2"
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.4
+    },
+    {
+      "id": "w83",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        22.5,
+        0.5
+      ],
+      "b": [
+        22.5,
+        1.5
+      ],
+      "rooms": [
+        "r1",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.7
+    },
+    {
+      "id": "w84",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        22.5,
+        3
+      ],
+      "b": [
+        22.5,
+        7
+      ],
+      "rooms": [
+        "r1",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.7
+    },
+    {
+      "id": "w85",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        22.5,
+        7
+      ],
+      "b": [
+        22.5,
+        10
+      ],
+      "rooms": [
+        "r0",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.9
+    },
+    {
+      "id": "w86",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        22.5,
+        10
+      ],
+      "b": [
+        22.5,
+        16.5
+      ],
+      "rooms": [
+        "r2",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.4
+    },
+    {
+      "id": "w87",
+      "level": 0,
+      "kind": "exterior",
+      "a": [
+        23,
+        1.5
+      ],
+      "b": [
+        23,
+        3
+      ],
+      "rooms": [
+        "r1",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 0,
+      "ceilingZ": 2.7
+    },
+    {
+      "id": "elev:w:elev:landing:up:0",
+      "kind": "exterior",
+      "a": [
+        3,
+        13.5
+      ],
+      "b": [
+        4,
+        13.5
+      ],
+      "rooms": [
+        "elev:landing:up",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 8,
+      "ceilingZ": 10.2,
+      "level": 1
+    },
+    {
+      "id": "elev:w:elev:landing:up:1",
+      "kind": "exterior",
+      "a": [
+        4,
+        13.5
+      ],
+      "b": [
+        4,
+        14.5
+      ],
+      "rooms": [
+        "elev:landing:up",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 8,
+      "ceilingZ": 10.2,
+      "level": 1
+    },
+    {
+      "id": "elev:w:elev:landing:up:2",
+      "kind": "exterior",
+      "a": [
+        4,
+        14.5
+      ],
+      "b": [
+        3,
+        14.5
+      ],
+      "rooms": [
+        "elev:landing:up",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 8,
+      "ceilingZ": 10.2,
+      "level": 1
+    },
+    {
+      "id": "elev:w:elev:landing:up:3",
+      "kind": "exterior",
+      "a": [
+        3,
+        14.5
+      ],
+      "b": [
+        3,
+        13.5
+      ],
+      "rooms": [
+        "elev:landing:up",
+        null
+      ],
+      "thickness": 0.3,
+      "floorZ": 8,
+      "ceilingZ": 10.2,
+      "level": 1
+    }
+  ],
+  "openings": [
+    {
+      "id": "o0",
+      "level": 0,
+      "wall": "w0",
+      "kind": "opening",
+      "a": [
+        7.5,
+        0
+      ],
+      "b": [
+        9,
+        0
+      ],
+      "width": 1.5,
+      "rooms": [
+        null,
+        "r0"
+      ],
+      "height": 2.2,
+      "portal": "p0",
+      "floorZ": 0
+    },
+    {
+      "id": "o1",
+      "level": 0,
+      "wall": "w87",
+      "kind": "opening",
+      "a": [
+        23,
+        1.5
+      ],
+      "b": [
+        23,
+        3
+      ],
+      "width": 1.5,
+      "rooms": [
+        "r1",
+        null
+      ],
+      "height": 2.2,
+      "portal": "p1",
+      "floorZ": 0
+    },
+    {
+      "id": "o2",
+      "level": 0,
+      "wall": "w23",
+      "kind": "opening",
+      "a": [
+        18.5,
+        7
+      ],
+      "b": [
+        19.5,
+        7
+      ],
+      "width": 1,
+      "rooms": [
+        "r1",
+        "r0"
+      ],
+      "height": 2.2,
+      "floorZ": 0
+    },
+    {
+      "id": "o3",
+      "level": 0,
+      "wall": "w25",
+      "kind": "door",
+      "a": [
+        17.5,
+        10
+      ],
+      "b": [
+        18.5,
+        10
+      ],
+      "width": 1,
+      "rooms": [
+        "r0",
+        "r2"
+      ],
+      "height": 2.1,
+      "swingInto": "r2",
+      "hinge": [
+        17.5,
+        10
+      ],
+      "floorZ": 0
+    }
+  ],
+  "portals": [
+    {
+      "id": "p0",
+      "connection": "c1",
+      "opening": "o0",
+      "level": 0,
+      "room": "r0",
+      "role": "both",
+      "kind": "opening",
+      "side": "N",
+      "width": 1.5,
+      "clear": 1,
+      "main": false,
+      "tags": [
+        "route"
+      ],
+      "floorZ": 0,
+      "band": "ground",
+      "state": "landing",
+      "at": [
+        8.25,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "p1",
+      "connection": "c0",
+      "opening": "o1",
+      "level": 0,
+      "room": "r1",
+      "role": "both",
+      "kind": "opening",
+      "side": "E",
+      "width": 1.5,
+      "clear": 1,
+      "main": false,
+      "tags": [
+        "side"
+      ],
+      "floorZ": 0,
+      "band": "ground",
+      "state": "landing",
+      "at": [
+        23,
+        2.25,
+        0
+      ]
+    }
+  ],
+  "columns": [],
+  "verticals": [],
+  "graph": {
+    "nodes": [
+      "r0",
+      "r1",
+      "r2",
+      "outside",
+      "elev:landing:up"
+    ],
+    "edges": [
+      [
+        "r0",
+        "r1",
+        "opening",
+        "o2"
+      ],
+      [
+        "r0",
+        "r2",
+        "door",
+        "o3"
+      ],
+      [
+        "r0",
+        "outside",
+        "opening",
+        "o0"
+      ],
+      [
+        "r1",
+        "outside",
+        "opening",
+        "o1"
+      ],
+      [
+        "r0",
+        "elev:landing:up",
+        "ladder",
+        "elev:ladder:up"
+      ]
+    ]
+  },
+  "meta": {
+    "rooms": 3,
+    "built": 0.733,
+    "openFloor": 0.703,
+    "partitions": 0,
+    "columns": 0,
+    "curves": 2,
+    "carved": 0,
+    "loops": 0,
+    "issues": [],
+    "ms": 17.08
+  },
+  "outline": [
+    {
+      "level": 0,
+      "rings": [
+        [
+          [
+            7.5,
+            0
+          ],
+          [
+            8,
+            0
+          ],
+          [
+            8.5,
+            0
+          ],
+          [
+            9,
+            0
+          ],
+          [
+            9,
+            0.5
+          ],
+          [
+            9,
+            1
+          ],
+          [
+            8.991,
+            1.066
+          ],
+          [
+            9.233,
+            1.102
+          ],
+          [
+            9.474,
+            1.146
+          ],
+          [
+            9.714,
+            1.198
+          ],
+          [
+            9.951,
+            1.258
+          ],
+          [
+            10.186,
+            1.326
+          ],
+          [
+            10.42,
+            1.401
+          ],
+          [
+            10.65,
+            1.484
+          ],
+          [
+            10.878,
+            1.574
+          ],
+          [
+            11.102,
+            1.672
+          ],
+          [
+            11.323,
+            1.777
+          ],
+          [
+            11.541,
+            1.889
+          ],
+          [
+            11.755,
+            2.008
+          ],
+          [
+            11.965,
+            2.134
+          ],
+          [
+            12.171,
+            2.267
+          ],
+          [
+            12.372,
+            2.406
+          ],
+          [
+            12.569,
+            2.552
+          ],
+          [
+            12.761,
+            2.705
+          ],
+          [
+            12.947,
+            2.863
+          ],
+          [
+            13.129,
+            3.028
+          ],
+          [
+            13.305,
+            3.198
+          ],
+          [
+            13.475,
+            3.374
+          ],
+          [
+            13.639,
+            3.555
+          ],
+          [
+            13.798,
+            3.742
+          ],
+          [
+            13.95,
+            3.934
+          ],
+          [
+            14.096,
+            4.131
+          ],
+          [
+            14.235,
+            4.332
+          ],
+          [
+            14.368,
+            4.538
+          ],
+          [
+            14.494,
+            4.748
+          ],
+          [
+            14.613,
+            4.962
+          ],
+          [
+            14.725,
+            5.18
+          ],
+          [
+            14.83,
+            5.401
+          ],
+          [
+            14.927,
+            5.626
+          ],
+          [
+            15.017,
+            5.853
+          ],
+          [
+            15.1,
+            6.084
+          ],
+          [
+            15.175,
+            6.317
+          ],
+          [
+            15.243,
+            6.552
+          ],
+          [
+            15.302,
+            6.79
+          ],
+          [
+            15.354,
+            7.029
+          ],
+          [
+            15.5,
+            7
+          ],
+          [
+            15.5,
+            7
+          ],
+          [
+            16,
+            7
+          ],
+          [
+            16,
+            6.5
+          ],
+          [
+            16,
+            6
+          ],
+          [
+            16,
+            5.5
+          ],
+          [
+            16,
+            5
+          ],
+          [
+            16,
+            4.5
+          ],
+          [
+            16,
+            4
+          ],
+          [
+            16,
+            3.5
+          ],
+          [
+            16,
+            3
+          ],
+          [
+            16,
+            2.5
+          ],
+          [
+            16,
+            2
+          ],
+          [
+            16,
+            1.5
+          ],
+          [
+            16,
+            1
+          ],
+          [
+            16,
+            0.5
+          ],
+          [
+            16.5,
+            0.5
+          ],
+          [
+            17,
+            0.5
+          ],
+          [
+            17.5,
+            0.5
+          ],
+          [
+            18,
+            0.5
+          ],
+          [
+            18.5,
+            0.5
+          ],
+          [
+            19,
+            0.5
+          ],
+          [
+            19.5,
+            0.5
+          ],
+          [
+            20,
+            0.5
+          ],
+          [
+            20.5,
+            0.5
+          ],
+          [
+            21,
+            0.5
+          ],
+          [
+            21.5,
+            0.5
+          ],
+          [
+            22,
+            0.5
+          ],
+          [
+            22.5,
+            0.5
+          ],
+          [
+            22.5,
+            1
+          ],
+          [
+            22.5,
+            1.5
+          ],
+          [
+            23,
+            1.5
+          ],
+          [
+            23,
+            2
+          ],
+          [
+            23,
+            2.5
+          ],
+          [
+            23,
+            3
+          ],
+          [
+            22.5,
+            3
+          ],
+          [
+            22.5,
+            3.5
+          ],
+          [
+            22.5,
+            4
+          ],
+          [
+            22.5,
+            4.5
+          ],
+          [
+            22.5,
+            5
+          ],
+          [
+            22.5,
+            5.5
+          ],
+          [
+            22.5,
+            6
+          ],
+          [
+            22.5,
+            6.5
+          ],
+          [
+            22.5,
+            7
+          ],
+          [
+            22.5,
+            7.5
+          ],
+          [
+            22.5,
+            8
+          ],
+          [
+            22.5,
+            8.5
+          ],
+          [
+            22.5,
+            9
+          ],
+          [
+            22.5,
+            9.5
+          ],
+          [
+            22.5,
+            10
+          ],
+          [
+            22.5,
+            10.5
+          ],
+          [
+            22.5,
+            11
+          ],
+          [
+            22.5,
+            11.5
+          ],
+          [
+            22.5,
+            12
+          ],
+          [
+            22.5,
+            12.5
+          ],
+          [
+            22.5,
+            13
+          ],
+          [
+            22.5,
+            13.5
+          ],
+          [
+            22.5,
+            14
+          ],
+          [
+            22.5,
+            14.5
+          ],
+          [
+            22.5,
+            15
+          ],
+          [
+            22.5,
+            15.5
+          ],
+          [
+            22.5,
+            16
+          ],
+          [
+            22.5,
+            16.5
+          ],
+          [
+            22,
+            16.5
+          ],
+          [
+            21.5,
+            16.5
+          ],
+          [
+            21,
+            16.5
+          ],
+          [
+            20.5,
+            16.5
+          ],
+          [
+            20,
+            16.5
+          ],
+          [
+            19.5,
+            16.5
+          ],
+          [
+            19,
+            16.5
+          ],
+          [
+            18.5,
+            16.5
+          ],
+          [
+            18,
+            16.5
+          ],
+          [
+            17.5,
+            16.5
+          ],
+          [
+            17,
+            16.5
+          ],
+          [
+            16.5,
+            16.5
+          ],
+          [
+            16,
+            16.5
+          ],
+          [
+            16,
+            16
+          ],
+          [
+            16,
+            15.5
+          ],
+          [
+            16,
+            15
+          ],
+          [
+            16,
+            14.5
+          ],
+          [
+            16,
+            14
+          ],
+          [
+            16,
+            13.5
+          ],
+          [
+            16,
+            13
+          ],
+          [
+            16,
+            12.5
+          ],
+          [
+            16,
+            12
+          ],
+          [
+            16,
+            11.5
+          ],
+          [
+            16,
+            11
+          ],
+          [
+            16,
+            10.5
+          ],
+          [
+            16,
+            10
+          ],
+          [
+            15.5,
+            10
+          ],
+          [
+            15.354,
+            9.971
+          ],
+          [
+            15.301,
+            10.214
+          ],
+          [
+            15.241,
+            10.456
+          ],
+          [
+            15.172,
+            10.695
+          ],
+          [
+            15.095,
+            10.932
+          ],
+          [
+            15.01,
+            11.166
+          ],
+          [
+            14.918,
+            11.397
+          ],
+          [
+            14.818,
+            11.625
+          ],
+          [
+            14.71,
+            11.85
+          ],
+          [
+            14.596,
+            12.07
+          ],
+          [
+            14.473,
+            12.287
+          ],
+          [
+            14.344,
+            12.5
+          ],
+          [
+            14.208,
+            12.709
+          ],
+          [
+            14.065,
+            12.912
+          ],
+          [
+            13.915,
+            13.111
+          ],
+          [
+            13.759,
+            13.305
+          ],
+          [
+            13.596,
+            13.493
+          ],
+          [
+            13.427,
+            13.676
+          ],
+          [
+            13.252,
+            13.854
+          ],
+          [
+            13.072,
+            14.025
+          ],
+          [
+            12.886,
+            14.19
+          ],
+          [
+            12.694,
+            14.349
+          ],
+          [
+            12.497,
+            14.502
+          ],
+          [
+            12.296,
+            14.648
+          ],
+          [
+            12.089,
+            14.787
+          ],
+          [
+            11.878,
+            14.919
+          ],
+          [
+            11.663,
+            15.045
+          ],
+          [
+            11.444,
+            15.163
+          ],
+          [
+            11.221,
+            15.273
+          ],
+          [
+            10.994,
+            15.376
+          ],
+          [
+            10.764,
+            15.472
+          ],
+          [
+            10.531,
+            15.56
+          ],
+          [
+            10.296,
+            15.64
+          ],
+          [
+            10.057,
+            15.712
+          ],
+          [
+            9.817,
+            15.777
+          ],
+          [
+            9.574,
+            15.833
+          ],
+          [
+            9.33,
+            15.881
+          ],
+          [
+            9.084,
+            15.921
+          ],
+          [
+            8.838,
+            15.953
+          ],
+          [
+            8.59,
+            15.977
+          ],
+          [
+            8.341,
+            15.992
+          ],
+          [
+            8.092,
+            15.999
+          ],
+          [
+            7.843,
+            15.998
+          ],
+          [
+            7.595,
+            15.989
+          ],
+          [
+            7.346,
+            15.971
+          ],
+          [
+            7.099,
+            15.946
+          ],
+          [
+            6.852,
+            15.912
+          ],
+          [
+            6.607,
+            15.869
+          ],
+          [
+            6.363,
+            15.819
+          ],
+          [
+            6.121,
+            15.761
+          ],
+          [
+            5.881,
+            15.694
+          ],
+          [
+            5.643,
+            15.62
+          ],
+          [
+            5.408,
+            15.538
+          ],
+          [
+            5.176,
+            15.448
+          ],
+          [
+            4.947,
+            15.35
+          ],
+          [
+            4.721,
+            15.245
+          ],
+          [
+            4.499,
+            15.133
+          ],
+          [
+            4.281,
+            15.013
+          ],
+          [
+            4.067,
+            14.886
+          ],
+          [
+            3.857,
+            14.752
+          ],
+          [
+            3.652,
+            14.611
+          ],
+          [
+            3.451,
+            14.463
+          ],
+          [
+            3.256,
+            14.309
+          ],
+          [
+            3.066,
+            14.148
+          ],
+          [
+            2.881,
+            13.981
+          ],
+          [
+            2.702,
+            13.808
+          ],
+          [
+            2.529,
+            13.63
+          ],
+          [
+            2.361,
+            13.445
+          ],
+          [
+            2.2,
+            13.255
+          ],
+          [
+            2.046,
+            13.06
+          ],
+          [
+            1.898,
+            12.86
+          ],
+          [
+            1.756,
+            12.655
+          ],
+          [
+            1.622,
+            12.446
+          ],
+          [
+            1.494,
+            12.232
+          ],
+          [
+            1.374,
+            12.014
+          ],
+          [
+            1.261,
+            11.792
+          ],
+          [
+            1.156,
+            11.566
+          ],
+          [
+            1.058,
+            11.338
+          ],
+          [
+            0.967,
+            11.106
+          ],
+          [
+            0.885,
+            10.871
+          ],
+          [
+            0.81,
+            10.633
+          ],
+          [
+            0.743,
+            10.393
+          ],
+          [
+            0.684,
+            10.152
+          ],
+          [
+            0.633,
+            9.908
+          ],
+          [
+            0.591,
+            9.663
+          ],
+          [
+            0.556,
+            9.416
+          ],
+          [
+            0.53,
+            9.168
+          ],
+          [
+            0.512,
+            8.92
+          ],
+          [
+            0.502,
+            8.671
+          ],
+          [
+            0.5,
+            8.422
+          ],
+          [
+            0.507,
+            8.173
+          ],
+          [
+            0.522,
+            7.925
+          ],
+          [
+            0.545,
+            7.677
+          ],
+          [
+            0.577,
+            7.43
+          ],
+          [
+            0.616,
+            7.184
+          ],
+          [
+            0.664,
+            6.94
+          ],
+          [
+            0.72,
+            6.697
+          ],
+          [
+            0.784,
+            6.457
+          ],
+          [
+            0.856,
+            6.218
+          ],
+          [
+            0.935,
+            5.982
+          ],
+          [
+            1.023,
+            5.749
+          ],
+          [
+            1.118,
+            5.519
+          ],
+          [
+            1.221,
+            5.292
+          ],
+          [
+            1.331,
+            5.069
+          ],
+          [
+            1.448,
+            4.85
+          ],
+          [
+            1.573,
+            4.634
+          ],
+          [
+            1.705,
+            4.423
+          ],
+          [
+            1.844,
+            4.216
+          ],
+          [
+            1.989,
+            4.014
+          ],
+          [
+            2.141,
+            3.817
+          ],
+          [
+            2.3,
+            3.626
+          ],
+          [
+            2.465,
+            3.439
+          ],
+          [
+            2.636,
+            3.258
+          ],
+          [
+            2.813,
+            3.083
+          ],
+          [
+            2.996,
+            2.914
+          ],
+          [
+            3.184,
+            2.751
+          ],
+          [
+            3.377,
+            2.594
+          ],
+          [
+            3.576,
+            2.444
+          ],
+          [
+            3.779,
+            2.3
+          ],
+          [
+            3.987,
+            2.164
+          ],
+          [
+            4.2,
+            2.034
+          ],
+          [
+            4.417,
+            1.911
+          ],
+          [
+            4.637,
+            1.796
+          ],
+          [
+            4.862,
+            1.688
+          ],
+          [
+            5.089,
+            1.588
+          ],
+          [
+            5.32,
+            1.495
+          ],
+          [
+            5.554,
+            1.41
+          ],
+          [
+            5.791,
+            1.333
+          ],
+          [
+            6.03,
+            1.263
+          ],
+          [
+            6.272,
+            1.202
+          ],
+          [
+            6.515,
+            1.149
+          ],
+          [
+            6.76,
+            1.103
+          ],
+          [
+            7.006,
+            1.066
+          ],
+          [
+            7.253,
+            1.037
+          ],
+          [
+            7.501,
+            1.017
+          ],
+          [
+            7.5,
+            1
+          ],
+          [
+            7.5,
+            1
+          ],
+          [
+            7.5,
+            0.5
+          ]
+        ]
+      ],
+      "floorZ": 0
+    }
+  ],
+  "curves": [
+    {
+      "id": "c0",
+      "level": 0,
+      "kind": "arc",
+      "room": "r0",
+      "pts": [
+        [
+          9,
+          1
+        ],
+        [
+          8.991,
+          1.066
+        ],
+        [
+          9.233,
+          1.102
+        ],
+        [
+          9.474,
+          1.146
+        ],
+        [
+          9.714,
+          1.198
+        ],
+        [
+          9.951,
+          1.258
+        ],
+        [
+          10.186,
+          1.326
+        ],
+        [
+          10.42,
+          1.401
+        ],
+        [
+          10.65,
+          1.484
+        ],
+        [
+          10.878,
+          1.574
+        ],
+        [
+          11.102,
+          1.672
+        ],
+        [
+          11.323,
+          1.777
+        ],
+        [
+          11.541,
+          1.889
+        ],
+        [
+          11.755,
+          2.008
+        ],
+        [
+          11.965,
+          2.134
+        ],
+        [
+          12.171,
+          2.267
+        ],
+        [
+          12.372,
+          2.406
+        ],
+        [
+          12.569,
+          2.552
+        ],
+        [
+          12.761,
+          2.705
+        ],
+        [
+          12.947,
+          2.863
+        ],
+        [
+          13.129,
+          3.028
+        ],
+        [
+          13.305,
+          3.198
+        ],
+        [
+          13.475,
+          3.374
+        ],
+        [
+          13.639,
+          3.555
+        ],
+        [
+          13.798,
+          3.742
+        ],
+        [
+          13.95,
+          3.934
+        ],
+        [
+          14.096,
+          4.131
+        ],
+        [
+          14.235,
+          4.332
+        ],
+        [
+          14.368,
+          4.538
+        ],
+        [
+          14.494,
+          4.748
+        ],
+        [
+          14.613,
+          4.962
+        ],
+        [
+          14.725,
+          5.18
+        ],
+        [
+          14.83,
+          5.401
+        ],
+        [
+          14.927,
+          5.626
+        ],
+        [
+          15.017,
+          5.853
+        ],
+        [
+          15.1,
+          6.084
+        ],
+        [
+          15.175,
+          6.317
+        ],
+        [
+          15.243,
+          6.552
+        ],
+        [
+          15.302,
+          6.79
+        ],
+        [
+          15.354,
+          7.029
+        ],
+        [
+          15.5,
+          7
+        ]
+      ],
+      "line": [
+        [
+          9,
+          1
+        ],
+        [
+          9.5,
+          1
+        ],
+        [
+          10,
+          1
+        ],
+        [
+          10,
+          1.5
+        ],
+        [
+          10.5,
+          1.5
+        ],
+        [
+          11,
+          1.5
+        ],
+        [
+          11.5,
+          1.5
+        ],
+        [
+          11.5,
+          2
+        ],
+        [
+          12,
+          2
+        ],
+        [
+          12,
+          2.5
+        ],
+        [
+          12.5,
+          2.5
+        ],
+        [
+          13,
+          2.5
+        ],
+        [
+          13,
+          3
+        ],
+        [
+          13.5,
+          3
+        ],
+        [
+          13.5,
+          3.5
+        ],
+        [
+          14,
+          3.5
+        ],
+        [
+          14,
+          4
+        ],
+        [
+          14,
+          4.5
+        ],
+        [
+          14.5,
+          4.5
+        ],
+        [
+          14.5,
+          5
+        ],
+        [
+          15,
+          5
+        ],
+        [
+          15,
+          5.5
+        ],
+        [
+          15,
+          6
+        ],
+        [
+          15,
+          6.5
+        ],
+        [
+          15.5,
+          6.5
+        ],
+        [
+          15.5,
+          7
+        ]
+      ],
+      "center": [
+        8,
+        8.5
+      ],
+      "radius": 7.5,
+      "angles": [
+        -1.4382447944982226,
+        -0.19739555984988022
+      ],
+      "floorZ": 0
+    },
+    {
+      "id": "c1",
+      "level": 0,
+      "kind": "arc",
+      "room": "r0",
+      "pts": [
+        [
+          15.5,
+          10
+        ],
+        [
+          15.354,
+          9.971
+        ],
+        [
+          15.301,
+          10.214
+        ],
+        [
+          15.241,
+          10.456
+        ],
+        [
+          15.172,
+          10.695
+        ],
+        [
+          15.095,
+          10.932
+        ],
+        [
+          15.01,
+          11.166
+        ],
+        [
+          14.918,
+          11.397
+        ],
+        [
+          14.818,
+          11.625
+        ],
+        [
+          14.71,
+          11.85
+        ],
+        [
+          14.596,
+          12.07
+        ],
+        [
+          14.473,
+          12.287
+        ],
+        [
+          14.344,
+          12.5
+        ],
+        [
+          14.208,
+          12.709
+        ],
+        [
+          14.065,
+          12.912
+        ],
+        [
+          13.915,
+          13.111
+        ],
+        [
+          13.759,
+          13.305
+        ],
+        [
+          13.596,
+          13.493
+        ],
+        [
+          13.427,
+          13.676
+        ],
+        [
+          13.252,
+          13.854
+        ],
+        [
+          13.072,
+          14.025
+        ],
+        [
+          12.886,
+          14.19
+        ],
+        [
+          12.694,
+          14.349
+        ],
+        [
+          12.497,
+          14.502
+        ],
+        [
+          12.296,
+          14.648
+        ],
+        [
+          12.089,
+          14.787
+        ],
+        [
+          11.878,
+          14.919
+        ],
+        [
+          11.663,
+          15.045
+        ],
+        [
+          11.444,
+          15.163
+        ],
+        [
+          11.221,
+          15.273
+        ],
+        [
+          10.994,
+          15.376
+        ],
+        [
+          10.764,
+          15.472
+        ],
+        [
+          10.531,
+          15.56
+        ],
+        [
+          10.296,
+          15.64
+        ],
+        [
+          10.057,
+          15.712
+        ],
+        [
+          9.817,
+          15.777
+        ],
+        [
+          9.574,
+          15.833
+        ],
+        [
+          9.33,
+          15.881
+        ],
+        [
+          9.084,
+          15.921
+        ],
+        [
+          8.838,
+          15.953
+        ],
+        [
+          8.59,
+          15.977
+        ],
+        [
+          8.341,
+          15.992
+        ],
+        [
+          8.092,
+          15.999
+        ],
+        [
+          7.843,
+          15.998
+        ],
+        [
+          7.595,
+          15.989
+        ],
+        [
+          7.346,
+          15.971
+        ],
+        [
+          7.099,
+          15.946
+        ],
+        [
+          6.852,
+          15.912
+        ],
+        [
+          6.607,
+          15.869
+        ],
+        [
+          6.363,
+          15.819
+        ],
+        [
+          6.121,
+          15.761
+        ],
+        [
+          5.881,
+          15.694
+        ],
+        [
+          5.643,
+          15.62
+        ],
+        [
+          5.408,
+          15.538
+        ],
+        [
+          5.176,
+          15.448
+        ],
+        [
+          4.947,
+          15.35
+        ],
+        [
+          4.721,
+          15.245
+        ],
+        [
+          4.499,
+          15.133
+        ],
+        [
+          4.281,
+          15.013
+        ],
+        [
+          4.067,
+          14.886
+        ],
+        [
+          3.857,
+          14.752
+        ],
+        [
+          3.652,
+          14.611
+        ],
+        [
+          3.451,
+          14.463
+        ],
+        [
+          3.256,
+          14.309
+        ],
+        [
+          3.066,
+          14.148
+        ],
+        [
+          2.881,
+          13.981
+        ],
+        [
+          2.702,
+          13.808
+        ],
+        [
+          2.529,
+          13.63
+        ],
+        [
+          2.361,
+          13.445
+        ],
+        [
+          2.2,
+          13.255
+        ],
+        [
+          2.046,
+          13.06
+        ],
+        [
+          1.898,
+          12.86
+        ],
+        [
+          1.756,
+          12.655
+        ],
+        [
+          1.622,
+          12.446
+        ],
+        [
+          1.494,
+          12.232
+        ],
+        [
+          1.374,
+          12.014
+        ],
+        [
+          1.261,
+          11.792
+        ],
+        [
+          1.156,
+          11.566
+        ],
+        [
+          1.058,
+          11.338
+        ],
+        [
+          0.967,
+          11.106
+        ],
+        [
+          0.885,
+          10.871
+        ],
+        [
+          0.81,
+          10.633
+        ],
+        [
+          0.743,
+          10.393
+        ],
+        [
+          0.684,
+          10.152
+        ],
+        [
+          0.633,
+          9.908
+        ],
+        [
+          0.591,
+          9.663
+        ],
+        [
+          0.556,
+          9.416
+        ],
+        [
+          0.53,
+          9.168
+        ],
+        [
+          0.512,
+          8.92
+        ],
+        [
+          0.502,
+          8.671
+        ],
+        [
+          0.5,
+          8.422
+        ],
+        [
+          0.507,
+          8.173
+        ],
+        [
+          0.522,
+          7.925
+        ],
+        [
+          0.545,
+          7.677
+        ],
+        [
+          0.577,
+          7.43
+        ],
+        [
+          0.616,
+          7.184
+        ],
+        [
+          0.664,
+          6.94
+        ],
+        [
+          0.72,
+          6.697
+        ],
+        [
+          0.784,
+          6.457
+        ],
+        [
+          0.856,
+          6.218
+        ],
+        [
+          0.935,
+          5.982
+        ],
+        [
+          1.023,
+          5.749
+        ],
+        [
+          1.118,
+          5.519
+        ],
+        [
+          1.221,
+          5.292
+        ],
+        [
+          1.331,
+          5.069
+        ],
+        [
+          1.448,
+          4.85
+        ],
+        [
+          1.573,
+          4.634
+        ],
+        [
+          1.705,
+          4.423
+        ],
+        [
+          1.844,
+          4.216
+        ],
+        [
+          1.989,
+          4.014
+        ],
+        [
+          2.141,
+          3.817
+        ],
+        [
+          2.3,
+          3.626
+        ],
+        [
+          2.465,
+          3.439
+        ],
+        [
+          2.636,
+          3.258
+        ],
+        [
+          2.813,
+          3.083
+        ],
+        [
+          2.996,
+          2.914
+        ],
+        [
+          3.184,
+          2.751
+        ],
+        [
+          3.377,
+          2.594
+        ],
+        [
+          3.576,
+          2.444
+        ],
+        [
+          3.779,
+          2.3
+        ],
+        [
+          3.987,
+          2.164
+        ],
+        [
+          4.2,
+          2.034
+        ],
+        [
+          4.417,
+          1.911
+        ],
+        [
+          4.637,
+          1.796
+        ],
+        [
+          4.862,
+          1.688
+        ],
+        [
+          5.089,
+          1.588
+        ],
+        [
+          5.32,
+          1.495
+        ],
+        [
+          5.554,
+          1.41
+        ],
+        [
+          5.791,
+          1.333
+        ],
+        [
+          6.03,
+          1.263
+        ],
+        [
+          6.272,
+          1.202
+        ],
+        [
+          6.515,
+          1.149
+        ],
+        [
+          6.76,
+          1.103
+        ],
+        [
+          7.006,
+          1.066
+        ],
+        [
+          7.253,
+          1.037
+        ],
+        [
+          7.501,
+          1.017
+        ],
+        [
+          7.5,
+          1
+        ]
+      ],
+      "line": [
+        [
+          15.5,
+          10
+        ],
+        [
+          15.5,
+          10.5
+        ],
+        [
+          15,
+          10.5
+        ],
+        [
+          15,
+          11
+        ],
+        [
+          15,
+          11.5
+        ],
+        [
+          15,
+          12
+        ],
+        [
+          14.5,
+          12
+        ],
+        [
+          14.5,
+          12.5
+        ],
+        [
+          14,
+          12.5
+        ],
+        [
+          14,
+          13
+        ],
+        [
+          14,
+          13.5
+        ],
+        [
+          13.5,
+          13.5
+        ],
+        [
+          13.5,
+          14
+        ],
+        [
+          13,
+          14
+        ],
+        [
+          13,
+          14.5
+        ],
+        [
+          12.5,
+          14.5
+        ],
+        [
+          12,
+          14.5
+        ],
+        [
+          12,
+          15
+        ],
+        [
+          11.5,
+          15
+        ],
+        [
+          11.5,
+          15.5
+        ],
+        [
+          11,
+          15.5
+        ],
+        [
+          10.5,
+          15.5
+        ],
+        [
+          10,
+          15.5
+        ],
+        [
+          10,
+          16
+        ],
+        [
+          9.5,
+          16
+        ],
+        [
+          9,
+          16
+        ],
+        [
+          8.5,
+          16
+        ],
+        [
+          8,
+          16
+        ],
+        [
+          7.5,
+          16
+        ],
+        [
+          7,
+          16
+        ],
+        [
+          6.5,
+          16
+        ],
+        [
+          6,
+          16
+        ],
+        [
+          6,
+          15.5
+        ],
+        [
+          5.5,
+          15.5
+        ],
+        [
+          5,
+          15.5
+        ],
+        [
+          4.5,
+          15.5
+        ],
+        [
+          4.5,
+          15
+        ],
+        [
+          4,
+          15
+        ],
+        [
+          4,
+          14.5
+        ],
+        [
+          3.5,
+          14.5
+        ],
+        [
+          3,
+          14.5
+        ],
+        [
+          3,
+          14
+        ],
+        [
+          2.5,
+          14
+        ],
+        [
+          2.5,
+          13.5
+        ],
+        [
+          2,
+          13.5
+        ],
+        [
+          2,
+          13
+        ],
+        [
+          2,
+          12.5
+        ],
+        [
+          1.5,
+          12.5
+        ],
+        [
+          1.5,
+          12
+        ],
+        [
+          1,
+          12
+        ],
+        [
+          1,
+          11.5
+        ],
+        [
+          1,
+          11
+        ],
+        [
+          1,
+          10.5
+        ],
+        [
+          0.5,
+          10.5
+        ],
+        [
+          0.5,
+          10
+        ],
+        [
+          0.5,
+          9.5
+        ],
+        [
+          0.5,
+          9
+        ],
+        [
+          0.5,
+          8.5
+        ],
+        [
+          0.5,
+          8
+        ],
+        [
+          0.5,
+          7.5
+        ],
+        [
+          0.5,
+          7
+        ],
+        [
+          0.5,
+          6.5
+        ],
+        [
+          1,
+          6.5
+        ],
+        [
+          1,
+          6
+        ],
+        [
+          1,
+          5.5
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          1.5,
+          5
+        ],
+        [
+          1.5,
+          4.5
+        ],
+        [
+          2,
+          4.5
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          3.5
+        ],
+        [
+          2.5,
+          3.5
+        ],
+        [
+          2.5,
+          3
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          3,
+          2.5
+        ],
+        [
+          3.5,
+          2.5
+        ],
+        [
+          4,
+          2.5
+        ],
+        [
+          4,
+          2
+        ],
+        [
+          4.5,
+          2
+        ],
+        [
+          4.5,
+          1.5
+        ],
+        [
+          5,
+          1.5
+        ],
+        [
+          5.5,
+          1.5
+        ],
+        [
+          6,
+          1.5
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          6.5,
+          1
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          7.5,
+          1
+        ]
+      ],
+      "center": [
+        8,
+        8.5
+      ],
+      "radius": 7.5,
+      "angles": [
+        0.19739555984988078,
+        4.6458208166088655
+      ],
+      "floorZ": 0
+    }
+  ],
+  "source": {
+    "schema": "br.filler/0.1",
+    "archetype": "circular_hall",
+    "seed": 7
+  },
+  "kind": "ladder-variant",
+  "fillId": "fill:circular_hall:7",
+  "bands": [
+    {
+      "id": "ground",
+      "elevation": 0
+    },
+    {
+      "id": "up",
+      "elevation": 8
+    }
+  ],
+  "connectors": [
+    {
+      "id": "elev:ladder:up",
+      "kind": "ladder",
+      "from": "s:r0",
+      "to": "s:elev:landing:up",
+      "state": "connected",
+      "direction": "both",
+      "width": 0.5,
+      "clearance": 1.8,
+      "landings": [
+        [
+          3.25,
+          14,
+          0
+        ],
+        [
+          3.25,
+          14,
+          8
+        ]
+      ],
+      "path": [
+        [
+          3.25,
+          14,
+          0
+        ],
+        [
+          3.75,
+          13.75,
+          0
+        ],
+        [
+          3.75,
+          13.75,
+          8
+        ],
+        [
+          3.25,
+          14,
+          8
+        ]
+      ],
+      "reservation": {
+        "id": "volume:elev:ladder:up",
+        "kind": "connector",
+        "rects": [
+          [
+            3,
+            13.5,
+            4,
+            14.5
+          ]
+        ],
+        "z0": -0.25,
+        "z1": 9.8
+      }
+    }
+  ],
+  "holes": [
+    {
+      "id": "elev:ladder:up:ceiling",
+      "connector": "elev:ladder:up",
+      "surface": "s:r0",
+      "face": "ceiling",
+      "rect": [
+        3.5,
+        13.5,
+        4,
+        14
+      ]
+    },
+    {
+      "id": "elev:ladder:up:floor",
+      "connector": "elev:ladder:up",
+      "surface": "s:elev:landing:up",
+      "face": "floor",
+      "rect": [
+        3.5,
+        13.5,
+        4,
+        14
+      ]
+    }
+  ],
+  "voids": [],
+  "route": [
+    [
+      3.25,
+      14,
+      0
+    ],
+    [
+      3.75,
+      13.75,
+      0
+    ],
+    [
+      3.75,
+      13.75,
+      8
+    ],
+    [
+      3.25,
+      14,
+      8
+    ]
+  ],
   "surfaces": [
     {
-      "id": "s:entry",
-      "room": "entry",
-      "owner": "fill:terraced_atrium:7",
+      "id": "s:r0",
+      "room": "r0",
+      "owner": "fill:circular_hall:7",
       "band": "ground",
       "rects": [
         [
-          32,
-          24,
-          40,
-          36
-        ]
-      ],
-      "floorZ": 0,
-      "ceilingZ": 2.8,
-      "slab": 0.25
-    },
-    {
-      "id": "s:gallery",
-      "room": "gallery",
-      "owner": "fill:terraced_atrium:7",
-      "band": "ground",
-      "rects": [
+          7.5,
+          0,
+          9,
+          16
+        ],
         [
-          32,
-          16,
-          40,
-          24
-        ]
-      ],
-      "floorZ": 0,
-      "ceilingZ": 2.8,
-      "slab": 0.25
-    },
-    {
-      "id": "s:middle",
-      "room": "middle",
-      "owner": "fill:terraced_atrium:7",
-      "band": "ground",
-      "rects": [
+          6,
+          1,
+          7.5,
+          16
+        ],
         [
-          12,
-          16,
-          20,
-          24
-        ]
-      ],
-      "floorZ": 2,
-      "ceilingZ": 4.6,
-      "slab": 0.25
-    },
-    {
-      "id": "s:side",
-      "room": "side",
-      "owner": "fill:terraced_atrium:7",
-      "band": "ground",
-      "rects": [
+          4.5,
+          1.5,
+          6,
+          15.5
+        ],
         [
+          10,
+          1.5,
+          11.5,
+          15.5
+        ],
+        [
+          15.5,
           7,
-          16,
-          12,
-          24
-        ]
-      ],
-      "floorZ": 2,
-      "ceilingZ": 4.6,
-      "slab": 0.25
-    },
-    {
-      "id": "s:turn",
-      "room": "turn",
-      "owner": "fill:terraced_atrium:7",
-      "band": "ground",
-      "rects": [
+          22.5,
+          10
+        ],
+        [
+          9,
+          1,
+          10,
+          16
+        ],
+        [
+          3,
+          2.5,
+          4,
+          14.5
+        ],
         [
           12,
-          0,
-          20,
-          4
-        ]
-      ],
-      "floorZ": 4,
-      "ceilingZ": 6.3,
-      "slab": 0.25
-    },
-    {
-      "id": "s:pocket",
-      "room": "pocket",
-      "owner": "fill:terraced_atrium:7",
-      "band": "ground",
-      "rects": [
+          2.5,
+          13,
+          14.5
+        ],
         [
-          7,
-          0,
+          4,
+          2,
+          4.5,
+          15
+        ],
+        [
+          11.5,
+          2,
           12,
-          4
-        ]
-      ],
-      "floorZ": 4,
-      "ceilingZ": 6.25,
-      "slab": 0.25
-    },
-    {
-      "id": "s:overlook",
-      "room": "overlook",
-      "owner": "fill:terraced_atrium:7",
-      "band": "ground",
-      "rects": [
+          15
+        ],
         [
-          32,
-          0,
-          40,
+          2.5,
+          3,
+          3,
+          14
+        ],
+        [
+          13,
+          3,
+          13.5,
+          14
+        ],
+        [
+          2,
+          3.5,
+          2.5,
+          13.5
+        ],
+        [
+          13.5,
+          3.5,
+          14,
+          13.5
+        ],
+        [
+          1.5,
+          4.5,
+          2,
+          12.5
+        ],
+        [
+          14,
+          4.5,
+          14.5,
+          12.5
+        ],
+        [
+          1,
+          5,
+          1.5,
           12
+        ],
+        [
+          14.5,
+          5,
+          15,
+          12
+        ],
+        [
+          0.5,
+          6.5,
+          1,
+          10.5
+        ],
+        [
+          15,
+          6.5,
+          15.5,
+          10.5
         ]
       ],
-      "floorZ": 6,
-      "ceilingZ": 8.8,
+      "floorZ": 0,
+      "ceilingZ": 2.9,
       "slab": 0.25
     },
     {
-      "id": "s:arrival",
-      "room": "arrival",
-      "owner": "fill:terraced_atrium:7",
-      "band": "upper",
+      "id": "s:r1",
+      "room": "r1",
+      "owner": "fill:circular_hall:7",
+      "band": "ground",
       "rects": [
         [
-          32,
-          24,
-          40,
-          36
+          16,
+          0.5,
+          22.5,
+          7
+        ],
+        [
+          22.5,
+          1.5,
+          23,
+          3
+        ]
+      ],
+      "floorZ": 0,
+      "ceilingZ": 2.7,
+      "slab": 0.25
+    },
+    {
+      "id": "s:r2",
+      "room": "r2",
+      "owner": "fill:circular_hall:7",
+      "band": "ground",
+      "rects": [
+        [
+          16,
+          10,
+          22.5,
+          16.5
+        ]
+      ],
+      "floorZ": 0,
+      "ceilingZ": 2.4,
+      "slab": 0.25
+    },
+    {
+      "id": "s:elev:landing:up",
+      "room": "elev:landing:up",
+      "owner": "fill:circular_hall:7",
+      "band": "up",
+      "rects": [
+        [
+          3,
+          13.5,
+          4,
+          14.5
         ]
       ],
       "floorZ": 8,
-      "ceilingZ": 10.8,
-      "slab": 0.25
-    },
-    {
-      "id": "s:stack",
-      "room": "stack",
-      "owner": "fill:terraced_atrium:7",
-      "band": "ground",
-      "rects": [
-        [
-          7,
-          0,
-          12,
-          4
-        ]
-      ],
-      "floorZ": 7,
-      "ceilingZ": 9.25,
+      "ceilingZ": 10.2,
       "slab": 0.25
     }
   ],
   "volumes": [
     {
-      "id": "volume:s:entry",
+      "id": "volume:s:r0",
       "kind": "room",
-      "rects": [
-        [
-          32,
-          24,
-          40,
-          36
-        ]
-      ],
-      "z0": -0.25,
-      "z1": 2.8
-    },
-    {
-      "id": "volume:s:gallery",
-      "kind": "room",
-      "rects": [
-        [
-          32,
-          16,
-          40,
-          24
-        ]
-      ],
-      "z0": -0.25,
-      "z1": 2.8
-    },
-    {
-      "id": "volume:s:middle",
-      "kind": "room",
-      "rects": [
-        [
-          12,
-          16,
-          20,
-          24
-        ]
-      ],
-      "z0": 1.75,
-      "z1": 4.6
-    },
-    {
-      "id": "volume:s:side",
-      "kind": "room",
-      "rects": [
-        [
-          7,
-          16,
-          12,
-          24
-        ]
-      ],
-      "z0": 1.75,
-      "z1": 4.6
-    },
-    {
-      "id": "volume:s:turn",
-      "kind": "room",
-      "rects": [
-        [
-          12,
-          0,
-          20,
-          4
-        ]
-      ],
-      "z0": 3.75,
-      "z1": 6.3
-    },
-    {
-      "id": "volume:s:pocket",
-      "kind": "room",
-      "rects": [
-        [
-          7,
-          0,
-          12,
-          4
-        ]
-      ],
-      "z0": 3.75,
-      "z1": 6.25
-    },
-    {
-      "id": "volume:s:overlook",
-      "kind": "room",
-      "rects": [
-        [
-          32,
-          0,
-          40,
-          12
-        ]
-      ],
-      "z0": 5.75,
-      "z1": 8.8
-    },
-    {
-      "id": "volume:s:arrival",
-      "kind": "room",
-      "rects": [
-        [
-          32,
-          24,
-          40,
-          36
-        ]
-      ],
-      "z0": 7.75,
-      "z1": 10.8
-    },
-    {
-      "id": "volume:s:stack",
-      "kind": "room",
-      "rects": [
-        [
-          7,
-          0,
-          12,
-          4
-        ]
-      ],
-      "z0": 6.75,
-      "z1": 9.25
-    },
-    {
-      "id": "volume:ramp:1",
-      "kind": "connector",
-      "rects": [
-        [
-          20,
-          18,
-          32,
-          20
-        ]
-      ],
-      "z0": -0.25,
-      "z1": 4.2
-    },
-    {
-      "id": "volume:ramp:2",
-      "kind": "connector",
-      "rects": [
-        [
-          16,
-          4,
-          18,
-          16
-        ]
-      ],
-      "z0": 1.75,
-      "z1": 6.2
-    },
-    {
-      "id": "volume:ramp:3",
-      "kind": "connector",
-      "rects": [
-        [
-          20,
-          1,
-          32,
-          3
-        ]
-      ],
-      "z0": 3.75,
-      "z1": 8.2
-    },
-    {
-      "id": "volume:ramp:4",
-      "kind": "connector",
-      "rects": [
-        [
-          35,
-          12,
-          37,
-          24
-        ]
-      ],
-      "z0": 5.75,
-      "z1": 10.2
-    },
-    {
-      "id": "volume:pocket:ladder",
-      "kind": "connector",
       "rects": [
         [
           7.5,
-          0.5,
-          8.5,
-          1.5
-        ]
-      ],
-      "z0": 3.75,
-      "z1": 8.8
-    },
-    {
-      "id": "atrium",
-      "kind": "void",
-      "rects": [
-        [
-          20,
-          4,
-          32,
+          0,
+          9,
           16
+        ],
+        [
+          6,
+          1,
+          7.5,
+          16
+        ],
+        [
+          4.5,
+          1.5,
+          6,
+          15.5
+        ],
+        [
+          10,
+          1.5,
+          11.5,
+          15.5
+        ],
+        [
+          15.5,
+          7,
+          22.5,
+          10
+        ],
+        [
+          9,
+          1,
+          10,
+          16
+        ],
+        [
+          3,
+          2.5,
+          4,
+          14.5
+        ],
+        [
+          12,
+          2.5,
+          13,
+          14.5
+        ],
+        [
+          4,
+          2,
+          4.5,
+          15
+        ],
+        [
+          11.5,
+          2,
+          12,
+          15
+        ],
+        [
+          2.5,
+          3,
+          3,
+          14
+        ],
+        [
+          13,
+          3,
+          13.5,
+          14
+        ],
+        [
+          2,
+          3.5,
+          2.5,
+          13.5
+        ],
+        [
+          13.5,
+          3.5,
+          14,
+          13.5
+        ],
+        [
+          1.5,
+          4.5,
+          2,
+          12.5
+        ],
+        [
+          14,
+          4.5,
+          14.5,
+          12.5
+        ],
+        [
+          1,
+          5,
+          1.5,
+          12
+        ],
+        [
+          14.5,
+          5,
+          15,
+          12
+        ],
+        [
+          0.5,
+          6.5,
+          1,
+          10.5
+        ],
+        [
+          15,
+          6.5,
+          15.5,
+          10.5
         ]
       ],
       "z0": -0.25,
-      "z1": 11
+      "z1": 2.9
+    },
+    {
+      "id": "volume:s:r1",
+      "kind": "room",
+      "rects": [
+        [
+          16,
+          0.5,
+          22.5,
+          7
+        ],
+        [
+          22.5,
+          1.5,
+          23,
+          3
+        ]
+      ],
+      "z0": -0.25,
+      "z1": 2.7
+    },
+    {
+      "id": "volume:s:r2",
+      "kind": "room",
+      "rects": [
+        [
+          16,
+          10,
+          22.5,
+          16.5
+        ]
+      ],
+      "z0": -0.25,
+      "z1": 2.4
+    },
+    {
+      "id": "volume:s:elev:landing:up",
+      "kind": "room",
+      "rects": [
+        [
+          3,
+          13.5,
+          4,
+          14.5
+        ]
+      ],
+      "z0": 7.75,
+      "z1": 10.2
+    },
+    {
+      "id": "volume:elev:ladder:up",
+      "kind": "connector",
+      "rects": [
+        [
+          3,
+          13.5,
+          4,
+          14.5
+        ]
+      ],
+      "z0": -0.25,
+      "z1": 9.8
     }
   ],
   "bandTerritories": [
     {
       "band": "ground",
       "elevation": 0,
-      "owner": "fill:terraced_atrium:7",
+      "owner": "fill:circular_hall:7",
       "rects": [
         [
-          32,
-          24,
-          40,
-          36
-        ],
-        [
-          32,
-          16,
-          40,
-          24
-        ],
-        [
-          20,
-          18,
-          32,
-          20
-        ],
-        [
-          20,
-          4,
-          32,
+          7.5,
+          0,
+          9,
           16
+        ],
+        [
+          6,
+          1,
+          7.5,
+          16
+        ],
+        [
+          4.5,
+          1.5,
+          6,
+          15.5
+        ],
+        [
+          10,
+          1.5,
+          11.5,
+          15.5
+        ],
+        [
+          15.5,
+          7,
+          22.5,
+          10
+        ],
+        [
+          9,
+          1,
+          10,
+          16
+        ],
+        [
+          3,
+          2.5,
+          4,
+          14.5
+        ],
+        [
+          12,
+          2.5,
+          13,
+          14.5
+        ],
+        [
+          4,
+          2,
+          4.5,
+          15
+        ],
+        [
+          11.5,
+          2,
+          12,
+          15
+        ],
+        [
+          2.5,
+          3,
+          3,
+          14
+        ],
+        [
+          13,
+          3,
+          13.5,
+          14
+        ],
+        [
+          2,
+          3.5,
+          2.5,
+          13.5
+        ],
+        [
+          13.5,
+          3.5,
+          14,
+          13.5
+        ],
+        [
+          1.5,
+          4.5,
+          2,
+          12.5
+        ],
+        [
+          14,
+          4.5,
+          14.5,
+          12.5
+        ],
+        [
+          1,
+          5,
+          1.5,
+          12
+        ],
+        [
+          14.5,
+          5,
+          15,
+          12
+        ],
+        [
+          0.5,
+          6.5,
+          1,
+          10.5
+        ],
+        [
+          15,
+          6.5,
+          15.5,
+          10.5
+        ],
+        [
+          16,
+          0.5,
+          22.5,
+          7
+        ],
+        [
+          22.5,
+          1.5,
+          23,
+          3
+        ],
+        [
+          16,
+          10,
+          22.5,
+          16.5
+        ],
+        [
+          3,
+          13.5,
+          4,
+          14.5
         ]
       ]
     },
     {
-      "band": "upper",
+      "band": "up",
       "elevation": 8,
-      "owner": "fill:terraced_atrium:7",
+      "owner": "fill:circular_hall:7",
       "rects": [
         [
-          32,
-          0,
-          40,
-          12
-        ],
-        [
-          32,
-          24,
-          40,
-          36
-        ],
-        [
-          7,
-          0,
-          12,
-          4
-        ],
-        [
-          20,
-          1,
-          32,
-          3
-        ],
-        [
-          35,
-          12,
-          37,
-          24
-        ],
-        [
-          7.5,
-          0.5,
-          8.5,
-          1.5
-        ],
-        [
-          20,
+          3,
+          13.5,
           4,
-          32,
-          16
+          14.5
+        ],
+        [
+          3,
+          13.5,
+          4,
+          14.5
         ]
       ]
     }
   ],
   "navigation": {
     "nodes": [
-      "s:entry",
-      "s:gallery",
-      "s:middle",
-      "s:side",
-      "s:turn",
-      "s:pocket",
-      "s:overlook",
-      "s:arrival",
-      "s:stack"
+      "s:r0",
+      "s:r1",
+      "s:r2",
+      "s:elev:landing:up"
     ],
     "edges": [
       {
-        "from": "s:entry",
-        "to": "s:gallery",
-        "kind": "opening",
-        "opening": "o0",
-        "direction": "both",
-        "connected": true,
-        "status": "connected"
-      },
-      {
-        "from": "s:middle",
-        "to": "s:side",
-        "kind": "opening",
-        "opening": "o1",
-        "direction": "both",
-        "connected": true,
-        "status": "connected"
-      },
-      {
-        "from": "s:turn",
-        "to": "s:pocket",
+        "from": "s:r0",
+        "to": "s:r1",
         "kind": "opening",
         "opening": "o2",
         "direction": "both",
@@ -2366,46 +5474,19 @@
         "status": "connected"
       },
       {
-        "from": "s:gallery",
-        "to": "s:middle",
-        "kind": "ramp",
-        "connector": "ramp:1",
+        "from": "s:r0",
+        "to": "s:r2",
+        "kind": "door",
+        "opening": "o3",
         "direction": "both",
         "connected": true,
         "status": "connected"
       },
       {
-        "from": "s:middle",
-        "to": "s:turn",
-        "kind": "ramp",
-        "connector": "ramp:2",
-        "direction": "both",
-        "connected": true,
-        "status": "connected"
-      },
-      {
-        "from": "s:turn",
-        "to": "s:overlook",
-        "kind": "ramp",
-        "connector": "ramp:3",
-        "direction": "both",
-        "connected": true,
-        "status": "connected"
-      },
-      {
-        "from": "s:overlook",
-        "to": "s:arrival",
-        "kind": "ramp",
-        "connector": "ramp:4",
-        "direction": "both",
-        "connected": true,
-        "status": "connected"
-      },
-      {
-        "from": "s:pocket",
-        "to": "s:stack",
+        "from": "s:r0",
+        "to": "s:elev:landing:up",
         "kind": "ladder",
-        "connector": "pocket:ladder",
+        "connector": "elev:ladder:up",
         "direction": "both",
         "connected": true,
         "status": "connected"
@@ -2419,60 +5500,55 @@
       "selected": true,
       "candidates": [
         {
-          "id": "up:s:arrival",
+          "id": "up:s:elev:landing:up",
           "kind": "ladder",
-          "surface": "s:arrival",
+          "surface": "s:elev:landing:up",
           "landing": [
-            32,
-            35,
-            33,
-            36
+            3,
+            13.5,
+            4,
+            14.5
           ],
           "hatch": [
-            32.5,
-            35,
-            33,
-            35.5
+            3.5,
+            13.5,
+            4,
+            14
           ],
           "at": [
-            32.25,
-            35.5,
+            3.25,
+            14,
             8
           ],
           "state": "supported",
           "variant": "ladder-hatch"
         }
       ],
-      "connections": [
-        "ramp:1",
-        "ramp:2",
-        "ramp:3",
-        "ramp:4"
-      ]
+      "connection": "elev:ladder:up"
     },
     "down": {
       "supported": true,
       "selected": false,
       "candidates": [
         {
-          "id": "down:s:entry",
+          "id": "down:s:r0",
           "kind": "ladder",
-          "surface": "s:entry",
+          "surface": "s:r0",
           "landing": [
-            32,
-            29.5,
-            33,
-            30.5
+            3,
+            13.5,
+            4,
+            14.5
           ],
           "hatch": [
-            32.5,
-            29.5,
-            33,
-            30
+            3.5,
+            13.5,
+            4,
+            14
           ],
           "at": [
-            32.25,
-            30,
+            3.25,
+            14,
             0
           ],
           "state": "supported",

@@ -19,7 +19,7 @@
     backdrop-filter: blur(6px); user-select: none; }
   #hud h1 { font-size: 13px; margin: 0 0 10px; letter-spacing: .02em; color: var(--accent); font-weight: 600; cursor: pointer; }
   .row { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
-  input[type=text] { flex: 1; min-width: 0; background: #1b1b1b; color: var(--text); border: 1px solid #3a3a3a;
+  input[type=text], input[type=number] { flex: 1; min-width: 0; background: #1b1b1b; color: var(--text); border: 1px solid #3a3a3a;
     border-radius: 6px; padding: 5px 7px; font: inherit; font-variant-numeric: tabular-nums; }
   button { background: #2f2f2f; color: var(--text); border: 1px solid #444; border-radius: 6px; padding: 5px 9px;
     font: inherit; cursor: pointer; }
@@ -65,7 +65,6 @@
     <div><i style="background:#3b3934"></i>Solid</div>
     <div><i style="background:#c4a068"></i>POI site (far)</div>
     <div><i style="background:#988462"></i>Site (far)</div>
-    <div><i style="background:#b194be"></i>Vertical exploration fill</div>
   </div>
   <div class="note">Every site is built by a template from its connections: a filler from the Backrooms pool, a house behind its front yard, or a block-sized template on its own lot. Smaller templates sit inside fillers. Zoom in past 1 px/m to see blueprints.</div>
   <div class="sec">Elevation</div>
@@ -74,12 +73,16 @@
     <select id="band" aria-label="Elevation band"></select>
     <button id="band-up" aria-label="Inspect upper band">+</button>
   </div>
-  <div class="row"><select id="floor" aria-label="Floor elevation within shared fills"></select></div>
-  <label class="tg"><input type="checkbox" id="o-ghost"> Ghost other floors in vertical fills</label>
-  <div class="row" style="margin-top:8px">
-    <button id="find-down">Find down fill</button><button id="find-up">Find up fill</button>
+  <label class="tg" for="height">Cutaway height</label>
+  <input id="height" type="range" step="0.01" style="width:100%" aria-label="Cutaway height">
+  <div class="row"><input id="height-value" type="number" step="any" aria-label="Cutaway height in metres"><span>m</span><button id="height-reset">Band height</button></div>
+  <div class="note">Shows the highest floor below the cut at each location. Darker floors are farther below it. Click a template to inspect its floors. Bands currently have separate horizontal networks.</div>
+  <div id="selection" hidden>
+    <div class="sec" id="selection-name"></div>
+    <select id="floor" aria-label="Selected template floor"></select>
+    <label class="tg"><input type="checkbox" id="o-ghost"> Ghost upper floors of this template</label>
+    <div class="row" style="margin-top:8px"><button id="clear-selection">Clear selection</button><button id="export-template">Template JSON</button></div>
   </div>
-  <div class="note">Bands are stable reference heights. A vertical fill owns its rooms and reserved space across bands; its intermediate floors are separate inspection slices. Band controls change the view.</div>
   <div class="row"><button id="export-world">Export this cell · 3 bands</button></div>
   <div class="note" id="export-status" role="status"></div>
   <div class="sec">Show</div>
@@ -144,9 +147,10 @@
     y: parseFloat(Q.get('y')) || 0,
     zoom: parseFloat(Q.get('z')) || 4,
     band: Math.max(-9999, Math.min(9999, parseInt(Q.get('band'), 10) || 0)),
-    floor: [-16, -12, -8, -4, -2, 0, 4, 8, 12, 14].includes(Number(Q.get('floor'))) ? Number(Q.get('floor')) : 0,
+    cutZ: Q.has('cut') && Number.isFinite(Number(Q.get('cut'))) ? Number(Q.get('cut')) : (parseInt(Q.get('band'), 10) || 0) * BR.BAND_CFG.spacing + (Number(Q.get('floor')) || 0),
     opts: {}
   };
+  if (!Q.has('cut')) state.cutZ = state.band * BR.BAND_CFG.spacing + (Number(Q.get('floor')) || 0);
   for (const k of OPTS) state.opts[k] = DEFAULT_ON.has(k) ? Q.get(k) !== '0' : Q.get(k) === '1';
   const hideHud = Q.get('hud') === '0';
   if (hideHud) { $('hud').style.display = 'none'; $('help').style.display = 'none'; }
@@ -158,6 +162,7 @@
     for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
     return h >>> 0;
   }
+  let selectedTemplate = null;
   let world = new BR.BandWorld(seedNum(state.seed), { band: state.band });
 
   // ---------- canvas sizing
@@ -177,7 +182,7 @@
     if (dirty || pending) {
       const t0 = performance.now();
       const view = { cx: state.x, cy: state.y, zoom: state.zoom, w: W, h: H, dpr: DPR };
-      lastItems = BR.draw(ctx, world, view, Object.assign({ hover: hoverSite, floor: state.floor }, state.opts), GEN_BUDGET);
+      lastItems = BR.draw(ctx, world, view, Object.assign({ hover: hoverSite, cutZ: state.cutZ, focus: selectedTemplate && selectedTemplate.key }, state.opts), GEN_BUDGET);
       frameMs = performance.now() - t0;
       pending = !lastItems.done;
       dirty = false;
@@ -191,7 +196,7 @@
     const s = world.stats;
     $('stats').textContent =
       'x ' + state.x.toFixed(0).padStart(7) + '   y ' + state.y.toFixed(0).padStart(7) + '   zoom ' + state.zoom.toFixed(2) + '\n' +
-      'band ' + state.band + ' · floor ' + BR.ELEV.zLabel(world.floorZ + state.floor) + '\n' +
+      'band ' + state.band + ' · cut ' + BR.ELEV.zLabel(state.cutZ) + '\n' +
       'view: ' + lastItems.mode + ' · ' + lastItems.tiles + ' tiles' + (pending ? '  (building…)' : '') + '\n' +
       'planned: ' + s.cellsPlanned + ' cells · built: ' + s.sitesBuilt + ' sites, ' + s.poisBuilt + ' POIs (' + (s.buildMs / Math.max(1, s.sitesBuilt)).toFixed(1) + ' ms avg)' +
       (s.issues ? ' · ' + s.issues + ' issues' : '') + '\n' +
@@ -209,20 +214,17 @@
     const bio = world.biomeAt(x, y);
     if (!s) { $('info').innerHTML = '<b>' + bio.name + '</b> · openness ' + bio.openness.toFixed(2); return; }
     const F = BR.FILL.fillers[world.fillerOf(s)], b = s.bbox;
-    const what = s.kind === 'transition' ? '<b>Terraced atrium</b> · vertical exploration fill<br>Shared owner ' + esc(s.owner) + ' · bands ' + s.transition.lower + ' ↔ ' + s.transition.upper
-      : s.kind === 'flush' ? '<b>' + esc(s.pois[0].name) + '</b> · its own lot, doors on the edge' : s.kind === 'lot' ? '<b>' + esc(s.pois[0].name) + '</b> · its own lot, in a yard' : '<b>' + esc(F.name) + '</b> · ' + F.feel + ' filler';
+    const what = s.kind === 'flush' ? '<b>' + esc(s.pois[0].name) + '</b> · its own lot, doors on the edge' : s.kind === 'lot' ? '<b>' + esc(s.pois[0].name) + '</b> · its own lot, in a yard' : '<b>' + esc(F.name) + '</b> · ' + F.feel + ' filler';
     let html = what + '<br>site ' + s.id + ' · ' + (b[2] - b[0]) + '×' + (b[3] - b[1]) + ' m · ' + s.area + ' m²' +
       (s.rects.length > 1 ? ' · ' + s.rects.length + ' blocks' : '') + '<br>' + s.conns.length + (s.conns.length === 1 ? ' connection · ' : ' connections · ') + bio.name + ' (openness ' + s.openness.toFixed(2) + ')';
     if (world.hasBuild(s)) {
       const r = world.build(s), f = r.filler;
       html += '<br>' + (f ? f.rooms.length + ' rooms · ' + (Number.isFinite(f.meta.built) ? 'built ' + Math.round(f.meta.built * 100) + '% · ' : '') : '') + r.ms.toFixed(1) + ' ms' + (r.issues.length ? '<br><span style="color:#e0503f">' + esc(r.issues[0]) + '</span>' : '');
-      const z = world.floorZ + state.floor, blueprints = (f ? [f] : []).concat(r.buildings.map((B) => B.b));
-      const surfaces = blueprints.flatMap((b) => (b.surfaces || b.rooms.map((room) => {
-        const floorZ = world.floorZ + (b.levels.find((l) => l.index === (room.level || 0)) || b.levels[0]).elevation;
-        return { floorZ, ceilingZ: floorZ + room.ceiling };
-      })).filter((v) => Math.abs(v.floorZ - z) < 1e-7));
-      if (surfaces.length) html += '<br>Floor ' + BR.ELEV.zLabel(z) + ' · clear height ' + Math.min(...surfaces.map((v) => v.ceilingZ - v.floorZ)).toFixed(1) + '–' + Math.max(...surfaces.map((v) => v.ceilingZ - v.floorZ)).toFixed(1) + ' m';
-      else html += '<br>No room floor at ' + BR.ELEV.zLabel(z) + ' in this site';
+      const hit = hitTemplate(s, x, y, false);
+      if (hit && hit.room) {
+        const z = hit.room.floorZ, room = hit.room.room;
+        html += '<br>' + esc(room.name) + ' · floor ' + BR.ELEV.zLabel(z) + ' · clear height ' + room.ceiling + ' m · ' + Math.max(0, state.cutZ - z).toFixed(2) + ' m below cut';
+      } else html += '<br>No walkable floor below this cut here';
     }
     const P = world.poiAt(x, y);
     if (P) {
@@ -240,7 +242,7 @@
     hashTimer = setTimeout(() => {
       const p = new URLSearchParams();
       p.set('seed', state.seed); p.set('x', state.x.toFixed(1)); p.set('y', state.y.toFixed(1)); p.set('z', state.zoom.toFixed(3));
-      p.set('band', state.band); if (state.floor) p.set('floor', state.floor);
+      p.set('band', state.band); p.set('cut', state.cutZ);
       for (const k of OPTS) {
         if (DEFAULT_ON.has(k)) { if (!state.opts[k]) p.set(k, '0'); }
         else if (state.opts[k]) p.set(k, '1');
@@ -257,12 +259,14 @@
   canvas.addEventListener('pointerdown', (e) => {
     canvas.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pointers.size === 1) { drag = { x: e.clientX, y: e.clientY }; canvas.classList.add('drag'); }
+    if (pointers.size === 1) { drag = { x: e.clientX, y: e.clientY, moved: false }; canvas.classList.add('drag'); }
+    else if (drag) drag.moved = true;
   });
   canvas.addEventListener('pointermove', (e) => {
     if (!pointers.has(e.pointerId)) { inspect(e.clientX, e.clientY); return; }
     const prev = pointers.get(e.pointerId);
     if (pointers.size === 2) {
+      if (drag) drag.moved = true;
       const [a, b] = [...pointers.values()];
       const d0 = Math.hypot(a.x - b.x, a.y - b.y);
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -273,12 +277,13 @@
     }
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (drag) {
+      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 4) drag.moved = true;
       state.x -= (e.clientX - prev.x) / state.zoom;
       state.y -= (e.clientY - prev.y) / state.zoom;
       changed();
     }
   });
-  const up = (e) => { pointers.delete(e.pointerId); if (!pointers.size) { drag = null; canvas.classList.remove('drag'); } };
+  const up = (e) => { if (e.type !== 'pointercancel' && drag && !drag.moved && pointers.size === 1) selectAt(e.clientX, e.clientY); pointers.delete(e.pointerId); if (!pointers.size) { drag = null; canvas.classList.remove('drag'); } };
   canvas.addEventListener('pointerup', up);
   canvas.addEventListener('pointercancel', up);
 
@@ -316,27 +321,71 @@
   })(lastT);
 
   // ---------- HUD
-  function newWorld() { world = new BR.BandWorld(seedNum(state.seed), { band: state.band }); hoverSite = null; $('export-status').textContent = ''; changed(); }
+  function newWorld() { world = new BR.BandWorld(seedNum(state.seed), { band: state.band }); hoverSite = null; clearSelection(); $('export-status').textContent = ''; changed(); }
   function elevationControls() {
     $('band').innerHTML = Array.from({ length: 5 }, (_, k) => state.band + k - 2).filter((n) => n >= -9999 && n <= 9999)
       .map((n) => '<option value="' + n + '">' + (n === 0 ? 'Ground zero' : 'Band ' + (n > 0 ? '+' : '') + n) + ' · ' + BR.ELEV.zLabel(n * BR.BAND_CFG.spacing) + '</option>').join('');
     $('band').value = String(state.band);
-    $('floor').innerHTML = [-16, -12, -8, -4, -2, 0, 4, 8, 12, 14].map((z) => '<option value="' + z + '">' + BR.ELEV.zLabel(world.floorZ + z) + (z === 0 ? ' · band reference' : ' · shared fill slice') + '</option>').join('');
-    $('floor').value = String(state.floor);
+    heightControls();
+  }
+  function heightControls() {
+    const floors = selectedTemplate ? BR.ELEV.floorElevations(selectedTemplate.b, selectedTemplate.baseZ) : [];
+    $('height').min = Math.min(world.floorZ - 16, state.cutZ, ...floors);
+    $('height').max = Math.max(world.floorZ + 16, state.cutZ, ...floors);
+    $('height').value = String(state.cutZ); $('height-value').value = String(state.cutZ);
+    if (selectedTemplate) $('floor').value = floors.includes(state.cutZ) ? String(state.cutZ) : '';
+  }
+  function setHeight(z) {
+    if (!Number.isFinite(z)) { heightControls(); return; }
+    state.cutZ = z; heightControls(); hoverSite = null; changed();
+  }
+  function clearSelection() { selectedTemplate = null; $('selection').hidden = true; dirty = true; }
+  function hitTemplate(s, x, y, build) {
+    if (!world.hasBuild(s) && !build) return null;
+    const r = world.build(s), candidates = r.buildings.slice().reverse().map((B) => ({ b: B.b, origin: B.origin, key: s.id + '/' + B.poi.id, name: B.poi.name }));
+    if (r.filler) candidates.push({ b: r.filler, origin: r.fillerOrigin, key: s.id, name: r.filler.name });
+    for (const c of candidates) {
+      c.baseZ = c.b.schema === BR.ELEV.SCHEMA ? 0 : world.floorZ;
+      c.room = BR.ELEV.hitCutaway(c.b, x - c.origin[0], y - c.origin[1], state.cutZ, c.baseZ);
+      c.connector = BR.ELEV.connectionAt(c.b, x - c.origin[0], y - c.origin[1], state.cutZ, state.opts.ghost && selectedTemplate && selectedTemplate.key === c.key);
+      if (c.room || c.connector) return c;
+    }
+    return null;
+  }
+  function selectAt(px, py) {
+    if (state.zoom < 1) return;
+    const x = state.x + (px - W / 2) / state.zoom, y = state.y + (py - H / 2) / state.zoom, s = world.siteAt(x, y);
+    const hit = s && hitTemplate(s, x, y, true); if (!hit) { clearSelection(); return; }
+    selectedTemplate = hit; $('selection').hidden = false;
+    $('selection-name').textContent = hit.name || hit.b.archetype || hit.b.filler;
+    const floors = BR.ELEV.floorElevations(hit.b, hit.baseZ);
+    $('floor').innerHTML = '<option value="">Jump to a local floor…</option>' + floors.map((z) => '<option value="' + z + '">Floor ' + BR.ELEV.zLabel(z) + '</option>').join('');
+    $('floor').value = String(hit.room ? hit.room.floorZ : floors[0]);
+    if (hit.connector) {
+      const ends = hit.connector.landings.map((p) => p[2]);
+      const destination = ends.find((z) => z > state.cutZ + 1e-7) ?? Math.min(...ends);
+      $('floor').value = String(destination); setHeight(destination);
+    }
+    heightControls(); changed();
   }
   function setBand(n) {
     if (!Number.isInteger(n) || Math.abs(n) > 9999) return;
-    state.band = n; state.floor = 0; world.setBand(n); hoverSite = null;
+    state.band = n; state.cutZ = n * BR.BAND_CFG.spacing; world.setBand(n); hoverSite = null; clearSelection();
     elevationControls(); changed();
   }
   $('band').addEventListener('change', () => setBand(Number($('band').value)));
   $('band-up').addEventListener('click', () => setBand(state.band + 1));
   $('band-down').addEventListener('click', () => setBand(state.band - 1));
-  $('floor').addEventListener('change', () => { state.floor = Number($('floor').value); state.zoom = Math.max(2, state.zoom); hoverSite = null; changed(); });
-  for (const dir of ['up', 'down']) $('find-' + dir).addEventListener('click', () => {
-    const p = world.nearestTransition(dir, state.x, state.y);
-    state.x = (p.rect[0] + p.rect[2]) / 2; state.y = (p.rect[1] + p.rect[3]) / 2; state.zoom = Math.max(4, state.zoom); state.floor = 0;
-    elevationControls(); changed();
+  $('height').addEventListener('input', () => setHeight(Number($('height').value)));
+  $('height-value').addEventListener('change', () => setHeight($('height-value').value.trim() ? Number($('height-value').value) : NaN));
+  $('height-reset').addEventListener('click', () => setHeight(world.floorZ));
+  $('floor').addEventListener('change', () => { if ($('floor').value !== '') setHeight(Number($('floor').value)); });
+  $('clear-selection').addEventListener('click', clearSelection);
+  $('export-template').addEventListener('click', () => {
+    if (!selectedTemplate) return;
+    const t = selectedTemplate, b = t.b.schema === BR.ELEV.SCHEMA ? t.b : BR.placeElevationBlueprint(BR.ELEV.prepare(t.b), t.baseZ, state.band, state.band);
+    const url = URL.createObjectURL(new Blob([JSON.stringify({ origin: t.origin, blueprint: b }, null, 2)], { type: 'application/json' }));
+    const a = document.createElement('a'); a.href = url; a.download = 'template-' + world.seed + '.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
   $('export-world').addEventListener('click', () => {
     try {
@@ -372,6 +421,7 @@
   resize();
   requestAnimationFrame(frame);
   window.__world = () => world;
+  window.__cutaway = { selectAt, setHeight, get selected() { return selectedTemplate; } };
 })();
 </script>
 </body>

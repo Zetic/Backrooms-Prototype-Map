@@ -709,7 +709,7 @@
     const g = cv.getContext('2d');
     g.fillStyle = state.blue ? '#0d2640' : '#2a2926'; g.fillRect(0, 0, cv.width, cv.height);
     const c = core(b);
-    $('dlevels').innerHTML = c && c.levels && c.levels.length > 1 ? c.levels.map((L) => '<button data-l="' + L.index + '"' + (L.index === level ? ' class="primary"' : '') + '>Level ' + L.index + '</button>').join('') : '';
+    $('dlevels').innerHTML = c && c.levels ? c.levels.map((L) => '<button data-l="' + L.index + '"' + (L.index === level ? ' class="primary"' : '') + '>Floor ' + (L.elevation > 0 ? '+' : '') + L.elevation + ' m</button>').join('') : '';
     for (const btn of $('dlevels').children) btn.addEventListener('click', () => { level = +btn.dataset.l; drawDetail(); });
     if (!b || b.error) { g.fillStyle = '#e0705f'; g.font = (14 * dpr) + 'px sans-serif'; g.fillText(b ? b.error : '', 20 * dpr, 30 * dpr); return; }
     if (!view) { const F = [0, 0, b.site.w, b.site.h], s = Math.min((cv.width - 60 * dpr) / F[2], (cv.height - 60 * dpr) / F[3]); view = { s, ox: (cv.width - F[2] * s) / 2, oy: (cv.height - F[3] * s) / 2 }; }

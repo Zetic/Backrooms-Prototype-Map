@@ -32,11 +32,11 @@ rather than replacing them with unconstrained three-dimensional noise.
 
 ## Three invariants
 
-1. **Occupancy does not imply connectivity.** A tall hall or an atrium can occupy
+1. **Occupancy does not imply connectivity.** A tall hall can occupy
    an upper band's space without offering an entrance into that network.
 2. **Reserve vertical space together.** Rooms, slabs, routes, pits, and voids
    belonging to one fill claim space before neighboring fills are generated.
-   An upper template must not be placed inside a lower template's atrium.
+   An upper template must not be placed inside a lower template's protected void.
 3. **Every template has up/down potential.** Capability is a physical connection
    option with a host surface, hatch footprint, and landing allowance. Selection
    requires a valid destination and successful reservation, rather than adding
@@ -67,7 +67,7 @@ openings, levels, footprints, and room graph, and adds:
 | `navigation` | Surface graph with explicit connector references and direction |
 | `route[]` | Authored XYZ main journey, for inspection and downstream use |
 
-`levels[]` in this export are display slices grouped by actual floor elevation.
+`levels[]` in this export group actual floor elevations for local inspection.
 They are neither world bands nor compulsory story numbers. A compact internal
 floor can have a display slice while remaining part of its home band.
 Use `navigation` for elevation reachability. The retained renderer-compatible
@@ -101,97 +101,120 @@ independent doorway probabilities. Regions intended to be reachable need a
 small planned connection backbone, with optional extra routes and loops.
 Generate only needed bands/chunks and include band identity in cache keys.
 
-## Milestones
+## Current implementation milestones
 
-### M1 — Spatial contract and a vertical exploration fill
+This plan supersedes the initial atrium demonstration. The spatial contract,
+optional ladder variants, band wrapper and exact portal validation remain;
+the atrium generator, world placement policy and associated previews are removed.
 
-Implement the model and validators in an isolated elevation lab reachable from
-the map/workbench. Keep the existing world's generation unchanged.
+### Milestone 1 — Cutaway presentation (implemented)
 
-- One deterministic fill connecting ground zero to an upper or lower reference
-  band through several rooms and four ramp sections around a reserved atrium.
-- Side branches and a compact stacked pocket demonstrate local floors that
-  remain in the home band. In the upward example the pocket occupies the
-  neighboring band's height without inventing a portal into that band. Clear
-  height always extends upward, including in a downward journey.
-- Shared ownership and differing occupancy sections at the two reference bands.
-- Atomic cross-fill reservation checking, including otherwise empty voids.
-- A common adapter provides every existing template and filler with up/down
-  ladder/hatch candidates. A selected variant creates a real destination landing,
-  cuts the relevant floor/ceiling, and reserves its shaft. Test the smallest closet.
-- An inspection page provides floor selection, ghosted neighboring floors,
-  connector paths, a main-route elevation profile, and complete JSON export.
-- Verify both directions, determinism, connectivity from the ground entrance,
-  stacked clearance, physical connector endpoints, collision rejection, and
-  compatibility with the existing flat test suite.
+- Replace the global preset floor slices with a continuous cut height. Show
+  the highest actual walkable floor at or below that height at each XY.
+- Keep uncovered lower floors visible, shade them by distance below the cut,
+  and label their actual floor elevation. Floor holes reveal lower surfaces.
+- Selecting a map template opens only that instance's actual floor choices.
+  Upper-floor ghosting is limited to that selected template. Its JSON download
+  preserves the generated geometry, XY origin and absolute world heights.
+- Keep exact local floor inspection in the lab and template workshop. The lab
+  also has the cutaway control; selecting a local floor switches to exact view.
+- Draw physical ramp/stair paths as full-width occupied strips, including bends,
+  with solid portions below the cut and faint dashed continuation above it.
+  Mark landing heights and the selected connection's destination footprint.
+  Ladders use their reserved hatch/landing area. Clicking a connection reveals
+  the other landing's floor.
+- Ramps and ceilings do not create additional floor choices. A hall with an
+  8 m ceiling still has one floor unless another surface is explicitly authored.
+- Remove the atrium from generation and the lab. Until replacement journeys
+  are implemented, the main world's reference bands are separate horizontal
+  networks; switching bands is inspection, not player traversal.
 
-This milestone does not populate upper/lower infinite world networks. Its
-destination landings are demonstrator geometry; world-side portal matching is M2.
-Legacy templates' abstract stair/elevator records are retained but flagged as
-needing authored physical paths; the adapter must not pretend to resolve them.
+This is a schematic projection of existing spatial data. It does not generate
+new house floors, connection zones, chains or slope-following reservations.
+The slider's 0.01 m increment is a UI convenience; numeric height entry accepts
+arbitrary values, and the spatial model has no required 2 m vertical grid.
 
-### M2 — Deterministic band planning and matching
+[Cutaway rendering preview](cutaway-preview.png). Its upper row is a display
+fixture testing overlap and ramps, not a new world template. The lower row uses
+an existing circular-hall filler with its optional ladder variant.
 
-**Implemented.** The main map now uses band-aware world ownership, sparse planned
-transition fills, shared reservations, and exact external portal matching.
-Networks extend in both directions. Generation order, chunk boundaries, eviction
-and regional topology are tested. Map controls inspect bands separately from
-individual floor heights. See [M2 implementation and world export](elevation-world.md)
-for the initial spacing/rarity policy, inspection controls and remaining scope.
+![Cutaway heights and local exact-floor inspection](cutaway-preview.png)
 
-### M3 — Authored template variants and elevation policy
+### Milestone 2 — Simple connection zones
 
-Replace common compact fallback connections with authored vertical exploration
-variants. Add sunken suites, pits with explicit hazard/traversal rules, mezzanines,
-terraced halls, offset stacks, and multi-band fills. Tune ground-zero stability,
-horizontal dominance, local variation, and major transition spacing. Potential
-remains universal; activation remains selective.
+Give vertical connections a simple footprint/area, entrance and exit locations,
+endpoint floor heights, and allowed/preferred connection types. Templates can
+favor ramps, stairs, ladders, or a mixed selection. This is the area needed to
+place a connection, without modeling individual steps or railings.
 
-### M4 — Unreal consumer proof
+Connect actual destination surfaces and reserve the route and usable headroom.
+For ramps, replace a single full-height bounding prism with short prisms that
+follow the slope. A high section may have usable space below it if clearance
+permits. Keep floor/ceiling cutouts explicit; occupying upper space never creates
+an entrance by itself. The milestone-1 renderer consumes these areas without
+introducing extra floor slices along the slope.
 
-Build a small Unreal consumer that reconstructs floors, walls, slabs, openings,
-connector geometry, and protected voids from the export. Agree character width,
-headroom, slopes, step dimensions, ladder use, and navigation capabilities with
-the game. Validate those against generated geometry. Keep the export independent
-of whether the consumer uses Blueprint, C++, or PCG metadata.
+### Milestone 3 — Template floors and authored vertical patterns
 
-Epic documents 3D transforms, bounds, and custom attributes on PCG points:
-[PCG overview](https://dev.epicgames.com/documentation/en-us/unreal-engine/procedural-content-generation-overview).
-This supports an adapter; it does not imply automatic import of this JSON format.
+Evolve existing templates to have real local floors at their own heights.
+Author multi-floor templates where the pattern matters: a house can give its
+floors different purposes. Include depressed floors, pits, mezzanines, compact
+stacks and offset exits. Keep every template's optional up/down fallback.
+
+A three-floor house can end around +8 m and accept a different template above
+it. Height does not require repeating the same theme through a whole stack.
+Keep each authored pattern inspectable in the workshop/lab.
+
+### Milestone 4 — World journeys composed from templates
+
+Build sparse vertical journeys by matching the connection zones of successive
+templates. Influence a journey toward ramp-heavy, ladder-heavy, or mixed choices,
+while allowing variation. Every occupied floor needs horizontal exploration
+between arrival and the next departure; repeated connections at one fixed XY
+must not become the default chain.
+
+Allow a template to span several bands, branch into another band, or coordinate
+its territory with templates above and below. Plan related footprints, occupied
+space and protected voids together before generating neighbors. Replace the
+retired atrium policy with these journeys and restore connections between the
+world's horizontal band networks. Generation order and cache eviction must
+preserve the same ownership and matching decisions.
+
+### Milestone 5 — Unreal consumer proof
+
+Build a small consumer that reconstructs floors, walls, slabs, openings,
+connection areas and protected voids. Agree width, headroom, slopes and traversal
+capabilities with the game. The spatial export remains independent of this
+prototype's schematic cutaway and the consumer's rendering/generation system.
+
+## Current usage
+
+Open [the elevation lab](../elevation.html). It starts with the existing circular
+hall's optional upward ladder variant. Every existing template and filler can
+be selected. “Potential only” keeps candidates without adding a connection;
+upward/downward variants add a real landing, reserved shaft and floor/ceiling
+cutouts. A connected local variant does not automatically connect world bands.
+
+```js
+const source = BR.TPL.generate({ archetype: 'closet', seed: 7 });
+const vertical = BR.ELEV.ladderVariant(source, { direction: 'down' });
+BR.ELEV.validate(vertical); // { errors, warnings }
+const ledger = new BR.ELEV.ReservationIndex();
+ledger.reserve(vertical.fillId, vertical.volumes); // atomic claim
+BR.ELEV.drawCutaway(ctx, vertical, { cutZ: -1.25, scale: 20 });
+```
+
+[Current example export](elevation-example.json) ·
+[World ownership and export](elevation-world.md).
+
+The compact adapter's default upward landing moves above a tall host ceiling if
+8 m would intersect it. An explicitly requested rise stays exact and is rejected
+if it conflicts. The future world planner must negotiate destination constraints
+before selecting a template, rather than silently moving a reference band.
 
 ## Open tuning decisions
 
-- Reference-band spacing and how much it can vary between districts.
-- How recognizable major transitions should be versus long gradual journeys.
-- Major transition spacing, local vertical variation frequency, and exceptions
-  for deliberately inaccessible or hazardous spaces.
-- Which templates receive dedicated exploration variants first.
-
-The example's 8 m band separation, 2 m intermediate rises, and compact 3 m
-stack are fixtures for exercising the contract, not final generation policy.
-The compact adapter's default upper landing moves above the host ceiling if
-8 m would place it inside a tall hall. An explicitly requested rise stays exact
-and is rejected if it conflicts. The future band planner must negotiate such
-constraints before choosing a template, rather than silently moving a world band.
-
-## M1 usage and inspection
-
-Open [the elevation lab](../elevation.html). The initial template is a vertical
-exploration fill; choosing another template/filler exercises its compact fallback.
-“Potential only” exports candidates without adding a connection. Upward/downward
-variants include a generated destination landing, reserved shaft, and cutouts.
-The connected flag applies to that internal demonstrator route, not a matched
-connection into the infinite world's next band.
-
-```js
-const b = BR.ELEV.generate({ seed: 7, direction: 'up' });
-const spatial = new BR.ELEV.ReservationIndex();
-spatial.reserve(b.fillId, b.volumes); // atomic; returns conflicts if blocked
-const closet = BR.TPL.generate({ archetype: 'closet', seed: 7 });
-const vertical = BR.ELEV.ladderVariant(closet, { direction: 'down' });
-BR.ELEV.validate(vertical);         // { errors, warnings }
-```
-
-[Example export](elevation-example.json) · [Rendered floor views](elevation-preview.png)
-
-![Selected floor elevations and main-route profile](elevation-preview.png)
+- Reference-band spacing and variation between districts.
+- Frequency of local elevation changes and major journeys.
+- Minimum horizontal exploration between consecutive vertical departures.
+- First templates to receive authored floors and connection-zone preferences.
