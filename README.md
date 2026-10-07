@@ -86,6 +86,14 @@ Open `workbench.html` to:
 - edit recipes;
 - export the JSON.
 
+Open [the elevation lab](elevation.html) to inspect the first elevation milestone:
+a fill explored vertically between two stable reference bands, local stacked
+pockets, shared spatial reservations, and optional up/down ladder variants of
+every template and filler. Select floor elevations, ghost overlapping floors,
+inspect the main route profile, and export `br.elevation/0.1` JSON. The infinite
+map's generation remains flat while the band planner is developed.
+[Elevation design, data contract, and milestones](docs/elevation.md).
+
 ## Controls (`index.html`)
 
 | Control | Function |
@@ -109,6 +117,7 @@ The URL hash keeps the seed, position, zoom and toggles, for example
 | `seams.js` | Where two blueprints end up wall to wall: each shared wall recorded once, and the seam rules that sometimes cut a window or door through it (a house against the backrooms) |
 | `render.js` | The map: tile cache, detail / plan / far views, overlays |
 | `tpl/` | The template system: kit grid, framework, the shared catalogue of room and zone types (`catalogue.js`), House, Rooms and Zone engines, the composite pipeline (`composite.js`: templates built inside a template and merged into one blueprint) and the Neighborhood and Park engines, archetypes, fillers, lots (`lot.js`: settings, the yard, and the adapter that builds templates inside bigger ones), blueprint renderer |
+| `tpl/elevation.js`, `tpl/elevation-view.js`, `elevation-lab.js` | Experimental stacked surfaces, reservations, vertical fill and connection variants; independent JSON renderer and lab controller. Loaded by the lab only |
 
 ```js
 const W = new BR.World(31337);
@@ -155,5 +164,9 @@ The runner checks:
   front, and a flush lot is joined only through its doors. The rest of the
   POI placement rules are checked too.
 - **The map page.** It runs `index.html`'s controller with a stub canvas.
+- **Elevation.** Both directions, stacked clearance, explicit floor/ceiling
+  cutouts, traversal from the ground entrance, protected void reservations,
+  all-template connection potential, and the lab's actual controller with a
+  minimal DOM/canvas adapter.
 
 There is no CI yet; run the checks before pushing.

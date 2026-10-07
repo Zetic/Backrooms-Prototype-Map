@@ -81,6 +81,13 @@ what to allot.
 
 ## 3. Output: `br.building/0.2`
 
+The optional elevation adapter in `src/tpl/elevation.js` converts this output
+into `br.elevation/0.1` without mutating it. Every template and filler receives
+physical up/down ladder/hatch candidates through that common adapter. Bands,
+actual floor heights, shared reservations, and connected variants are described
+in [the elevation implementation plan](elevation.md). Existing abstract vertical
+links require authored XYZ paths before they are complete elevation exports.
+
 Lengths are in metres in the site frame. Ids are stable within a building.
 
 | field | content |
