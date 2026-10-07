@@ -220,7 +220,7 @@ POIs are decided per 128 m cell (the same grid), from `(seed, i, j)` only.
 |---|---:|---:|---|
 | tiny | 2.0 | 55% beside a bigger POI (not one in a yard) | closet |
 | small | 1.8 | 45% | storage room, restroom, mechanical room, storage units |
-| medium | 0.9 | | ranch, bungalow, split ranch, suburban |
+| medium | 0.9 | | ranch, bungalow, split ranch, suburban, indoor park (on a flush lot) |
 | large | 0.04 | | neighborhood hall (about one in 25 cells), on a flush lot |
 | huge | 0.004 | | none yet |
 

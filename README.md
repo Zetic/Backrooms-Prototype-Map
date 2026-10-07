@@ -59,6 +59,9 @@ no furniture.
 - **House** (ranch, bungalow, split ranch, suburban) and **Rooms & small
   POIs** (closet, storage room, restroom, mechanical room, storage units).
   [Contract, pipeline and how to add archetypes](docs/templates.md)
+- **Park**, an indoor park: a hall whose floor is tiled by zones (lawn,
+  paths, plaza, playground, seating) for a later prop pass, pillars on tile
+  pads, and sometimes a small building built by its own template.
 - **Neighborhood**, a template made of templates: a street down a big hall,
   houses on both sides facing it, each built by the house template on its own
   lot and merged into one blueprint.
@@ -99,7 +102,7 @@ The URL hash keeps the seed, position, zoom and toggles, for example
 | `world.js` | Cell plans (borders, blocks, sites, connection graph), site builds, bounded caches, queries |
 | `seams.js` | Where two blueprints end up wall to wall: each shared wall recorded once, and the seam rules that sometimes cut a window or door through it (a house against the backrooms) |
 | `render.js` | The map: tile cache, detail / plan / far views, overlays |
-| `tpl/` | The template system: kit grid, framework, House and Rooms engines, the composite pipeline (`composite.js`: templates built inside a template and merged into one blueprint) and the Neighborhood engine, archetypes, fillers, lots (`lot.js`: settings, the yard, and the adapter that builds templates inside bigger ones), blueprint renderer |
+| `tpl/` | The template system: kit grid, framework, House and Rooms engines, the composite pipeline (`composite.js`: templates built inside a template and merged into one blueprint) and the Neighborhood and Park engines, archetypes, fillers, lots (`lot.js`: settings, the yard, and the adapter that builds templates inside bigger ones), blueprint renderer |
 
 ```js
 const W = new BR.World(31337);
@@ -122,6 +125,10 @@ The runner checks:
   sides. Seam openings sit clear of every other opening, doors have floor in
   front of them on both sides and join the world graph, and seams come out the
   same whatever was built first.
+- **The park.** Its floor is tiled exactly by zones, every park has a
+  playground, paths and lawn, every way in opens onto a path, pillars stand on
+  tile pads and a 1 m walker gets everywhere round them, and its building is
+  exactly what its template builds alone.
 - **The neighborhood.** Every house in it is exactly what the house template
   builds alone from the spec it records. Houses line both sides of the street
   and face it, every door a house chose opens onto its front yard, and on the

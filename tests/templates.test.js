@@ -11,7 +11,7 @@
  *   - generation is deterministic and independent of what was built before
  */
 const path = require('path');
-for (const f of ['core', 'tpl/grid', 'tpl/framework', 'tpl/house', 'tpl/room', 'tpl/composite', 'tpl/neighborhood', 'tpl/archetypes/house', 'tpl/archetypes/room', 'tpl/archetypes/neighborhood'])
+for (const f of ['core', 'tpl/grid', 'tpl/framework', 'tpl/house', 'tpl/room', 'tpl/composite', 'tpl/neighborhood', 'tpl/park', 'tpl/archetypes/house', 'tpl/archetypes/room', 'tpl/archetypes/neighborhood', 'tpl/archetypes/park'])
   require(path.join(__dirname, '..', 'src', f + '.js'));
 const BR = globalThis.BR, TPL = BR.TPL, TG = BR.TG;
 
