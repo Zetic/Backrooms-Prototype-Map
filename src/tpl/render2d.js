@@ -4,10 +4,13 @@
  * it doubles as a check that the contract carries everything a client needs.
  *
  *   BR.TPL.drawBuilding(ctx, building, { scale, ox, oy, level, theme: 'plan' | 'blueprint',
- *                       labels, dims, tags, graph, portals, highlight, site, layer })
+ *                       labels, dims, tags, graph, portals, highlight, site, layer, cuts })
+ *   BR.TPL.drawSeamOpenings(ctx, seams, { scale, ox, oy, theme })
  * (ox, oy) is where the site's (0, 0) lands in canvas pixels; scale is px/m.
  * layer 'floors' draws only the site and floors, 'walls' everything else, so
- * a map can draw every site's floors before any walls.
+ * a map can draw every site's floors before any walls. cuts: [{ o, c, s0,
+ * s1 }] (site frame) stretches left out of its walls: where a seam (seams.js)
+ * cuts an opening, or a shared wall the other side draws.
  */
 (function (root) {
   'use strict';
@@ -17,12 +20,16 @@
     plan: {
       site: '#3b3934', siteLine: 'rgba(255,255,255,0.16)', wall: '#2c2925', thin: '#3d3934', open: 'rgba(60,50,40,0.3)',
       label: 'rgba(50,42,34,0.85)', sub: 'rgba(50,42,34,0.55)', door: '#4f463c', arc: 'rgba(79,70,60,0.55)', window: '#6fb3d2',
-      floor: { backrooms: '#ecd9b4', public: '#ecd9b4', private: '#e8d1ca', service: '#d8dbd0', circulation: '#ece2cc', wet: '#cfe2e6', storage: '#dcd3c3', yard: '#d9d4c7', _: '#e2dccf' }
+      floor: { backrooms: '#ecd9b4', public: '#ecd9b4', private: '#e8d1ca', service: '#d8dbd0', circulation: '#ece2cc', wet: '#cfe2e6', storage: '#dcd3c3', yard: '#d9d4c7', street: '#c9c6bd', _: '#e2dccf' },
+      marking: '#d6a92e',
+      zone: { lawn: '#b9c79a', path: '#efece4', plaza: '#e6e2d8', playground: '#e2c493', seating: '#cdbf9c', pit: '#2a2724' }
     },
     blueprint: {
       site: '#123250', siteLine: 'rgba(170,210,255,0.25)', wall: '#eaf3ff', thin: '#c9def5', open: 'rgba(200,225,255,0.35)',
       label: 'rgba(225,238,255,0.92)', sub: 'rgba(200,222,250,0.65)', door: '#eaf3ff', arc: 'rgba(220,235,255,0.5)', window: '#7fd0ff',
-      floor: { backrooms: '#1b4a75', public: '#1b4a75', private: '#1b4a75', service: '#1b4a75', circulation: '#1f527f', wet: '#1d5582', storage: '#194468', yard: '#1a4670', _: '#1b4a75' }
+      floor: { backrooms: '#1b4a75', public: '#1b4a75', private: '#1b4a75', service: '#1b4a75', circulation: '#1f527f', wet: '#1d5582', storage: '#194468', yard: '#1a4670', street: '#17405f', _: '#1b4a75' },
+      marking: '#ffe48a',
+      zone: { lawn: '#1d5a5f', path: '#245a86', plaza: '#22557f', playground: '#3a5f8a', seating: '#2b6182', pit: '#0b1e33' }
     }
   };
   const ROLE = { entrance: '#3fbf6f', exit: '#e8913a', both: '#3fb6bf' };
@@ -32,6 +39,7 @@
   const bigRect = (rs) => rs.reduce((p, q) => ((q[2] - q[0]) * (q[3] - q[1]) > (p[2] - p[0]) * (p[3] - p[1]) ? q : p));
   function floorKey(rm) {
     const t = rm.tags || [];
+    if (t.indexOf('street') >= 0) return 'street';
     if (t.indexOf('yard') >= 0) return 'yard';
     if (t.indexOf('backrooms') >= 0) return 'backrooms';             // every filler room: one carpet
     if (t.indexOf('wet') >= 0 && t.indexOf('kitchen') < 0) return 'wet';
@@ -87,6 +95,15 @@
         g.restore();
       }
     }
+    // ---- zones: marked areas of a room's floor (a park's lawns, paths, playground)
+    if (floors) for (const z of b.zones || []) {
+      if ((z.level || 0) !== lv || !TH.zone || !TH.zone[z.type]) continue;
+      g.fillStyle = TH.zone[z.type];
+      g.beginPath();
+      for (const r of z.rects) g.rect(Math.round(X(r[0])), Math.round(Y(r[1])), Math.round(X(r[2])) - Math.round(X(r[0])), Math.round(Y(r[3])) - Math.round(Y(r[1])));
+      g.fill();
+    }
+    if (floors) drawMarkings(g, b, lv, X, Y, S, TH);
     if (!walls) { g.restore(); return; }
     // ---- verticals (stairs / lifts): a tread pattern in the room
     for (const v of b.verticals || []) for (const rid of v.rooms) {
@@ -112,7 +129,7 @@
     for (const w of b.walls) if (onLv(w) && w.kind === 'open') { g.beginPath(); g.moveTo(X(w.a[0]), Y(w.a[1])); g.lineTo(X(w.b[0]), Y(w.b[1])); g.stroke(); }
     g.setLineDash([]);
     // ---- walls minus openings
-    const runs = wallRuns(b, lv);
+    const runs = wallRuns(b, lv, o.cuts);
     g.lineCap = 'square';
     for (const kind of ['interior', 'exterior']) {
       g.strokeStyle = kind === 'exterior' ? TH.wall : TH.thin;
@@ -170,6 +187,15 @@
         g.fillStyle = TH.sub;
         fit.forEach((t, k) => { if (g.measureText(t).width <= w - 3) g.fillText(t, cx, y0 + fs * 1.1 * (k + 1)); });
       }
+      // the zones worth naming on a plan
+      for (const z of b.zones || []) {
+        if ((z.level || 0) !== lv || ['playground', 'pit'].indexOf(z.type) < 0) continue;
+        const r = bigRect(z.rects), w = (r[2] - r[0]) * S, fs = Math.max(8, Math.min(12, S * 0.38));
+        g.font = 'italic ' + fs + 'px ui-sans-serif, system-ui, sans-serif';
+        if (g.measureText(z.type).width > w - 6 || (r[3] - r[1]) * S < fs * 1.4) continue;
+        g.fillStyle = z.type === 'pit' ? WRONG : TH.sub;
+        g.fillText(z.type, X((r[0] + r[2]) / 2), Y((r[1] + r[3]) / 2));
+      }
     }
     g.restore();
   }
@@ -180,25 +206,26 @@
    * pieces a curve replaces:
    * { exterior: [[x0, y0, x1, y1]], interior: [...] } in site metres.
    */
-  function wallRuns(b, lv) {
+  function wallRuns(b, lv, cuts) {
     lv = lv || 0;
-    const out = { exterior: [], interior: [] }, byWall = new Map(), cuts = [];
+    const out = { exterior: [], interior: [] }, byWall = new Map();
     for (const op of b.openings) { if (!byWall.has(op.wall)) byWall.set(op.wall, []); byWall.get(op.wall).push(op); }
-    for (const c of b.curves || []) if ((c.level || 0) === lv) for (let k = 1; k < c.line.length; k++) cuts.push([c.line[k - 1], c.line[k]]);
+    cuts = (cuts || []).slice();
+    for (const cv of b.curves || []) if ((cv.level || 0) === lv) for (let k = 1; k < cv.line.length; k++) {
+      const p = cv.line[k - 1], q = cv.line[k], horiz = Math.abs(p[1] - q[1]) < 1e-9;
+      cuts.push({ o: horiz ? 'h' : 'v', c: horiz ? p[1] : p[0], s0: Math.min(horiz ? p[0] : p[1], horiz ? q[0] : q[1]), s1: Math.max(horiz ? p[0] : p[1], horiz ? q[0] : q[1]) });
+    }
     for (const w of b.walls) {
       if ((w.level || 0) !== lv || w.kind === 'open') continue;
-      const horiz = w.a[1] === w.b[1], list = out[w.kind === 'exterior' ? 'exterior' : 'interior'];
+      // a facade is a building's outer wall inside a bigger template: drawn as one
+      const horiz = w.a[1] === w.b[1], list = out[w.kind === 'exterior' || w.kind === 'facade' ? 'exterior' : 'interior'];
       const s0 = horiz ? Math.min(w.a[0], w.b[0]) : Math.min(w.a[1], w.b[1]), s1 = horiz ? Math.max(w.a[0], w.b[0]) : Math.max(w.a[1], w.b[1]);
       const c = horiz ? w.a[1] : w.a[0];
       const gaps = (byWall.get(w.id) || []).filter((op) => op.kind !== 'false').map((op) => {
         const a = horiz ? op.a[0] : op.a[1], bb = horiz ? op.b[0] : op.b[1];
         return [Math.min(a, bb), Math.max(a, bb)];
       });
-      for (const [p, q] of cuts) {
-        if (horiz ? Math.abs(p[1] - c) > 1e-6 || Math.abs(q[1] - c) > 1e-6 : Math.abs(p[0] - c) > 1e-6 || Math.abs(q[0] - c) > 1e-6) continue;
-        const a = horiz ? Math.min(p[0], q[0]) : Math.min(p[1], q[1]), bb = horiz ? Math.max(p[0], q[0]) : Math.max(p[1], q[1]);
-        if (bb > s0 && a < s1) gaps.push([a, bb]);
-      }
+      for (const k of cuts) if (k.o === (horiz ? 'h' : 'v') && Math.abs(k.c - c) < 1e-9 && k.s1 > s0 && k.s0 < s1) gaps.push([k.s0, k.s1]);
       gaps.sort((p, q) => p[0] - q[0]);
       const seg = (p, q) => { if (q - p > 1e-6) list.push(horiz ? [p, c, q, c] : [c, p, c, q]); };
       let t = s0;
@@ -290,7 +317,40 @@
     if (p.role === 'exit' || p.role === 'both') head(tip, out);
   }
 
+  /** floor paint read from room tags: a double centre line down a street */
+  function drawMarkings(g, b, lv, X, Y, S, TH) {
+    if (S < 1.5) return;
+    for (const rm of b.rooms) {
+      if ((rm.level || 0) !== lv || (rm.tags || []).indexOf('street') < 0) continue;
+      const r = bigRect(rm.rects), along = r[3] - r[1] >= r[2] - r[0], mid = along ? (r[0] + r[2]) / 2 : (r[1] + r[3]) / 2;
+      g.strokeStyle = TH.marking || '#d6a92e'; g.lineWidth = Math.max(1, S * 0.1);
+      g.beginPath();
+      for (const d of [-0.16, 0.16]) {
+        if (along) { g.moveTo(X(mid + d), Y(r[1] + 1)); g.lineTo(X(mid + d), Y(r[3] - 1)); }
+        else { g.moveTo(X(r[0] + 1), Y(mid + d)); g.lineTo(X(r[2] - 1), Y(mid + d)); }
+      }
+      g.stroke();
+    }
+  }
+
+  /**
+   * What seam rules cut through shared walls (seams.js), drawn once over both
+   * blueprints: world metres, (ox, oy) where the world's (0, 0) lands.
+   */
+  function drawSeamOpenings(g, seams, o) {
+    const S = o.scale, TH = THEMES[o.theme] || THEMES.plan, X = (x) => o.ox + x * S, Y = (y) => o.oy + y * S;
+    for (const sm of seams) for (const op of sm.openings) {
+      const rooms = new Map();
+      if (op.kind !== 'window') {
+        const d = op.swing > 0 ? 1 : -1, r = sm.o === 'h' ? [op.s0, Math.min(sm.c, sm.c + d), op.s1, Math.max(sm.c, sm.c + d)] : [Math.min(sm.c, sm.c + d), op.s0, Math.max(sm.c, sm.c + d), op.s1];
+        rooms.set('into', { rects: [r] });
+      }
+      drawOpening(g, Object.assign({}, op, { swingInto: op.kind === 'window' ? undefined : 'into' }), rooms, X, Y, S, TH);
+    }
+  }
+
   TPL.drawBuilding = drawBuilding;
+  TPL.drawSeamOpenings = drawSeamOpenings;
   TPL.wallRuns = wallRuns;
   TPL.floorKey = floorKey;
   TPL.THEMES = THEMES;

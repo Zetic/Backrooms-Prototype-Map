@@ -298,7 +298,7 @@
     const at = (x, y) => sites.findIndex((s) => s.rects.some((q) => x >= q[0] && x < q[2] && y >= q[1] && y < q[3]));
     for (const s of sites) {
       if (s.kind !== 'flush' && s.kind !== 'lot') continue;
-      const L = s.lots[0];
+      const L = s.lots[0], joined = frontJoined(L);
       L.portalConns = {};
       for (const d of L.doors) {
         const m = (d.s0 + d.s1) / 2, inner = d.o === 'h' ? (d.c === L.rect[1] ? 1 : -1) : (d.c === L.rect[0] ? 1 : -1);
@@ -307,7 +307,10 @@
         const lowIsLot = inner === 1 ? false : true, id = i + ',' + j + ':e' + conns.length;
         conns.push({ id, o: d.o, c: d.c, s0: d.s0, s1: d.s1, a: sites[lowIsLot ? s.k : other].id, b: sites[lowIsLot ? other : s.k].id, route: d.main, cross: false });
         L.portalConns[d.portal] = id;
-        tree.union(s.k, other);
+        // a door only joins the lot to the site across it if the building
+        // links that door to its front; otherwise that site still needs a
+        // way in of its own
+        if (joined.has(d.portal)) tree.union(s.k, other);
       }
     }
     const place = (e, route) => {
@@ -343,6 +346,24 @@
     const byId = new Map(sites.map((s) => [s.id, s]));
     for (const cn of conns) for (const sid of [cn.a, cn.b]) if (sid) byId.get(sid).conns.push(cn.id);
     return { i, j, rect: [x0, y0, x1, y1], density: pc.density, openness: cellOpen, pois: pois.filter((P) => !dropped.has(P.id)), lots, borders, blocks: blocks.map((b) => b.r), sites, conns, byId, connById: new Map(conns.map((c) => [c.id, c])) };
+  }
+
+  /**
+   * The portals of a lot's building that its front reaches without leaving
+   * it: the main door, every door onto the lot's own front yard (they share
+   * the yard), and every door whose room the building's room graph joins to
+   * one of those. A building may split its rooms between doors (a garage
+   * wing reached only through the garage door), so a door outside this set
+   * does not join the lot to the site across it.
+   */
+  const WALK = { door: 1, double: 1, opening: 1, slider: 1, vehicle: 1, open: 1, stair: 1, elevator: 1, ladder: 1 };
+  function frontJoined(L) {
+    const b = L.b, adj = new Map(b.rooms.map((r) => [r.id, []]));
+    for (const [a, c, k] of b.graph.edges) if (WALK[k] && adj.has(a) && adj.has(c)) { adj.get(a).push(c); adj.get(c).push(a); }
+    const onEdge = new Set(L.doors.map((d) => d.portal));
+    const st = b.portals.filter((p) => !p.level && (p.main || (L.kind === 'yard' && !onEdge.has(p.id)))).map((p) => p.room), seen = new Set(st);
+    while (st.length) for (const v of adj.get(st.pop())) if (!seen.has(v)) { seen.add(v); st.push(v); }
+    return new Set(b.portals.filter((p) => seen.has(p.room)).map((p) => p.id));
   }
 
   /** a connection as a filler sees it from one of its sites (site frame, metres) */
@@ -469,7 +490,8 @@
     /**
      * The world's room graph over the sites of cells [i0..i1] x [j0..j1]:
      * every blueprint's own graph, joined where two portals share a
-     * connection. Nodes: 'siteId/roomId' or 'siteId/poiId/roomId'.
+     * connection, and through seam doors when seams.js is loaded.
+     * Nodes: 'siteId/roomId' or 'siteId/poiId/roomId'.
      * Returns { nodes: Set, edges: [[u, v]], dangling: [connection ids that leave the region] }.
      */
     graph(i0, j0, i1, j1) {
@@ -487,6 +509,17 @@
           for (const rm of B.b.rooms) nodes.add(bp + rm.id);
           for (const e of B.b.graph.edges) if (e[0] !== 'outside' && e[1] !== 'outside') edges.push([bp + e[0], bp + e[1]]);
           for (const p of B.b.portals) if (B.conns[p.id]) end(B.conns[p.id], bp + p.room);
+        }
+      }
+      // seam doors (seams.js): extra ways between rooms of two blueprints that
+      // happen to share a wall, both sides in the region
+      if (this.seamsBetween) {
+        const inR = (n) => n.i >= i0 && n.i <= i1 && n.j >= j0 && n.j <= j1;
+        for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) for (const s of this.cell(i, j).sites) {
+          for (const n of [s].concat(this.neighbours(s))) {
+            if (n.id < s.id || !inR(n)) continue;
+            for (const S of this.seamsBetween(s, n)) for (const op of S.openings) if (op.kind === 'door') edges.push([S.a.node, S.b.node]);
+          }
         }
       }
       const dangling = [];

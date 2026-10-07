@@ -14,11 +14,16 @@ connections:
   tunnels, room mazes, partition fields, nested rings, and now and then a
   hall of pillars.
 - **POI templates** build the places that should feel designed (houses,
-  closets, restrooms, storage). A house stands toward the back of its own lot,
-  in a big yard room. A template at least 8 m across can be a lot of its own
-  with its door on the edge, and a smaller one sits inside a filler.
+  closets, restrooms, storage, neighborhoods). A house stands toward the back
+  of its own lot, in a big yard room. A template at least 8 m across can be a
+  lot of its own with its door on the edge, and a smaller one sits inside a
+  filler. A template can be made of other templates: a neighborhood lines a
+  street in a big hall with houses, each one built by the house template.
 
 The world itself only decides where the sites are and how they connect.
+Where two blueprints happen to end up wall to wall, the shared wall is a
+**seam**: recorded once, and sometimes cut through by a seam rule (a window or
+a door from a house straight into the backrooms next door).
 
 ## The world
 
@@ -54,6 +59,18 @@ no furniture.
 - **House** (ranch, bungalow, split ranch, suburban) and **Rooms & small
   POIs** (closet, storage room, restroom, mechanical room, storage units).
   [Contract, pipeline and how to add archetypes](docs/templates.md)
+- **Every room and zone alone.** Each is defined once in a shared catalogue
+  that every template draws on, and is a template of its own: a janitor
+  closet or a corridor on its own (the *expected* pool), or, rarely, a
+  kitchen, a stall or a playground walled in somewhere it doesn't belong (the
+  *weird* pool).
+- **Park**, an indoor park: a hall whose floor is tiled by zones (lawn,
+  paths, plaza, playground, seating) for a later prop pass, pillars on tile
+  pads, and sometimes a small building built by its own template.
+- **Neighborhood**, a template made of templates: a street down a big hall,
+  houses on both sides facing it, each built by the house template on its own
+  lot and merged into one blueprint.
+  [Templates inside templates](docs/templates.md#8-templates-inside-templates-srctplcompositejs)
 - **Fillers**: a pool of 33 Backrooms fillers, weighted 70 / 20 / 10
   enclosed / mixed / open, plus the yard round a house. Each builds a site in about
   2–3 ms and honours every connection exactly.
@@ -88,8 +105,9 @@ The URL hash keeps the seed, position, zoom and toggles, for example
 | `core.js` | Seeded hashing, PRNG, noise, union-find |
 | `poi.js` | POI placement per cell: tiers, density rhythm, settings (yard lots built round their house, flush lots, inside fillers), clusters, sites; `buildPOI` |
 | `world.js` | Cell plans (borders, blocks, sites, connection graph), site builds, bounded caches, queries |
+| `seams.js` | Where two blueprints end up wall to wall: each shared wall recorded once, and the seam rules that sometimes cut a window or door through it (a house against the backrooms) |
 | `render.js` | The map: tile cache, detail / plan / far views, overlays |
-| `tpl/` | The template system: kit grid, framework, House and Rooms engines, archetypes, fillers, lots (`lot.js`: settings, the yard, and the adapter that builds templates inside bigger ones), blueprint renderer |
+| `tpl/` | The template system: kit grid, framework, the shared catalogue of room and zone types (`catalogue.js`), House, Rooms and Zone engines, the composite pipeline (`composite.js`: templates built inside a template and merged into one blueprint) and the Neighborhood and Park engines, archetypes, fillers, lots (`lot.js`: settings, the yard, and the adapter that builds templates inside bigger ones), blueprint renderer |
 
 ```js
 const W = new BR.World(31337);
@@ -108,6 +126,23 @@ The runner checks:
 
 - **Templates.** Every archetype builds on many seeds, sites and main sides,
   and keeps the blueprint contract.
+- **Seams.** Every seam is one wall both blueprints share with floor on both
+  sides. Seam openings sit clear of every other opening, doors have floor in
+  front of them on both sides and join the world graph, and seams come out the
+  same whatever was built first.
+- **The catalogue.** Every engine's rooms and zones are the catalogue's plus
+  only its own context; every room and zone is a template of its own, alone;
+  every template is in the expected or the weird pool, and weird ones are
+  placed rarely.
+- **The park.** Its floor is tiled exactly by zones, every park has a
+  playground, paths and lawn, every way in opens onto a path, pillars stand on
+  tile pads and a 1 m walker gets everywhere round them, and its building is
+  exactly what its template builds alone.
+- **The neighborhood.** Every house in it is exactly what the house template
+  builds alone from the spec it records. Houses line both sides of the street
+  and face it, every door a house chose opens onto its front yard, and on the
+  map a neighborhood is its own lot, joined through its doors, every room
+  reachable.
 - **Fillers.** Every filler keeps the contract on any site shape and honours
   every connection. The pool leans enclosed, and fillers are fast.
 - **The world, on five seeds.** Sites tile every cell exactly. Connections are

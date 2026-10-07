@@ -240,6 +240,23 @@ const B = [-1, -1, 1, 1];
     if (!inside) cross.add(cn.id);
   }
   check('only openings that leave the region are left dangling', g.dangling.length === cross.size && g.dangling.every((id) => cross.has(id)), `${g.dangling.length} lead out`);
+  // a house may reach some rooms only through a door other than its front
+  // one (a garage wing behind the garage door): the site across that door
+  // must still have a way into the world of its own
+  const WALK = new Set(['door', 'double', 'opening', 'slider', 'vehicle', 'open', 'stair']);
+  let split = null;
+  for (let i = R[0]; i <= R[2] && !split; i++) for (let j = R[1]; j <= R[3] && !split; j++) for (const L of W.cell(i, j).lots) {
+    if (L.kind !== 'yard' || !L.doors.length) continue;
+    const b = L.b, adj = new Map(b.rooms.map((r) => [r.id, []])), edge = new Set(L.doors.map((d) => d.portal));
+    for (const [a, c, k] of b.graph.edges) if (WALK.has(k) && adj.has(a) && adj.has(c)) { adj.get(a).push(c); adj.get(c).push(a); }
+    const st = b.portals.filter((p) => !edge.has(p.id)).map((p) => p.room), seen = new Set(st);
+    while (st.length) for (const v of adj.get(st.pop())) if (!seen.has(v)) { seen.add(v); st.push(v); }
+    if (L.doors.some((d) => !seen.has(b.portals.find((p) => p.id === d.portal).room))) { split = [i, j]; break; }
+  }
+  if (split) {
+    const g2 = W.graph(split[0] - 1, split[1] - 1, split[0] + 1, split[1] + 1), c2 = components(g2.nodes, g2.edges);
+    check('round a house with a wing behind another door, every room is still reachable', c2.sizes.length === 1, `cell ${split}: ${c2.sizes.length} piece(s)`);
+  } else check('round a house with a wing behind another door, every room is still reachable', true, 'none in this region');
 }
 
 // ---- 7. builds are the same whatever was built before
@@ -260,8 +277,13 @@ const B = [-1, -1, 1, 1];
   const tiers = BR.POI_TIERS.filter((t) => cat[t].length);
   check('POI density is dense but not crowded', st.perHa > 2 && st.perHa < 7, st.perHa.toFixed(2) + ' POIs/ha');
   check('every tier with templates is placed', tiers.every((t) => st.byTier[t] > 0), JSON.stringify(st.byTier));
+  // the expected pool is what the backrooms are made of: every one appears; the
+  // weird pool (a lone kitchen, a stall, a playground) is rare by design
   const used = new Set(ps.map((P) => P.archetype)), all = tiers.flatMap((t) => cat[t].map((a) => a.id));
-  check('every template in the catalogue appears', all.every((id) => used.has(id)), `${used.size}/${all.length}`);
+  const pool = (id) => TPL.archetypes[id].pool || 'expected', exp = all.filter((id) => pool(id) === 'expected'), weird = all.filter((id) => pool(id) === 'weird');
+  check('every template in the expected pool appears', exp.every((id) => used.has(id)), `${exp.filter((id) => used.has(id)).length}/${exp.length}`);
+  const wShare = ps.filter((P) => pool(P.archetype) === 'weird').length / ps.length, wSeen = weird.filter((id) => used.has(id)).length;
+  check('weird-pool templates turn up, rarely', weird.length === 0 || (wShare > 0.01 && wShare < 0.15 && wSeen >= weird.length / 2), `${(wShare * 100).toFixed(1)}% of POIs, ${wSeen}/${weird.length} templates seen`);
   const shapes = new Set(ps.map((P) => P.shape)), sides = new Set(ps.map((P) => P.approach));
   check('POI sites come in irregular shapes and face every side', shapes.size >= 3 && sides.size === 4, [...shapes].join(','));
   check('small POIs cluster beside bigger ones', ps.filter((P) => P.cluster).length > ps.length * 0.15);
