@@ -7,7 +7,8 @@ const run = (file, args, title) => {
   if (r.status !== 0) process.exit(r.status || 1);
 };
 run('templates.test.js', [], 'templates');
+run('neighborhood.test.js', [], 'neighborhood (templates inside a template)');
 run('fillers.test.js', [], 'fillers');
 for (const seed of ['31337', '7', '12345', '99', '4242']) run('world.test.js', [seed], 'world: seed ' + seed);
 run('ui-smoke.test.js', [], 'map page');
-console.log('\nAll template, filler, world (5 seeds) and map page checks passed.');
+console.log('\nAll template, neighborhood, filler, world (5 seeds) and map page checks passed.');

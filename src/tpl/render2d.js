@@ -17,12 +17,14 @@
     plan: {
       site: '#3b3934', siteLine: 'rgba(255,255,255,0.16)', wall: '#2c2925', thin: '#3d3934', open: 'rgba(60,50,40,0.3)',
       label: 'rgba(50,42,34,0.85)', sub: 'rgba(50,42,34,0.55)', door: '#4f463c', arc: 'rgba(79,70,60,0.55)', window: '#6fb3d2',
-      floor: { backrooms: '#ecd9b4', public: '#ecd9b4', private: '#e8d1ca', service: '#d8dbd0', circulation: '#ece2cc', wet: '#cfe2e6', storage: '#dcd3c3', yard: '#d9d4c7', _: '#e2dccf' }
+      floor: { backrooms: '#ecd9b4', public: '#ecd9b4', private: '#e8d1ca', service: '#d8dbd0', circulation: '#ece2cc', wet: '#cfe2e6', storage: '#dcd3c3', yard: '#d9d4c7', street: '#c9c6bd', _: '#e2dccf' },
+      marking: '#d6a92e'
     },
     blueprint: {
       site: '#123250', siteLine: 'rgba(170,210,255,0.25)', wall: '#eaf3ff', thin: '#c9def5', open: 'rgba(200,225,255,0.35)',
       label: 'rgba(225,238,255,0.92)', sub: 'rgba(200,222,250,0.65)', door: '#eaf3ff', arc: 'rgba(220,235,255,0.5)', window: '#7fd0ff',
-      floor: { backrooms: '#1b4a75', public: '#1b4a75', private: '#1b4a75', service: '#1b4a75', circulation: '#1f527f', wet: '#1d5582', storage: '#194468', yard: '#1a4670', _: '#1b4a75' }
+      floor: { backrooms: '#1b4a75', public: '#1b4a75', private: '#1b4a75', service: '#1b4a75', circulation: '#1f527f', wet: '#1d5582', storage: '#194468', yard: '#1a4670', street: '#17405f', _: '#1b4a75' },
+      marking: '#ffe48a'
     }
   };
   const ROLE = { entrance: '#3fbf6f', exit: '#e8913a', both: '#3fb6bf' };
@@ -32,6 +34,7 @@
   const bigRect = (rs) => rs.reduce((p, q) => ((q[2] - q[0]) * (q[3] - q[1]) > (p[2] - p[0]) * (p[3] - p[1]) ? q : p));
   function floorKey(rm) {
     const t = rm.tags || [];
+    if (t.indexOf('street') >= 0) return 'street';
     if (t.indexOf('yard') >= 0) return 'yard';
     if (t.indexOf('backrooms') >= 0) return 'backrooms';             // every filler room: one carpet
     if (t.indexOf('wet') >= 0 && t.indexOf('kitchen') < 0) return 'wet';
@@ -66,6 +69,7 @@
       g.fill();
       if (o.highlight === rm.id) { g.fillStyle = o.theme === 'blueprint' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.4)'; g.fill(); }
     }
+    if (floors) drawMarkings(g, b, lv, X, Y, S, TH);
     if (!walls) { g.restore(); return; }
     // ---- verticals (stairs / lifts): a tread pattern in the room
     for (const v of b.verticals || []) for (const rid of v.rooms) {
@@ -161,7 +165,8 @@
     for (const op of b.openings) { if (!byWall.has(op.wall)) byWall.set(op.wall, []); byWall.get(op.wall).push(op); }
     for (const w of b.walls) {
       if ((w.level || 0) !== lv || w.kind === 'open') continue;
-      const horiz = w.a[1] === w.b[1], list = out[w.kind === 'exterior' ? 'exterior' : 'interior'];
+      // a facade is a building's outer wall inside a bigger template: drawn as one
+      const horiz = w.a[1] === w.b[1], list = out[w.kind === 'exterior' || w.kind === 'facade' ? 'exterior' : 'interior'];
       const s0 = horiz ? Math.min(w.a[0], w.b[0]) : Math.min(w.a[1], w.b[1]), s1 = horiz ? Math.max(w.a[0], w.b[0]) : Math.max(w.a[1], w.b[1]);
       const c = horiz ? w.a[1] : w.a[0];
       const gaps = (byWall.get(w.id) || []).filter((op) => op.kind !== 'false').map((op) => {
@@ -256,6 +261,22 @@
     };
     if (p.role === 'entrance' || p.role === 'both') head(base, [-out[0], -out[1]]);
     if (p.role === 'exit' || p.role === 'both') head(tip, out);
+  }
+
+  /** floor paint read from room tags: a double centre line down a street */
+  function drawMarkings(g, b, lv, X, Y, S, TH) {
+    if (S < 1.5) return;
+    for (const rm of b.rooms) {
+      if ((rm.level || 0) !== lv || (rm.tags || []).indexOf('street') < 0) continue;
+      const r = bigRect(rm.rects), along = r[3] - r[1] >= r[2] - r[0], mid = along ? (r[0] + r[2]) / 2 : (r[1] + r[3]) / 2;
+      g.strokeStyle = TH.marking || '#d6a92e'; g.lineWidth = Math.max(1, S * 0.1);
+      g.beginPath();
+      for (const d of [-0.16, 0.16]) {
+        if (along) { g.moveTo(X(mid + d), Y(r[1] + 1)); g.lineTo(X(mid + d), Y(r[3] - 1)); }
+        else { g.moveTo(X(r[0] + 1), Y(mid + d)); g.lineTo(X(r[2] - 1), Y(mid + d)); }
+      }
+      g.stroke();
+    }
   }
 
   TPL.drawBuilding = drawBuilding;

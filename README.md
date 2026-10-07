@@ -14,9 +14,11 @@ connections:
   tunnels, room mazes, partition fields, nested rings, and now and then a
   hall of pillars.
 - **POI templates** build the places that should feel designed (houses,
-  closets, restrooms, storage). A house stands toward the back of its own lot,
-  in a big yard room. A template at least 8 m across can be a lot of its own
-  with its door on the edge, and a smaller one sits inside a filler.
+  closets, restrooms, storage, neighborhoods). A house stands toward the back
+  of its own lot, in a big yard room. A template at least 8 m across can be a
+  lot of its own with its door on the edge, and a smaller one sits inside a
+  filler. A template can be made of other templates: a neighborhood lines a
+  street in a big hall with houses, each one built by the house template.
 
 The world itself only decides where the sites are and how they connect.
 
@@ -54,6 +56,10 @@ no furniture.
 - **House** (ranch, bungalow, split ranch, suburban) and **Rooms & small
   POIs** (closet, storage room, restroom, mechanical room, storage units).
   [Contract, pipeline and how to add archetypes](docs/templates.md)
+- **Neighborhood**, a template made of templates: a street down a big hall,
+  houses on both sides facing it, each built by the house template on its own
+  lot and merged into one blueprint.
+  [Templates inside templates](docs/templates.md#8-templates-inside-templates-srctplcompositejs)
 - **Fillers**: a pool of 33 Backrooms fillers, weighted 70 / 20 / 10
   enclosed / mixed / open, plus the yard round a house. Each builds a site in about
   2–3 ms and honours every connection exactly.
@@ -89,7 +95,7 @@ The URL hash keeps the seed, position, zoom and toggles, for example
 | `poi.js` | POI placement per cell: tiers, density rhythm, settings (yard lots built round their house, flush lots, inside fillers), clusters, sites; `buildPOI` |
 | `world.js` | Cell plans (borders, blocks, sites, connection graph), site builds, bounded caches, queries |
 | `render.js` | The map: tile cache, detail / plan / far views, overlays |
-| `tpl/` | The template system: kit grid, framework, House and Rooms engines, archetypes, fillers, lots (`lot.js`: settings, the yard, and the adapter that builds templates inside bigger ones), blueprint renderer |
+| `tpl/` | The template system: kit grid, framework, House and Rooms engines, the composite pipeline (`composite.js`: templates built inside a template and merged into one blueprint) and the Neighborhood engine, archetypes, fillers, lots (`lot.js`: settings, the yard, and the adapter that builds templates inside bigger ones), blueprint renderer |
 
 ```js
 const W = new BR.World(31337);
@@ -108,6 +114,11 @@ The runner checks:
 
 - **Templates.** Every archetype builds on many seeds, sites and main sides,
   and keeps the blueprint contract.
+- **The neighborhood.** Every house in it is exactly what the house template
+  builds alone from the spec it records. Houses line both sides of the street
+  and face it, every door a house chose opens onto its front yard, and on the
+  map a neighborhood is its own lot, joined through its doors, every room
+  reachable.
 - **Fillers.** Every filler keeps the contract on any site shape and honours
   every connection. The pool leans enclosed, and fillers are fast.
 - **The world, on five seeds.** Sites tile every cell exactly. Connections are
