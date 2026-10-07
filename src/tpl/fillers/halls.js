@@ -15,10 +15,6 @@
  *                      1.5-2 m lattice until it is a maze (enclosed)
  *   office             a big room with loose rows of cubicle stubs and a few
  *                      small offices along one or two edges (mixed)
- *   meander            a 3-6 m hall that bends across the site, its width
- *                      wobbling like a cave, with a few stray columns (mixed)
- *   tail               a long room that ends in a thin winding 1 m corridor,
- *                      sometimes to a small end room (mixed)
  *   aisles             a room of long parallel walls (partitions or thin
  *                      solid) with gaps to cross, like shelving rows (mixed)
  *   scattered_pillars  a big room with small pillars at random spacing and a
@@ -31,7 +27,7 @@
  * compacts the plan. Units are kit cells (0.5 m), rects [x0, y0, x1, y1].
  *
  * Most world sites are small (9-12 m across), so every filler here scales
- * down to a 9 m inner side (loop_hall and office 10 m, tail 9 x 12 m):
+ * down to a 9 m inner side (loop_hall and office 10 m):
  * under about 14 m the spacing, bands, widths and room counts shrink with
  * the site rather than the concept turning into noise.
  */
@@ -183,58 +179,6 @@
     if (s1 - s0 < 2 * min + 1) return 0;
     const m = (s0 + s1) >> 1;
     return partRun(walk, o, c, s0, m, min) + partRun(walk, o, c, m + 1, s1, min);
-  }
-
-  /** smooth 1D noise in [-1, 1]: knots every `step` along t */
-  function wobble(rng, n, step) {
-    const knots = [];
-    for (let k = 0; k <= Math.ceil(n / step) + 1; k++) knots.push(rng.range(-1, 1));
-    return (t) => {
-      const u = t / step, k = Math.floor(u), f = u - k, s = f * f * (3 - 2 * f);
-      return knots[k] + (knots[k + 1] - knots[k]) * s;
-    };
-  }
-
-  /**
-   * A wandering 4-connected line of cells from (x0, y0) towards (x1, y1):
-   * the heading swings off the straight line by up to o.amp radians, smoothly
-   * every o.step cells, and straightens out over the last o.fade cells. Where
-   * o.ok(x, y) refuses the next cell it steers round (sliding along an
-   * obstacle), else stops. It never comes back within 2 cells of where it
-   * was more than 6 steps ago. At most o.max steps. Returns cell indices,
-   * the start first.
-   */
-  function snake(P, rng, x0, y0, x1, y1, o) {
-    const W = P.W, out = [y0 * W + x0], sw = wobble(rng, o.max + 2, o.step), seen = new Int32Array(W * P.H);
-    let px = x0 + 0.5, py = y0 + 0.5, cx = x0, cy = y0;
-    seen[out[0]] = 1;
-    const near = (x, y, t) => {
-      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
-        const nx = x + dx, ny = y + dy;
-        if (nx < 0 || ny < 0 || nx >= W || ny >= P.H) continue;
-        const s = seen[ny * W + nx];
-        if (s && s < t - 6) return true;
-      }
-      return false;
-    };
-    for (let t = 1; t <= o.max; t++) {
-      const dx = x1 + 0.5 - px, dy = y1 + 0.5 - py, dist = Math.hypot(dx, dy);
-      if (dist < 1) break;
-      const th0 = Math.atan2(dy, dx) + o.amp * Math.min(1, dist / (o.fade || 8)) * sw(t);
-      let moved = false;
-      for (const turn of [0, 0.5, -0.5, 1, -1, 1.5, -1.5, 2, -2, 2.5, -2.5]) {
-        const nx = px + Math.cos(th0 + turn), ny = py + Math.sin(th0 + turn), ix = Math.floor(nx), iy = Math.floor(ny);
-        const steps = [];
-        if (ix !== cx) steps.push([ix, cy]);
-        if (iy !== cy) steps.push([ix, iy]);
-        if (!steps.every(([sx, sy]) => o.ok(sx, sy) && !near(sx, sy, out.length))) continue;
-        for (const [sx, sy] of steps) { out.push(sy * W + sx); seen[sy * W + sx] = out.length; }
-        px = nx; py = ny; cx = ix; cy = iy; moved = true;
-        break;
-      }
-      if (!moved) break;
-    }
-    return out;
   }
 
   // ------------------------------------------------------------ loop hall
@@ -563,200 +507,6 @@
         }
       }
       if (rng.f() < 0.3) for (let k = rng.int(1, 2); k > 0; k--) K.column(walk, r, rng);
-    }
-  });
-
-  // ------------------------------------------------------------ meandering hall
-  FILL.register({
-    id: 'meander', name: 'Meandering hall', feel: 'mixed', weight: 2,
-    blurb: 'A 3-6 m hall that bends across the site through solid, its width wobbling like a cave, with a few stray small columns.',
-    doors: { opening: 0.8, wide: 0.2 }, loops: 0.1, soft: ['meander'],
-    fits: (S) => Math.min(...dims(S)) >= 18 && Math.max(...dims(S)) >= 20,
-    site: { w: [10, 36], h: [10, 30] },
-    layout(P, rng) {
-      const I = P.inner, W = P.W, iw = TG.rw(I), ih = TG.rh(I), alongX = iw >= ih, small = Math.min(iw, ih) < 26;
-      // 3.5-5 m across with a 0.75-1.5 m wobble; 2-3 m on a small site
-      const base = small ? rng.int(4, 6) : rng.int(7, 10), amp = small ? rng.range(0.8, 1.5) : rng.range(1.5, 3), m = (base >> 1) + 1;
-      const inI = (x, y) => [clamp(x, I[0] + m, I[2] - m - 1), clamp(y, I[1] + m, I[3] - m - 1)];
-      const mid = (c) => { const q = c.landing; return [(q[0] + q[2]) >> 1, (q[1] + q[3]) >> 1]; };
-      // ends: the pair farthest apart among the connections and a point on
-      // each edge of the inner rect, a connection counting a little extra
-      const cs = P.conns.map(mid), pts0 = cs.map((c) => [c, 1]);
-      pts0.push([inI(I[0], I[1] + rng.int(0, ih)), 0], [inI(I[2], I[1] + rng.int(0, ih)), 0], [inI(I[0] + rng.int(0, iw), I[1]), 0], [inI(I[0] + rng.int(0, iw), I[3]), 0]);
-      let A, B, best = -1;
-      for (let i = 0; i < pts0.length; i++) for (let j = i + 1; j < pts0.length; j++) {
-        const [p, a] = pts0[i], [q, b] = pts0[j], dd = Math.abs(p[0] - q[0]) + Math.abs(p[1] - q[1]) + 8 * (a + b);
-        if (dd > best) { best = dd; A = p; B = q; }
-      }
-      // one or two bends pushed off the straight line
-      const pts = [A], nb = small ? 1 : rng.int(1, 2);
-      let sgn = rng.f() < 0.5 ? 1 : -1;
-      for (let k = 1; k <= nb; k++) {
-        const f = k / (nb + 1), px = A[0] + (B[0] - A[0]) * f, py = A[1] + (B[1] - A[1]) * f;
-        const off = sgn * (small ? rng.range(0.15, 0.3) : rng.range(0.2, 0.4)) * (alongX ? ih : iw);
-        pts.push(inI(Math.round(px + (alongX ? 0 : off)), Math.round(py + (alongX ? off : 0))));
-        sgn = -sgn;
-      }
-      pts.push(B);
-      const path = [], swing = rng.range(0.4, 0.8), step = rng.int(9, 15), inBox = (x, y) => P.inSite(x, y);
-      for (let k = 1; k < pts.length; k++) {
-        const [ax, ay] = path.length ? [path[path.length - 1] % W, (path[path.length - 1] - path[path.length - 1] % W) / W] : pts[0];
-        const seg = snake(P, rng, ax, ay, pts[k][0], pts[k][1], { ok: inBox, amp: swing, step, fade: 6, max: 4 * (iw + ih) });
-        path.push(...(path.length ? seg.slice(1) : seg));
-      }
-      const v = P.add('hall', ['meander']);
-      if (!path.length) { P.paint(share(P, rng, 0.5, 0.8, 12), v); return; }
-      // the brush: a square whose side wobbles in [lo, hi], now and then a bulge to one side
-      const brush = (cells, base, amp, lo, hi, bulge) => {
-        const wide = wobble(rng, cells.length, rng.int(5, 9)), lat = wobble(rng, cells.length, rng.int(7, 12));
-        for (let t = 0; t < cells.length; t++) {
-          const x = cells[t] % W, y = (cells[t] - x) / W, w = clamp(Math.round(base + amp * wide(t)), lo, hi), o = Math.round(lat(t) * 1.5);
-          const x0 = x - (w >> 1) + (alongX ? 0 : o), y0 = y - (w >> 1) + (alongX ? o : 0);
-          P.paint([x0, y0, x0 + w, y0 + w], v);
-          if (t % 6 === 0 && rng.f() < bulge) {
-            const bw = rng.int(4, small ? 5 : 7), bd = rng.int(2, small ? 3 : 4), side = rng.int(0, 3);
-            const q = side === 0 ? [x - (bw >> 1), y0 - bd, x - (bw >> 1) + bw, y0] : side === 1 ? [x - (bw >> 1), y0 + w, x - (bw >> 1) + bw, y0 + w + bd]
-              : side === 2 ? [x0 - bd, y - (bw >> 1), x0, y - (bw >> 1) + bw] : [x0 + w, y - (bw >> 1), x0 + w + bd, y - (bw >> 1) + bw];
-            P.paint(q, v);
-          }
-        }
-      };
-      brush(path, base, amp, small ? 4 : 6, small ? 7 : 12, small ? 0.12 : 0.25);
-      // the other connections: narrower branches of the hall wandering in from the edge
-      for (const c of P.conns) {
-        if (landed(P, c)) continue;
-        const [sx, sy] = mid(c);
-        let tx = -1, ty = -1, bd = Infinity;
-        for (let i = 0; i < P.R.a.length; i++) if (P.R.a[i] === v) { const x = i % W, y = (i - x) / W, d = Math.abs(x - sx) + Math.abs(y - sy); if (d < bd) { bd = d; tx = x; ty = y; } }
-        if (tx < 0) continue;
-        brush(snake(P, rng, sx, sy, tx, ty, { ok: inBox, amp: 0.5, step: 8, fade: 4, max: 3 * bd + 10 }), rng.int(4, small ? 4 : 6), 1, 4, small ? 5 : 8, 0);
-      }
-      for (let k = rng.int(0, small ? 1 : 2); k > 0; k--) K.alcove(P, v, rng, 'alcove');
-      linkConns(P, rng, 3);
-    },
-    furnish(P, walk, rng) {
-      const v = mainRoom(P, 'meander'), cells = v >= 0 ? P.cells(v) : [];
-      if (!cells.length) return;
-      const n = rng.int(cells.length < 500 ? 1 : 2, clamp(Math.round(cells.length / 120), 2, 6));
-      for (let k = 0, tries = 0; k < n && tries < n * 10; tries++) {
-        const i = cells[rng.int(0, cells.length - 1)], x = i % P.W, y = (i - x) / P.W, s = rng.f() < 0.6 ? 1 : 2;
-        if (walk.column([x, y, x + s, y + s], 2)) k++;
-      }
-      if (rng.f() < 0.3) K.stubWall(walk, P.bigRect(v), rng, rng.range(0.2, 0.4));
-    }
-  });
-
-  // ------------------------------------------------------------ hall with a tail
-  FILL.register({
-    id: 'tail', name: 'Hall with a tail', feel: 'mixed', weight: 1,
-    blurb: 'A long room that ends in a thin winding 1 m corridor through the solid, sometimes reaching a small end room.',
-    doors: { opening: 0.85, door: 0.15 }, loops: 0, soft: ['tail'],
-    fits: (S) => Math.min(...dims(S)) >= 18 && Math.max(...dims(S)) >= 24,
-    site: { w: [12, 36], h: [9, 24] },
-    layout(P, rng) {
-      const I = P.inner, W = P.W, alongX = TG.rw(I) >= TG.rh(I);
-      const A0 = alongX ? I[0] : I[1], A1 = alongX ? I[2] : I[3], C0 = alongX ? I[1] : I[0], C1 = alongX ? I[3] : I[2];
-      const rect = (a0, a1, c0, c1) => (alongX ? [a0, c0, a1, c1] : [c0, a0, c1, a1]);
-      const tight = A1 - A0 < 36 || C1 - C0 < 20;
-      const len = Math.round((A1 - A0) * (tight ? rng.range(0.5, 0.65) : rng.range(0.48, 0.62)));
-      const b = Math.min(rng.int(tight ? 5 : 6, 10), C1 - C0 - 4, Math.max(6, Math.round((C1 - C0) * 0.4)));
-      // no room for the tail beyond the far end (a small site): it leaves from
-      // the side of the far end and folds back along the room, which keeps to
-      // one edge of the site to leave it room
-      const fold = A1 - A0 - len < 14;
-      // the room goes near the connections, with its far end (where the tail leaves) away from them
-      const cs = P.conns.map((c) => [(c.landing[0] + c.landing[2]) >> 1, (c.landing[1] + c.landing[3]) >> 1]);
-      let best = null;
-      for (let k = 0; k < 8; k++) {
-        const fromStart = k % 2 === 0;
-        const c0 = fold ? (rng.f() < 0.5 ? C0 + rng.int(0, 2) : C1 - b - rng.int(0, 2)) : C0 + 2 + rng.int(0, Math.max(0, C1 - C0 - b - 4));
-        const a0 = fromStart ? A0 + rng.int(0, 3) : A1 - rng.int(0, 3) - len, r = rect(a0, a0 + len, c0, c0 + b), far = fromStart ? a0 + len : a0;
-        let score = rng.f() * 4;
-        for (const [x, y] of cs) {
-          score += Math.max(r[0] - x, 0, x - r[2] + 1) + Math.max(r[1] - y, 0, y - r[3] + 1);
-          if (((alongX ? x : y) - far) * (fromStart ? 1 : -1) > 0) score += 12;
-        }
-        if (!best || score < best.score) best = { score, fromStart, c0, a0 };
-      }
-      const { fromStart, c0, a0 } = best, a1 = a0 + len;
-      const v = P.add('hall', ['long']);
-      // the long room in 1-3 sections, a step in its width between them
-      const ns = rng.int(1, tight ? 2 : 3);
-      for (let k = 0, t = a0; k < ns; k++) {
-        const sl = k === ns - 1 ? a1 - t : Math.round(len / ns) + rng.int(-2, 2), wk = clamp(b + rng.int(-1, 2), 5, C1 - C0), off = clamp(c0 + rng.int(-1, 1), C0, C1 - wk);
-        P.paint(rect(t, t + sl, off, off + wk), v);
-        t += sl;
-      }
-      // sometimes a leg off the head end, turning the room into an L
-      if (!fold && rng.f() < 0.4) {
-        const lw = rng.int(4, 6), up = c0 - C0 > C1 - (c0 + b), ll = Math.min(rng.int(6, 12), up ? c0 - C0 : C1 - c0 - b);
-        if (ll >= 4) {
-          const h0 = fromStart ? a0 : a1 - lw;
-          P.paint(up ? rect(h0, h0 + lw, c0 - ll, c0) : rect(h0, h0 + lw, c0 + b, c0 + b + ll), v);
-        }
-      }
-      // the tail: straight out of the far end (or its side), then winding
-      // through the solid, 1.5 m (1 m on a tight site) clear of the room, the
-      // landings and the site edge
-      const clr = tight ? 2 : 3, e = clr + 1, R = P.R.a, near = dilate(P, (i) => R[i] >= 0 || P.land[i] === 1 || P.mask.a[i] !== 1, clr);
-      const exit = [], cell = (a, c) => (alongX ? c * W + a : a * W + c), dir = fromStart ? 1 : -1;
-      if (fold) {
-        // out of the side with more room, 1-2 m in from the far end (the path
-        // brush paints the cell and the one before it on each axis)
-        const ae = fromStart ? a1 - 2 - rng.int(0, 2) : a0 + 1 + rng.int(0, 2);
-        let lo = -1, hi = -1;
-        for (let c = C0; c < C1; c++) if (R[cell(ae, c)] === v) { if (lo < 0) lo = c; hi = c; }
-        if (lo < 0) { lo = c0; hi = c0 + b - 1; }
-        const side = lo - C0 > C1 - 1 - hi ? -1 : 1;
-        for (let k = 1; k <= e; k++) exit.push(cell(ae, side > 0 ? hi + k : lo - k));
-      } else {
-        const cm = c0 + (b >> 1);
-        for (let k = 0; k < 4; k++) exit.push(cell(fromStart ? a1 + k : a0 - 1 - k, cm));
-      }
-      const free = (x, y) => x >= e && y >= e && x <= W - e && y <= P.H - e && !near[y * W + x] && !near[(y - 1) * W + x] && !near[y * W + x - 1] && !near[(y - 1) * W + x - 1];
-      // run the exit on until it is clear of the room (its sections differ in width)
-      const xy = (i) => [i % W, (i - (i % W)) / W], dx = exit[1] - exit[0];
-      for (let k = 0; k < 4 && !free(...xy(exit[exit.length - 1])); k++) {
-        const nx = exit[exit.length - 1] + dx, [x, y] = xy(nx);
-        if (!P.inSite(x, y) || Math.abs(nx % W - exit[exit.length - 1] % W) > 1) break;
-        exit.push(nx);
-      }
-      const st = exit[exit.length - 1], sx = st % W, sy = (st - sx) / W, cand = [];
-      for (let k = 0; k < 80; k++) {
-        const x = rng.int(e, W - e), y = rng.int(e, P.H - e);
-        if (!free(x, y) || (!fold && ((alongX ? x : y) - (alongX ? sx : sy)) * dir < 2)) continue;
-        cand.push([Math.abs(x - sx) + Math.abs(y - sy) + rng.range(0, 10), x, y]);
-      }
-      cand.sort((p, q) => q[0] - p[0]);
-      let tail = [];
-      const amp = rng.range(1.0, 1.4), step = rng.int(7, 12);
-      for (const [, x, y] of cand.slice(0, 4)) {
-        const p = snake(P, rng, sx, sy, x, y, { ok: free, amp, step, fade: 4, max: 3 * (Math.abs(x - sx) + Math.abs(y - sy)) + 20 });
-        if (p.length > tail.length) tail = p;
-        if (tail.length >= 16) break;
-      }
-      const tv = P.add('passage', ['tail']);
-      paintPath(P, exit.concat(tail.slice(1)), 2, tv);
-      // sometimes it reaches a small end room
-      if (tail.length >= 8 && rng.f() < 0.55) {
-        const e = tail[tail.length - 1], ex = e % W, ey = (e - ex) / W;
-        for (let tries = 0; tries < 10; tries++) {
-          const w = rng.int(tight ? 5 : 6, tight ? 7 : 10), h = rng.int(tight ? 5 : 6, tight ? 7 : 10), x0 = ex - rng.int(1, w - 2), y0 = ey - rng.int(1, h - 2), q = [x0, y0, x0 + w, y0 + h];
-          let clear = true;
-          for (let y = q[1] - 1; clear && y <= q[3]; y++) for (let x = q[0] - 1; x <= q[2]; x++) {
-            const o = P.own(x, y), inQ = x >= q[0] && x < q[2] && y >= q[1] && y < q[3];
-            if ((inQ && (o === -2 || P.land[y * W + x])) || (o >= 0 && o !== tv)) { clear = false; break; }
-          }
-          if (!clear) continue;
-          const er = P.add('room', ['end']);
-          P.paint(q, er, true);
-          P.recolor(q, tv, er);
-          break;
-        }
-      }
-      // connections: wide legs of the long room (the L of the reference), clear of the tail
-      const avoid = dilate(P, (i) => R[i] === tv, 2);
-      linkConns(P, rng, tight ? rng.int(3, 4) : rng.int(4, 6), { avoid, room: v, goal: (i) => R[i] === v });
     }
   });
 

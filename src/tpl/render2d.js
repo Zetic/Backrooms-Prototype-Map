@@ -65,9 +65,8 @@
       g.strokeStyle = TH.siteLine; g.lineWidth = 1; g.setLineDash([4, 4]);
       g.stroke(); g.setLineDash([]);
     }
-    // ---- floors (inside the smoothed outline when stair-step walls are drawn
-    // as curves: what the curves cut off is left out, what they take in is
-    // filled with the room's floor)
+    // ---- floors (inside the authored arc/radial outline; the patches between
+    // the raster and the drawn boundary take their owning room's floor)
     const outline = (b.outline || []).find(onLv), curves = (b.curves || []).filter(onLv);
     const poly = (pts) => pts.forEach((p, k) => (k ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))));
     if (floors) {

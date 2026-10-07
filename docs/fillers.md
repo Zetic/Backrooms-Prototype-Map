@@ -34,7 +34,7 @@ passage to the lot edge.
 
 ## The pool
 
-33 fillers in four files, most drawn from the hand-drawn and pixel reference
+34 fillers in five files, most drawn from the hand-drawn and pixel reference
 maps. *Smallest* is the smallest square site (or, for a long one, the
 narrowest 1 : 2 site) the filler takes; *map* is the share of the world's
 filler sites it fits, since most of them are only 8–12 m across.
@@ -74,8 +74,6 @@ filler sites it fits, since most of them are only 8–12 m across.
 | `loop_hall` | mixed | 3 | 10 m | 52% | a wide 3–5 m hall in an L, U or ring round a block of 2–4 rooms that open off it, closing into a loop |
 | `partitions` | mixed | 3 | 9 m | 70% | a large room full of free-standing straight, L and T wall pieces: the classic Level 0 look |
 | `office` | mixed | 2 | 10 m | 52% | a big room with loose rows of cubicle stubs and a few small offices along one or two edges |
-| `meander` | mixed | 2 | 10 m | 69% | a 3–6 m hall that bends across the site, its width wobbling like a cave, a few stray columns |
-| `tail` | mixed | 1 | 9 × 18 m | 61% | a long room that ends in a thin winding 1 m corridor, sometimes to a small end room |
 | `aisles` | mixed | 1 | 9 m | 70% | long parallel walls with gaps to cross between them, like shelving rows |
 | `cross_pillars` | open | 3 | 9 m | 70% | a big hall with rows of plus-shaped pillars and a scalloped edge |
 | `scattered_pillars` | open | 2 | 9 m | 70% | a big room with small pillars at random spacing and a notched edge |
@@ -89,8 +87,26 @@ filler sites it fits, since most of them are only 8–12 m across.
 | `nested` | enclosed | 1 | 9 m | 70% | ring corridors one inside the other round a small core, each entered on a different side |
 | `repetition` | enclosed | 1 | 8.5 m | 84% | the same room, with the same partition or columns, copied 3–6 times in a row or grid |
 | `big_rooms` | mixed | 2 | 10 m | 52% | 2–5 big rooms joined through wide openings or no wall at all into one sprawling space |
-| `curved` | mixed | 1 | 8 m | 99% | a mostly rectangular room with one or two sides curving: a slope easing across, the solid bowing in, the room bowing out, or a wave |
 | `gallery` | mixed | 1 | 8 m | 99% | a central room ringed by shallow bays between solid piers or wall stubs |
+
+`architectural.js`, regular curves based on architectural floor plans:
+
+| filler | feel | weight | minimum inner site | what it builds |
+|---|---|---|---|---|
+| `circular_hall` | mixed | 1 | 8 × 12 m | a circular hall opening into a rectangular wing, with rooms beside the wing |
+| `twin_domes` | mixed | 1 | 8 × 14 m | two equal semicircular halls on rectangular bases, joined by a straight gallery |
+| `sector` | mixed | 1 | 8 × 8 m | a quarter-circle or 120-degree sector with straight radial sides and a squared entrance tip |
+| `radial_suite` | mixed | 1 | 12 × 18 m | concentric semicircular circulation and 3–5 radial rooms, with a central entrance to each bay |
+
+These replace the organic `meander`, `tail` and `curved` layouts from PR 10.
+Radii stay constant, paired domes share a radius, and the suite's arcs share
+one centre. Layouts turn to the site's long axis and may mirror; they keep
+the curved body inside the largest inner rectangle, with straight adapters
+to the exact site connections. On irregular sites, unused arms stay solid
+except where a connection needs an adapter. No generic spline rounding is
+applied to the other fillers.
+
+![Architectural curved fillers, seed 17](fillers-architectural.png)
 
 Not in the pool: `yard` (weight 0), a house's front yard (a strip across the
 front of the house and a lane out to the lot edge) and the passages from its
@@ -100,10 +116,7 @@ the yard comes as a `hint`).
 The weights add up to 70 enclosed, 20 mixed and 10 open. `BR.FILL.pick`
 chooses by weight among the fillers that fit the site (each has a `fits`
 rule). A biome can pass its own `weights`; the world's biome tilts them
-between deep warrens and open stretches. Across the map (8 seeds, about
-15,000 sites) that comes to 71% of filler area enclosed, 19% mixed and 10%
-open, with warren on about a fifth of the sites and every other filler
-somewhere between 0.5% and 10%.
+between deep warrens and open stretches.
 
 Shared pieces for layouts and furnishings are in `src/tpl/fillers/kit.js`:
 `blob` (a room made of 2–3 overlapping rectangles, the room shape of the
@@ -160,7 +173,7 @@ renderer draws it:
 | `openings[]` | `opening` (no leaf) or `door`, on their walls |
 | `portals[]` | one per connection: `{ id, connection, opening, room, side, width, kind, tags: ['route' or 'side'] }` |
 | `columns[]` | `{ id, room, rect }` |
-| `curves[]` | only where a wall steps on a slant: `{ id, level, room, pts, line }`. `pts` is the curve drawn in place of the stair-step wall pieces in `line`, which runs from the curve's first point through the corners of the steps to its last. Both ends sit on the straight wall either side |
+| `curves[]` | authored geometry only: `{ id, level, kind, room, pts, line }`, where `kind` is `arc` or `line`. Arcs also carry `center`, `radius` (metres) and `angles` (unwrapped radians). `pts` replaces the raster wall pieces in `line`; both ends meet those walls. Arc samples follow the exact radius, with short joins to the pinned grid endpoints |
 | `outline` | with `curves` only: `[{ level, rings }]`, the edge of the floor with the curves in place of the steps, for drawing the floor |
 | `graph` | room graph, with `outside` for the portals |
 | `meta` | `rooms, built` (share of the site built), `openFloor` (share of floor in rooms of 80 m² or more), `partitions, columns, curves, carved, loops, issues, ms` |
@@ -192,27 +205,19 @@ of the site once, and the shared pipeline makes the result sound:
 6. **Furnish.** The filler's partitions and columns are each kept only if
    the 1 m walker still reaches every floor cell. They keep clear of
    openings, and partitions never cross or double up.
-7. **Curves.** The floor is a 0.5 m raster, so a wall on a slant comes
-   out as a staircase. Where the edge between floor and solid steps three
-   or more times the same way in a row (every other run at most 1.5 m, the
-   rest at most 5 m), the steps are drawn as one smooth curve through their
-   middles, easing in from the straight wall at each end. Points where rooms
-   meet, the ends of openings and partitions, and the cells round columns
-   never move. The raster stays the truth: rooms, walls and the walker are
-   unchanged, and a curve keeps close to its stairs. Single jogs and the
-   offset rectangles of blob rooms stay square. A filler can name **soft**
-   rooms by tag (`soft: ['meander']`): there every run of 2 m or less
-   between two corners is rounded too, so small bumps and jogs go as well.
-   The meandering hall, the hall with a tail's corridor and the curved room
-   are soft. They get curves on every site, the stair-step corridor on
-   about two in five.
-
-   ![Stair-step walls before, curves after](fillers-curves.png)
+7. **Architectural geometry.** Only a layout's explicitly authored
+   `P.geometry` arcs and radial lines replace raster wall pieces. The engine
+   matches the surviving exterior edges after cleanup and joining, so an
+   adapter or door cannot be covered by an arc. Samples follow a constant
+   radius, including concentric inner boundaries; radial sides stay straight.
+   Openings, room junctions and partitions stay pinned, and short joins meet
+   the grid wall endpoints. Rooms, walls and the 1 m walker still use the
+   raster. Other fillers keep their rectilinear outlines.
 8. **Output.** Metres, site frame. The renderer draws the floor inside
    `outline` and the curves in place of the wall pieces they replace.
 
 A new filler is a `layout` (and maybe a `furnish`), registered with
-`BR.FILL.register({ id, name, feel, weight, blurb, fits, doors, loops, soft, layout, furnish })`.
+`BR.FILL.register({ id, name, feel, weight, blurb, fits, doors, loops, layout, furnish })`.
 The pipeline's helpers are in `BR.FILL.lib`: `bsp`, `voidSome`, `notch`,
 `paintRooms`, `route`, `paintPath`; the shared layout pieces in `BR.FILL.kit`.
 A layout can ask for links in `P.require` (pairs of rooms that must share
@@ -222,7 +227,7 @@ carried through when the engine renumbers its rooms. A furnish places
 pillar, such as a plus), each kept only if the 1 m walker still gets
 everywhere.
 
-## Tests (`tests/fillers.test.js`)
+## Tests (`tests/fillers.test.js`, `tests/architectural.test.js`)
 
 These are checked from the output JSON alone, on every filler over many
 seeds, site shapes (rect, L, U, notched, random) and 0–4 connections:
@@ -240,6 +245,9 @@ seeds, site shapes (rect, L, U, notched, random) and 0–4 connections:
 * every curve starts and ends on its room's straight exterior walls,
   replaces only that room's exterior wall pieces, never runs over an
   opening, and keeps within 1 m of the steps it replaces;
+* architectural arcs keep a constant radius, paired domes match, radial
+  suites remain concentric, and geometry is deterministic in either orientation;
+* the organic layouts are absent and ordinary fillers receive no spline rounding;
 * the average time on 10–24 m sites stays under 5 ms (it is about 2.5 ms).
 
 ## Next
