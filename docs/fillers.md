@@ -203,6 +203,8 @@ of the site once, and the shared pipeline makes the result sound:
    jogs and the offset rectangles of blob rooms stay square. The meandering
    hall, the curved room and the hall with a tail get curves on nearly every
    site, the stair-step corridor on about two in five.
+
+   ![Stair-step walls before, curves after](fillers-curves.png)
 8. **Output.** Metres, site frame. The renderer draws the floor inside
    `outline` and the curves in place of the wall pieces they replace.
 
