@@ -11,9 +11,12 @@ if(ui.error)throw ui.error;if(ui.status!==0)process.exit(ui.status||1);
 console.log('\ntemplates');
 const tpl=spawnSync(process.execPath,[path.join(__dirname,'templates.test.js')],{stdio:'inherit'});
 if(tpl.error)throw tpl.error;if(tpl.status!==0)process.exit(tpl.status||1);
+console.log('\nfillers');
+const fill=spawnSync(process.execPath,[path.join(__dirname,'fillers.test.js')],{stdio:'inherit'});
+if(fill.error)throw fill.error;if(fill.status!==0)process.exit(fill.status||1);
 for(const seed of [31337,7]){
  console.log(`\npoi: seed ${seed}`);
  const poi=spawnSync(process.execPath,[path.join(__dirname,'poi.test.js'),String(seed)],{stdio:'inherit'});
  if(poi.error)throw poi.error;if(poi.status!==0)process.exit(poi.status||1);
 }
-console.log(`\nAll ${runs} canonical suite runs, UI controller, template and POI checks passed.`);
+console.log(`\nAll ${runs} canonical suite runs, UI controller, template, filler and POI checks passed.`);

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Filler Bench</title>
+<style>
+  :root { --bg: #242321; --card: #302f2c; --panel: #1b1a18; --text: #e9e3d6; --muted: #a39d92; --accent: #e5cc9b; --line: rgba(255, 255, 255, 0.09); --bad: #e0705f; --good: #8fc28a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 10px 14px; position: sticky; top: 0; z-index: 2; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+  .g2 { display: flex; gap: 6px; align-items: center; }
+  .g2 > span { color: var(--muted); font-size: 12px; }
+  h1 { font-size: 14px; margin: 0; color: var(--accent); font-weight: 600; }
+  select, input { background: #121211; color: var(--text); border: 1px solid #3a3a3a; border-radius: 6px; padding: 5px 7px; font: inherit; }
+  input[type=number] { width: 66px; }
+  input.wide { width: 260px; }
+  button { background: #2f2f2f; color: var(--text); border: 1px solid #444; border-radius: 6px; padding: 5px 10px; font: inherit; cursor: pointer; }
+  button:hover { background: #3a3a3a; }
+  label.tg { display: inline-flex; gap: 5px; align-items: center; color: var(--muted); cursor: pointer; }
+  #blurb { color: var(--muted); margin-top: 6px; font-size: 12px; }
+  #stats { color: var(--muted); margin-top: 4px; font-size: 12px; font-variant-numeric: tabular-nums; }
+  #stats b { color: var(--text); }
+  main { padding: 12px 14px 40px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 11px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+  .card canvas { width: 100%; aspect-ratio: 1 / 1; display: block; background: #2a2926; }
+  .cap { padding: 6px 9px 8px; font-size: 12px; display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; }
+  .cap .l1 { display: flex; justify-content: space-between; gap: 6px; }
+  .k { color: var(--muted); } .bad { color: var(--bad); } .good { color: var(--good); }
+  @media (max-width: 640px) { .cards { grid-template-columns: 1fr; } input.wide { width: 100%; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1>Filler bench</h1>
+    <div class="g2"><span>Filler</span><select id="filler"></select></div>
+    <div class="g2"><span>Seed</span><input id="seed" type="number" value="1"><button id="prev">◀</button><button id="next">▶</button></div>
+    <div class="g2"><span>Site</span><input id="sw" type="number" value="24" step="0.5"><span>×</span><input id="sh" type="number" value="20" step="0.5"><span>m</span></div>
+    <div class="g2"><span>Shape</span><select id="shape"><option>rect</option><option>L</option><option>U</option><option>notched</option><option>random</option><option value="mix">mixed</option></select></div>
+    <div class="g2"><span>Connections</span><select id="nconn"><option>1</option><option selected>2</option><option>3</option><option>4</option><option value="0">none</option></select></div>
+    <div class="g2"><span>or exactly</span><input id="manual" class="wide" placeholder="S 4 1.5; E 10 2  (side, at m, width m)"></div>
+  </div>
+  <div class="bar" style="margin-top:7px">
+    <label class="tg"><input type="checkbox" id="labels"> labels</label>
+    <label class="tg"><input type="checkbox" id="graph"> room graph</label>
+    <label class="tg"><input type="checkbox" id="blue"> blueprint</label>
+    <label class="tg"><input type="checkbox" id="vary" checked> vary site size</label>
+    <button id="poolBtn">Pool check (300 sites)</button>
+  </div>
+  <div id="blurb"></div>
+  <div id="stats"></div>
+</header>
+<main><div class="cards" id="cards"></div></main>
+
+<script src="src/core.js"></script>
+<script src="src/tpl/grid.js"></script>
+<script src="src/tpl/framework.js"></script>
+<script src="src/tpl/render2d.js"></script>
+<script src="src/tpl/fillers/engine.js"></script>
+<script src="src/tpl/fillers/pool.js"></script>
+<script>
+(function () {
+  'use strict';
+  const { FILL, TPL, Rng, hash4 } = BR;
+  const $ = (id) => document.getElementById(id);
+  const PAGE = 12, SHAPES = ['rect', 'L', 'U', 'notched', 'random'];
+
+  const sel = $('filler');
+  sel.add(new Option('pool pick (weighted)', ''));
+  for (const F of FILL.list()) sel.add(new Option(F.name + ' · ' + F.feel + ' · ' + F.weight, F.id));
+  try { const s = JSON.parse(localStorage.getItem('fillerBench') || '{}'); for (const k in s) if ($(k)) { if ($(k).type === 'checkbox') $(k).checked = s[k]; else $(k).value = s[k]; } } catch (e) { /* storage off */ }
+  const save = () => {
+    const s = {};
+    for (const k of ['filler', 'seed', 'sw', 'sh', 'shape', 'nconn', 'manual', 'labels', 'graph', 'blue', 'vary']) s[k] = $(k).type === 'checkbox' ? $(k).checked : $(k).value;
+    try { localStorage.setItem('fillerBench', JSON.stringify(s)); } catch (e) { /* storage off */ }
+  };
+
+  function siteFor(seed) {
+    const rng = new Rng(hash4(seed, 0x73697465, 0, 0));
+    let w = +$('sw').value || 20, h = +$('sh').value || 20;
+    if ($('vary').checked) { w = Math.round(w * rng.range(0.7, 1.3) * 2) / 2; h = Math.round(h * rng.range(0.7, 1.3) * 2) / 2; }
+    let shape = $('shape').value;
+    if (shape === 'mix') shape = SHAPES[rng.int(0, 4)];
+    return shape === 'rect' ? { w, h } : { rects: TPL.siteShape(w, h, shape, rng, ['S', 'E', 'N', 'W'][rng.int(0, 3)]) };
+  }
+  function connsFor(site, seed) {
+    const txt = $('manual').value.trim();
+    if (txt) return txt.split(';').map((p, k) => p.trim().split(/\s+/)).filter((p) => p.length >= 2).map((p, k) => ({ id: 'c' + k, side: p[0].toUpperCase(), at: +p[1], width: +(p[2] || 1.5) }));
+    return FILL.sampleConnections(site, +$('nconn').value, seed);
+  }
+
+  function draw(cv, b) {
+    const dpr = window.devicePixelRatio || 1, W = cv.clientWidth * dpr, H = cv.clientHeight * dpr;
+    cv.width = W; cv.height = H;
+    const g = cv.getContext('2d');
+    const pad = 22 * dpr, S = Math.min((W - 2 * pad) / b.site.w, (H - 2 * pad) / b.site.h);
+    const ox = (W - b.site.w * S) / 2, oy = (H - b.site.h * S) / 2;
+    const theme = $('blue').checked ? 'blueprint' : 'plan';
+    TPL.drawBuilding(g, b, { scale: S, ox, oy, theme, labels: $('labels').checked, graph: $('graph').checked });
+    g.fillStyle = theme === 'blueprint' ? '#eaf3ff' : '#2c2925';
+    for (const c of b.columns || []) g.fillRect(ox + c.rect[0] * S, oy + c.rect[1] * S, (c.rect[2] - c.rect[0]) * S, (c.rect[3] - c.rect[1]) * S);
+  }
+
+  function card(b, seed) {
+    const el = document.createElement('div');
+    el.className = 'card';
+    const cv = document.createElement('canvas');
+    el.appendChild(cv);
+    const cap = document.createElement('div');
+    cap.className = 'cap';
+    if (b.error) cap.innerHTML = '<div class="l1"><b>#' + seed + '</b><span class="bad">' + b.error + '</span></div>';
+    else {
+      const m = b.meta, bad = m.issues.length;
+      cap.innerHTML = '<div class="l1"><b>' + b.name + ' #' + seed + '</b><span class="' + (bad ? 'bad' : 'good') + '">' + (bad ? m.issues[0] : 'ok') + '</span></div>' +
+        '<div class="k">' + b.site.w + '×' + b.site.h + ' m · ' + m.rooms + ' rooms · built ' + Math.round(m.built * 100) + '% · open floor ' + Math.round(m.openFloor * 100) + '% · ' + b.portals.length + ' conn · ' + m.ms + ' ms</div>';
+    }
+    el.appendChild(cap);
+    $('cards').appendChild(el);
+    if (!b.error) requestAnimationFrame(() => draw(cv, b));
+    return el;
+  }
+
+  function render() {
+    save();
+    const s0 = +$('seed').value || 1, F = FILL.fillers[sel.value];
+    $('blurb').textContent = F ? F.blurb : 'Each card picks a filler from the pool by weight, among those that fit the site.';
+    $('cards').innerHTML = '';
+    let ms = 0, n = 0, bad = 0, built = 0, open = 0;
+    for (let k = 0; k < PAGE; k++) {
+      const seed = s0 + k, site = siteFor(seed);
+      const b = FILL.generate({ filler: sel.value || undefined, seed, site, connections: connsFor(site, seed) });
+      card(b, seed);
+      if (b.error) { bad++; continue; }
+      n++; ms += b.meta.ms; built += b.meta.built; open += b.meta.openFloor;
+      if (b.meta.issues.length) bad++;
+    }
+    $('stats').innerHTML = 'avg <b>' + (ms / Math.max(1, n)).toFixed(2) + ' ms</b> · built <b>' + Math.round((built / Math.max(1, n)) * 100) + '%</b> of the site · open floor <b>' +
+      Math.round((open / Math.max(1, n)) * 100) + '%</b> · ' + (bad ? '<span class="bad">' + bad + ' with problems</span>' : '<span class="good">no problems</span>');
+  }
+
+  function poolCheck() {
+    const tally = {}, feel = { enclosed: 0, mixed: 0, open: 0 };
+    let ms = 0, bad = 0;
+    for (let s = 1; s <= 300; s++) {
+      const rng = new Rng(hash4(s, 0x706f6f6c, 0, 0)), w = Math.round(rng.range(8, 40) * 2) / 2, h = Math.round(rng.range(8, 40) * 2) / 2;
+      const site = { w, h }, b = FILL.generate({ seed: s, site, connections: FILL.sampleConnections(site, rng.int(1, 4), s) });
+      if (b.error || b.meta.issues.length) { bad++; continue; }
+      tally[b.filler] = (tally[b.filler] || 0) + 1; feel[b.feel]++; ms += b.meta.ms;
+    }
+    const pct = (v) => Math.round((v / 300) * 100) + '%';
+    $('stats').innerHTML = '300 sites (8-40 m): enclosed <b>' + pct(feel.enclosed) + '</b> · mixed <b>' + pct(feel.mixed) + '</b> · open <b>' + pct(feel.open) + '</b> · ' +
+      Object.keys(tally).map((k) => k + ' ' + tally[k]).join(', ') + ' · avg ' + (ms / 300).toFixed(2) + ' ms · ' + (bad ? '<span class="bad">' + bad + ' with problems</span>' : '<span class="good">no problems</span>');
+  }
+
+  for (const id of ['filler', 'seed', 'sw', 'sh', 'shape', 'nconn', 'manual', 'labels', 'graph', 'blue', 'vary']) $(id).addEventListener('change', render);
+  $('prev').onclick = () => { $('seed').value = Math.max(1, (+$('seed').value || 1) - PAGE); render(); };
+  $('next').onclick = () => { $('seed').value = (+$('seed').value || 1) + PAGE; render(); };
+  $('poolBtn').onclick = poolCheck;
+  window.addEventListener('resize', () => render());
+  render();
+})();
+</script>
+</body>
+</html>

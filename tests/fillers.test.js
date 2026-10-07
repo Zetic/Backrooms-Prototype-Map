@@ -1,0 +1,226 @@
+/*
+ * Filler checks (run: node tests/fillers.test.js [seedsPerFiller])
+ *
+ * Everything is checked from the output JSON alone, independently of the
+ * engine's own checks:
+ *   - kit grid; rooms inside the site, never overlapping, at least 1 m wide
+ *   - every connection honoured: one portal, exactly where the world asked,
+ *     on an exterior wall, on the right side
+ *   - every room reachable through the room graph
+ *   - walkable: every floor cell can be walked to from every portal, with
+ *     walls, openings, partitions and columns taken into account
+ *   - deterministic, and independent of load order and connection order
+ *   - the pool picks only fillers that fit, and leans enclosed
+ */
+const path = require('path');
+for (const f of ['core', 'tpl/grid', 'tpl/framework', 'tpl/fillers/engine', 'tpl/fillers/pool'])
+  require(path.join(__dirname, '..', 'src', f + '.js'));
+const BR = globalThis.BR, FILL = BR.FILL, TPL = BR.TPL, { Rng, hash4 } = BR;
+
+const N = +(process.argv[2] || 40);
+let failures = 0;
+function check(name, ok, detail) {
+  console.log((ok ? 'ok   ' : 'FAIL ') + name + (detail ? '  (' + detail + ')' : ''));
+  if (!ok) failures++;
+}
+const G = 0.5, onGrid = (v) => Math.abs(v * 2 - Math.round(v * 2)) < 1e-9;
+const SHAPES = ['rect', 'rect', 'L', 'U', 'notched', 'random'];
+
+/** a test site and connections from a seed: 6-44 m, any shape, 0-4 connections */
+function caseFor(seed, minDim) {
+  const rng = new Rng(hash4(seed, 0x74657374, 0, 0));
+  const w = Math.round(rng.range(minDim || 6, 44) * 2) / 2, h = Math.round(rng.range(minDim || 6, 44) * 2) / 2;
+  const shape = SHAPES[rng.int(0, SHAPES.length - 1)];
+  const site = shape === 'rect' ? { w, h } : { rects: TPL.siteShape(w, h, shape, rng, ['S', 'E', 'N', 'W'][rng.int(0, 3)]) };
+  return { site, connections: FILL.sampleConnections(site, rng.int(0, 4), seed) };
+}
+
+/** Contract problems of one filler blueprint (empty = fine). */
+function contract(b, spec) {
+  const bad = [];
+  if (b.schema !== FILL.SCHEMA) bad.push('schema');
+  const W = Math.round(b.site.w / G), H = Math.round(b.site.h / G);
+  const site = new Uint8Array(W * H), cell = new Int32Array(W * H).fill(-1);
+  for (const r of b.site.rects) for (let y = Math.round(r[1] / G); y < Math.round(r[3] / G); y++) for (let x = Math.round(r[0] / G); x < Math.round(r[2] / G); x++) site[y * W + x] = 1;
+  const ids = new Map(b.rooms.map((r, i) => [r.id, i]));
+  b.rooms.forEach((rm, i) => {
+    if (!Array.isArray(rm.tags) || rm.tags.indexOf('backrooms') < 0) bad.push(rm.id + ' not tagged backrooms');
+    let wide = false;
+    for (const r of rm.rects) {
+      if (!r.every(onGrid)) bad.push(rm.id + ' off grid');
+      if (Math.min(r[2] - r[0], r[3] - r[1]) >= 1) wide = true;
+      for (let y = Math.round(r[1] / G); y < Math.round(r[3] / G); y++) for (let x = Math.round(r[0] / G); x < Math.round(r[2] / G); x++) {
+        if (x < 0 || y < 0 || x >= W || y >= H || !site[y * W + x]) { bad.push(rm.id + ' outside the site'); return; }
+        if (cell[y * W + x] >= 0) { bad.push(rm.id + ' overlaps ' + b.rooms[cell[y * W + x]].id); return; }
+        cell[y * W + x] = i;
+      }
+    }
+    if (!wide) bad.push(rm.id + ' narrower than 1 m');
+  });
+  // every room is at least 1 m wide everywhere: each cell sits in a 2x2 block of its room
+  const own = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? -1 : cell[y * W + x]);
+  let sliver = 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const v = own(x, y);
+    if (v < 0) continue;
+    let ok = false;
+    for (let dy = -1; dy <= 0 && !ok; dy++) for (let dx = -1; dx <= 0; dx++) if (own(x + dx, y + dy) === v && own(x + dx + 1, y + dy) === v && own(x + dx, y + dy + 1) === v && own(x + dx + 1, y + dy + 1) === v) { ok = true; break; }
+    if (!ok) sliver++;
+  }
+  if (sliver) bad.push(sliver + ' cells in slivers under 1 m');
+  // connections: one portal each, exactly as asked
+  const walls = new Map(b.walls.map((w) => [w.id, w])), ops = new Map(b.openings.map((o) => [o.id, o]));
+  for (const c of spec.connections || []) {
+    const ps = b.portals.filter((p) => p.connection === c.id);
+    if (ps.length !== 1) { bad.push('connection ' + c.id + ' has ' + ps.length + ' portals'); continue; }
+    const p = ps[0], op = ops.get(p.opening), w = op && walls.get(op.wall);
+    if (!w || w.kind !== 'exterior') { bad.push('portal ' + p.id + ' not on an exterior wall'); continue; }
+    if (p.side !== c.side) bad.push('portal ' + p.id + ' faces ' + p.side + ', not ' + c.side);
+    const horiz = c.side === 'N' || c.side === 'S';
+    const s0 = Math.min(horiz ? op.a[0] : op.a[1], horiz ? op.b[0] : op.b[1]), s1 = Math.max(horiz ? op.a[0] : op.a[1], horiz ? op.b[0] : op.b[1]);
+    const line = horiz ? op.a[1] : op.a[0];
+    if (Math.abs(s0 - c.at) > 1e-9 || Math.abs(s1 - (c.at + c.width)) > 1e-9 || (c.line !== undefined && Math.abs(line - c.line) > 1e-9)) bad.push('portal ' + p.id + ' moved');
+    // the room behind it is inside, the cell in front outside the site
+    const mid = Math.round(((s0 + s1) / 2) / G - 0.5), L = Math.round(line / G);
+    const inside = c.side === 'N' ? [mid, L] : c.side === 'S' ? [mid, L - 1] : c.side === 'W' ? [L, mid] : [L - 1, mid];
+    const outside = c.side === 'N' ? [mid, L - 1] : c.side === 'S' ? [mid, L] : c.side === 'W' ? [L - 1, mid] : [L, mid];
+    if (own(inside[0], inside[1]) !== ids.get(p.room)) bad.push('portal ' + p.id + ' not on its room');
+    if (outside[0] >= 0 && outside[1] >= 0 && outside[0] < W && outside[1] < H && site[outside[1] * W + outside[0]]) bad.push('portal ' + p.id + ' opens into the site');
+  }
+  if (b.portals.length !== (spec.connections || []).length) bad.push(b.portals.length + ' portals for ' + (spec.connections || []).length + ' connections');
+  // room graph
+  const adj = new Map(b.rooms.map((r) => [r.id, []]));
+  for (const [a, c, kind] of b.graph.edges) if (adj.has(a) && adj.has(c) && kind !== 'window') { adj.get(a).push(c); adj.get(c).push(a); }
+  if (b.rooms.length) {
+    const seen = new Set([b.rooms[0].id]), st = [b.rooms[0].id];
+    while (st.length) for (const v of adj.get(st.pop())) if (!seen.has(v)) { seen.add(v); st.push(v); }
+    if (seen.size !== b.rooms.length) bad.push((b.rooms.length - seen.size) + ' rooms unreachable in the graph');
+  } else bad.push('no rooms');
+  // walkability on the cell grid
+  const pass = new Map();                          // edge key -> 1 open / 0 blocked
+  const ek = (x0, y0, x1, y1) => (x0 < x1 || y0 < y1 ? x0 + ',' + y0 + ',' + x1 + ',' + y1 : x1 + ',' + y1 + ',' + x0 + ',' + y0);
+  const along = (a, b2, fn) => {
+    const horiz = a[1] === b2[1], c = Math.round((horiz ? a[1] : a[0]) / G);
+    const s0 = Math.round(Math.min(horiz ? a[0] : a[1], horiz ? b2[0] : b2[1]) / G), s1 = Math.round(Math.max(horiz ? a[0] : a[1], horiz ? b2[0] : b2[1]) / G);
+    for (let s = s0; s < s1; s++) fn(horiz ? ek(s, c - 1, s, c) : ek(c - 1, s, c, s));
+  };
+  for (const op of b.openings) if (op.kind === 'opening' || op.kind === 'door') along(op.a, op.b, (k) => pass.set(k, 1));
+  for (const w of b.walls) if (w.kind === 'open') along(w.a, w.b, (k) => pass.set(k, 1));
+  for (const w of b.walls) if (w.kind === 'partition') along(w.a, w.b, (k) => pass.set(k, 0));
+  const col = new Uint8Array(W * H);
+  for (const c of b.columns) for (let y = Math.round(c.rect[1] / G); y < Math.round(c.rect[3] / G); y++) for (let x = Math.round(c.rect[0] / G); x < Math.round(c.rect[2] / G); x++) col[y * W + x] = 1;
+  const can = (x0, y0, x1, y1) => {
+    const a = own(x0, y0), c = own(x1, y1);
+    if (a < 0 || c < 0 || col[y1 * W + x1]) return false;
+    const k = ek(x0, y0, x1, y1);
+    return a === c ? pass.get(k) !== 0 : pass.get(k) === 1;
+  };
+  let total = 0, start = -1;
+  for (let i = 0; i < W * H; i++) if (cell[i] >= 0 && !col[i]) { total++; if (start < 0) start = i; }
+  if (start >= 0) {
+    const seen = new Uint8Array(W * H), st = [start];
+    seen[start] = 1;
+    let n = 0;
+    while (st.length) {
+      const i = st.pop(), x = i % W, y = (i - x) / W; n++;
+      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+        const j = ny * W + nx;
+        if (!seen[j] && can(x, y, nx, ny)) { seen[j] = 1; st.push(j); }
+      }
+    }
+    if (n !== total) bad.push((total - n) + ' floor cells cannot be walked to');
+  }
+  for (const k of ['furniture', 'materials', 'lights']) if (k in b) bad.push('has ' + k);
+  return bad;
+}
+
+// ---------------------------------------------------------------- every filler, many sites
+const stats = {};
+let errors = 0, total = 0;
+for (const F of FILL.list()) {
+  const st = stats[F.id] = { n: 0, ok: 0, ms: 0, built: 0, open: 0, skipped: 0, bad: [] };
+  for (let s = 1; s <= N; s++) {
+    const seed = s * 7919 + F.id.length;
+    const cs = caseFor(seed);
+    if (F.fits && !F.fits(FILL.makeSite(cs.site))) { st.skipped++; continue; }
+    const spec = { filler: F.id, seed, site: cs.site, connections: cs.connections };
+    const b = FILL.generate(spec);
+    st.n++; total++;
+    if (b.error) { errors++; st.bad.push('#' + seed + ' error: ' + b.error); continue; }
+    const c = contract(b, spec).concat(b.meta.issues);
+    if (c.length) { st.bad.push('#' + seed + ': ' + c.slice(0, 3).join('; ')); continue; }
+    st.ok++; st.ms += b.meta.ms; st.built += b.meta.built; st.open += b.meta.openFloor;
+  }
+  console.log('     ' + F.id.padEnd(12) + (st.ok + '/' + st.n + ' ok').padEnd(10) + ' avg ' + (st.ms / Math.max(1, st.ok)).toFixed(2) + ' ms, built ' +
+    Math.round((st.built / Math.max(1, st.ok)) * 100) + '%, open floor ' + Math.round((st.open / Math.max(1, st.ok)) * 100) + '%' + (st.skipped ? ', ' + st.skipped + ' sites too small' : ''));
+}
+const allBad = [].concat(...Object.keys(stats).map((k) => stats[k].bad.map((x) => k + ' ' + x)));
+check('every filler builds on any site shape and keeps the contract', allBad.length === 0, allBad.length + ' bad of ' + total + (allBad.length ? ': ' + allBad.slice(0, 4).join(' | ') : ''));
+check('connections that do not fit are refused, not moved', (() => {
+  const b1 = FILL.generate({ filler: 'warren', seed: 1, site: { w: 20, h: 20 }, connections: [{ id: 'x', side: 'N', at: 19.5, width: 1.5 }] });
+  const b2 = FILL.generate({ filler: 'warren', seed: 1, site: { rects: [[0, 0, 10, 20], [10, 10, 20, 20]] }, connections: [{ id: 'y', side: 'N', at: 12, width: 1.5, line: 0 }] });
+  return !!b1.error && !!b2.error;
+})());
+
+// ---------------------------------------------------------------- tiny and odd sites
+{
+  const bad = [];
+  const sites = [{ w: 2, h: 2 }, { w: 1.5, h: 9 }, { w: 3, h: 3 }, { rects: [[0, 0, 2, 12], [2, 10, 14, 12]] }, { rects: [[0, 0, 6, 6], [6, 2, 30, 4]] }];
+  sites.forEach((site, k) => {
+    for (let s = 1; s <= 6; s++) {
+      const connections = FILL.sampleConnections(site, 1 + (s % 3), s);
+      const spec = { seed: s, site, connections }, b = FILL.generate(spec);
+      if (b.error) { bad.push('site ' + k + ': ' + b.error); continue; }
+      const c = contract(b, spec).concat(b.meta.issues);
+      if (c.length) bad.push('site ' + k + ' ' + b.filler + ': ' + c[0]);
+    }
+  });
+  check('tiny, thin and odd sites still give a valid filler', bad.length === 0, bad.slice(0, 3).join(' | '));
+}
+
+// ---------------------------------------------------------------- determinism
+{
+  const cs = caseFor(4242, 20), spec = { filler: 'warren', seed: 4242, site: cs.site, connections: cs.connections };
+  const strip = (b) => JSON.stringify(b, (k, v) => (k === 'ms' ? undefined : v));
+  const a = strip(FILL.generate(spec));
+  for (let k = 0; k < 6; k++) FILL.generate({ seed: 100 + k, site: { w: 18, h: 22 }, connections: FILL.sampleConnections({ w: 18, h: 22 }, 2, k) });
+  const b = strip(FILL.generate(Object.assign({}, spec)));
+  check('same spec gives the same filler, whatever was built before', a === b);
+  const rev = strip(FILL.generate(Object.assign({}, spec, { connections: spec.connections.slice().reverse() })));
+  check('connection order does not matter', a === rev);
+  check('a different seed gives a different filler', a !== strip(FILL.generate(Object.assign({}, spec, { seed: 4243 }))));
+}
+
+// ---------------------------------------------------------------- the pool
+{
+  const feel = { enclosed: 0, mixed: 0, open: 0 }, seen = new Set();
+  let misfit = 0;
+  for (let s = 1; s <= 400; s++) {
+    const cs = caseFor(s * 31, 8), id = FILL.pick({ seed: s, site: cs.site }), F = FILL.fillers[id];
+    if (F.fits && !F.fits(FILL.makeSite(cs.site))) misfit++;
+    feel[F.feel]++; seen.add(id);
+  }
+  check('the pool picks only fillers that fit the site', misfit === 0, misfit + ' misfits');
+  check('every filler gets picked', seen.size === FILL.list().length, [...seen].join(', '));
+  check('the pool leans enclosed', feel.enclosed > feel.mixed + feel.open && feel.open < feel.enclosed / 3,
+    'enclosed ' + feel.enclosed + ', mixed ' + feel.mixed + ', open ' + feel.open + ' of 400');
+  const w = { enclosed: 0, mixed: 0, open: 0 };
+  for (const F of FILL.list()) w[F.feel] += F.weight;
+  check('pool weights are 70 / 20 / 10 enclosed / mixed / open', w.enclosed === 70 && w.mixed === 20 && w.open === 10, JSON.stringify(w));
+}
+
+// ---------------------------------------------------------------- speed
+{
+  let ms = 0, n = 0;
+  for (let s = 1; s <= 200; s++) {
+    const rng = new Rng(hash4(s, 0x7370, 0, 0)), site = { w: Math.round(rng.range(10, 24) * 2) / 2, h: Math.round(rng.range(10, 24) * 2) / 2 };
+    const b = FILL.generate({ seed: s, site, connections: FILL.sampleConnections(site, rng.int(1, 4), s) });
+    if (!b.error) { ms += b.meta.ms; n++; }
+  }
+  console.log('     avg ' + (ms / n).toFixed(2) + ' ms per filler on 10-24 m sites');
+  check('fillers are fast (under 5 ms on average on 10-24 m sites)', ms / n < 5, (ms / n).toFixed(2) + ' ms');
+}
+
+console.log(failures ? '\n' + failures + ' check(s) failed' : '\nall checks passed');
+process.exit(failures ? 1 : 0);
