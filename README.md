@@ -87,13 +87,11 @@ Open `workbench.html` to:
 - edit recipes;
 - export the JSON.
 
-Open [the elevation lab](elevation.html) to inspect the first elevation milestone:
-a fill explored vertically between two stable reference bands, local stacked
-pockets, shared spatial reservations, and optional up/down ladder variants of
-every template and filler. Select floor elevations, ghost overlapping floors,
-inspect the main route profile, and export `br.elevation/0.1` JSON. The infinite
-map now generates connected bands above and below ground zero. Use its band and
-floor controls, find up/down fills, and export regional elevation JSON.
+Open [the elevation lab](elevation.html) to inspect actual floors, continuous
+cutaway heights, full-width connection footprints, and optional up/down ladder
+variants of every template and filler. Exact local floor inspection, ghosting,
+route profiles and `br.elevation/0.1` JSON export remain available. The main map
+uses band controls, a continuous cut height, and template-specific inspection.
 [Elevation world planning, reservations and export](docs/elevation-world.md).
 [Elevation design, data contract, and milestones](docs/elevation.md).
 
@@ -105,9 +103,15 @@ floor controls, find up/down fills, and export regional elevation JSON.
 | Wheel / pinch / `+` / `-` | Zoom. Blueprints from 1 px/m, room labels in POIs from 7 px/m |
 | Go to | Enter `x, y` |
 | Site outlines / Connection graph | Show the sites and the graph between them |
+| Band controls | Inspect an independently generated horizontal band |
+| Cutaway height | Highest floor below the cut at each XY; lower floors shaded by depth |
+| Click a template | Its actual floor choices, focused upper-floor ghosting and JSON export |
 | Hover | The site's template, size, connections, biome and build time; the POI, its setting and its doors |
 
-The URL hash keeps the seed, position, zoom and toggles, for example
+The atrium is currently removed; world bands remain separate until replacement
+vertical journeys are implemented. See [the current plan](docs/elevation.md).
+
+The URL hash keeps the seed, position, zoom, band, cut height and toggles, for example
 `#seed=31337&x=20&y=70&z=9&graph=1`.
 
 ## Modules
@@ -120,8 +124,8 @@ The URL hash keeps the seed, position, zoom and toggles, for example
 | `seams.js` | Where two blueprints end up wall to wall: each shared wall recorded once, and the seam rules that sometimes cut a window or door through it (a house against the backrooms) |
 | `render.js` | The map: tile cache, detail / plan / far views, overlays |
 | `tpl/` | The template system: kit grid, framework, the shared catalogue of room and zone types (`catalogue.js`), House, Rooms and Zone engines, the composite pipeline (`composite.js`: templates built inside a template and merged into one blueprint) and the Neighborhood and Park engines, archetypes, fillers, lots (`lot.js`: settings, the yard, and the adapter that builds templates inside bigger ones), blueprint renderer |
-| `tpl/elevation.js`, `tpl/elevation-view.js`, `elevation-lab.js` | Stacked surfaces, reservations, physical fill/connection variants, JSON renderer and standalone lab |
-| `band-world.js` | Deterministic reference-band networks, sparse shared vertical fills, spatial reservations, exact portal matching and canonical world export |
+| `tpl/elevation.js`, `tpl/elevation-view.js`, `elevation-lab.js` | Stacked surfaces, reservations, compact connection variants, cutaway, JSON renderer and standalone lab |
+| `band-world.js` | Deterministic reference-band networks, spatial reservations, exact portal matching and canonical world export |
 
 ```js
 const W = new BR.World(31337);

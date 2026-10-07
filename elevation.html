@@ -59,7 +59,7 @@
 <header>
   <h1>Elevation lab</h1>
   <nav><a href="index.html">Map</a><a href="workbench.html">Templates</a><a href="docs/elevation.md">Implementation plan</a></nav>
-  <p>Stable bands, local floors, and shared vertical territory. Experimental layouts for the future 3D generator.</p>
+  <p>Actual floor heights and connection footprints. Inspect data for the future 3D generator.</p>
 </header>
 <main>
   <aside>
@@ -70,22 +70,23 @@
       <div class="row"><label class="field">Width (m)<input id="width" type="number" min="1" max="128" step="0.5" value="40"></label><label class="field">Depth (m)<input id="depth" type="number" min="1" max="128" step="0.5" value="36"></label></div>
     </div>
     <div class="checks">
-      <label><input id="ghost" type="checkbox" checked> Ghost other floors</label>
-      <label><input id="territories" type="checkbox"> Band reservations</label>
+      <label><input id="ghost" type="checkbox" checked> Ghost upper / other floors</label>
+
       <label><input id="labels" type="checkbox" checked> Room labels</label>
     </div>
     <div id="capabilities" class="small"></div>
     <button id="export" type="button">Download elevation JSON</button>
     <div id="status" class="small" role="status" aria-live="polite"></div>
-    <p id="note" class="muted small">The infinite map remains flat in this milestone. Band landings are ready for later world matching; occupying a band does not create an entrance into it.</p>
+    <p id="note" class="muted small">The atrium is retired. These optional ladder variants demonstrate local elevation data; world bands remain separate until replacement journeys are authored.</p>
   </aside>
   <section id="workspace" aria-label="Elevation inspection">
-    <div id="floorbar"><label>Floor<select id="floor" aria-label="Floor elevation"></select></label><span id="summary"></span></div>
+    <div id="floorbar"><label>View<select id="mode"><option value="cutaway">Cutaway</option><option value="exact">Exact floor</option></select></label><label>Local floor<select id="floor" aria-label="Floor elevation"></select></label><span id="summary"></span></div>
+    <div class="row" style="margin:10px 0"><label for="height">Cut height (m)</label><input id="height" type="range" step="0.01" style="flex:1"><input id="height-value" type="number" step="any" style="width:90px" aria-label="Cut height in metres"></div>
     <div id="error" role="alert"></div>
     <div id="planwrap"><canvas id="plan" role="img" aria-label="Floor plan with vertical routes and neighboring floors"></canvas><div id="hover"></div></div>
     <h2>Main route · elevation along the journey</h2>
     <canvas id="profile" role="img" aria-label="Elevation profile from the entrance to the destination"></canvas>
-    <div class="muted small">Solid floors belong to the selected elevation; faint floors overlap in plan. The profile follows the main route, while side pockets appear in the room list.</div>
+    <div class="muted small">Cutaway shows the highest floor below the cut at each XY. Exact floor isolates a local floor. Connections occupy their drawn width; dashed continuation and destination outlines show where they go. Click a connection to reveal its other landing.</div>
     <h2>Rooms and floor surfaces</h2>
     <div class="tablewrap"><table><thead><tr><th>Room</th><th>Floor</th><th>Clear height</th><th>Home band</th></tr></thead><tbody id="rooms"></tbody></table></div>
     <h2>Physical connections</h2>

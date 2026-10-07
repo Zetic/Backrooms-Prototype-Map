@@ -1,11 +1,9 @@
-/* Deterministic sparse elevation planning over the template-first world.
- * Reservations are decisions derived from seed/region/pair, never accumulated
- * by whichever chunk happened to load first. See docs/elevation-world.md. */
+/* Independent deterministic horizontal bands. The retired atrium planner is
+ * removed; replacement vertical journeys belong to a later milestone. */
 (function (root) {
   'use strict';
   const BR = root.BR, E = BR.ELEV, C = BR.WORLD_CFG.cell;
-  const CFG = { spacing: 16, regionCells: 4, fillWidth: 56, fillDepth: 48, ceilingLimit: 15.5,
-    limits: { bands: 4, transitions: 64, claims: 256 } };
+  const CFG = { spacing: 16, ceilingLimit: 15.5, limits: { bands: 4 } };
   const clone = (x) => JSON.parse(JSON.stringify(x));
   const bandId = (n) => 'band:' + n;
   const assertBand = (n) => { if (!Number.isInteger(n) || Math.abs(n) > 10000) throw new Error('band must be an integer between -10000 and 10000'); return n; };
@@ -40,7 +38,7 @@
       this.seed = seed >>> 0; this.options = options || {}; this.band = 0;
       this.limits = Object.assign({}, CFG.limits, this.options.elevationLimits);
       if (Object.values(this.limits).some((n) => !Number.isInteger(n) || n < 1)) throw new Error('elevation cache limits must be positive integers');
-      this.worlds = new Map(); this.transitions = new Map(); this.claims = new Map();
+      this.worlds = new Map();
       this.totals = { cellsPlanned: 0, sitesBuilt: 0, buildMs: 0, poisBuilt: 0, issues: 0 };
       this.setBand(this.options.band === undefined ? 0 : this.options.band);
     }
@@ -58,8 +56,7 @@
       assertBand(n);
       if (this.worlds.has(n)) { const w = this.worlds.get(n); this.worlds.delete(n); this.worlds.set(n, w); return w; }
       const seed = n === 0 ? this.seed : BR.hash4(this.seed, n, 0, 0xba01);
-      const w = new BR.World(seed, { band: n, floorZ: n * CFG.spacing, limits: this.options.limits,
-        plannedLots: (i, j) => this.plannedLots(n, i, j), buildTransition: (s) => this.buildTransition(s) });
+      const w = new BR.World(seed, { band: n, floorZ: n * CFG.spacing, limits: this.options.limits });
       this.worlds.set(n, w);
       while (this.worlds.size > this.limits.bands) {
         const first = this.worlds.keys().next().value, old = this.worlds.get(first);
@@ -67,71 +64,6 @@
         this.worlds.delete(first);
       }
       return w;
-    }
-    /** Exactly one journey per 512 x 512 m region per neighboring band pair.
-     * Alternating X halves keep the up and down owners in different cells. */
-    transitionPlan(lower, ri, rj) {
-      const rng = new BR.Rng(BR.hash4(this.seed, ri, rj, 0xba02 ^ Math.imul(lower, 0x9e3779b1)));
-      const half = ((lower % 2) + 2) % 2;
-      const cells = [];
-      const startX = rng.int(0, 1), startY = rng.int(0, 3);
-      for (let a = 0; a < 2; a++) for (let b = 0; b < 4; b++) cells.push([ri * 4 + half * 2 + (startX + a) % 2, rj * 4 + (startY + b) % 4]);
-      const seeds = [lower, lower + 1].map((n) => n === 0 ? this.seed : BR.hash4(this.seed, n, 0, 0xba01));
-      // Reserve a rectangle by carving five strips before random BSP. A strip
-      // cut must miss BOTH bands' border openings, so a border door stays whole.
-      for (const [i, j] of cells) {
-        for (const split of ['h', 'v']) {
-          const span = split === 'h' ? CFG.fillDepth : CFG.fillWidth, candidates = [];
-          const openings = seeds.flatMap((s) => [BR.borderOpenings(s, split === 'h' ? 'v' : 'h', i, j),
-            BR.borderOpenings(s, split === 'h' ? 'v' : 'h', split === 'h' ? i + 1 : i, split === 'h' ? j : j + 1)]).flat();
-          for (let q = 8; q <= C - span - 8; q++) if ([q, q + span].every((cut) => openings.every(([a, b]) => cut <= a - 1 || cut >= b + 1))) candidates.push(q);
-          if (!candidates.length) continue;
-          const q = candidates[rng.int(0, candidates.length - 1)];
-          const x = i * C + (split === 'v' ? q : rng.int(8, C - CFG.fillWidth - 8));
-          const y = j * C + (split === 'h' ? q : rng.int(8, C - CFG.fillDepth - 8));
-          return { id: 'journey:' + lower + ':' + ri + ',' + rj, lower, upper: lower + 1, ri, rj, i, j, split,
-            seed: BR.hash4(this.seed, ri, rj, 0xba03 ^ Math.imul(lower, 0x9e3779b1)), rect: [x, y, x + CFG.fillWidth, y + CFG.fillDepth] };
-        }
-      }
-      throw new Error('no reserved journey territory fits region ' + ri + ',' + rj);
-    }
-    transition(p) {
-      return BR.World.lru(this.transitions, p.id, this.limits.transitions, () => {
-        const b = E.generate({ seed: p.seed, rise: CFG.spacing, site: { w: CFG.fillWidth, h: CFG.fillDepth }, fillId: p.id, infill: true });
-        placeBlueprint(b, p.lower * CFG.spacing, p.lower, p.upper);
-        const result = E.validate(b);
-        if (result.errors.length) throw new Error(p.id + ': ' + result.errors.join('; '));
-        return b;
-      });
-    }
-    plannedLots(n, i, j) {
-      const key = n + '|' + i + ',' + j;
-      return BR.World.lru(this.claims, key, this.limits.claims, () => {
-        const out = [], ri = Math.floor(i / CFG.regionCells), rj = Math.floor(j / CFG.regionCells);
-        for (const lower of [n - 1, n]) {
-          const p = this.transitionPlan(lower, ri, rj);
-          if (p.i !== i || p.j !== j) continue;
-          const b = this.transition(p), doors = [];
-          for (const portal of b.portals.filter((v) => v.floorZ === n * CFG.spacing)) {
-            const op = b.openings.find((v) => v.id === portal.opening), horizontal = op.a[1] === op.b[1];
-            const c = (horizontal ? op.a[1] + p.rect[1] : op.a[0] + p.rect[0]);
-            const s0 = horizontal ? Math.min(op.a[0], op.b[0]) + p.rect[0] : Math.min(op.a[1], op.b[1]) + p.rect[1];
-            doors.push({ portal: portal.id, o: horizontal ? 'h' : 'v', c, s0, s1: s0 + op.width, main: true });
-          }
-          out.push({ id: p.id, kind: 'reserved', rect: p.rect.slice(), doors, pois: [], transition: p });
-        }
-        return out;
-      }).map((l) => clone(l)); // World assigns portalConns; never mutate cached plans.
-    }
-    buildTransition(site) {
-      const t0 = clock(), p = site.transition, b = clone(this.transition(p)), L = site.lots[0];
-      // Each slice exposes only the portal into its own horizontal network.
-      // The complete shared blueprint still owns the journey through both bands.
-      const bindings = Object.assign({}, L.portalConns);
-      for (const portal of b.portals) { if (bindings[portal.id]) portal.connection = bindings[portal.id]; else delete portal.connection; }
-      return { site, owner: p.id, origin: p.rect.slice(0, 2), fillerOrigin: p.rect.slice(0, 2), filler: b,
-        buildings: [], conns: site.conns.map((id) => this.worldFor(site.band).connection(site, id)),
-        issues: [], ms: clock() - t0 };
     }
     bandOf(siteOrId) { const id = typeof siteOrId === 'string' ? siteOrId : siteOrId.id; const m = /^b(-?\d+)\|/.exec(id); if (!m) throw new Error('missing band in site id'); return +m[1]; }
     cell(i, j, band) { return this.worldFor(band === undefined ? this.band : band).cell(i, j); }
@@ -148,7 +80,6 @@
      * painting. Keep the original blueprint and cache its spatial view beside it. */
     spatial(s) {
       const w = this.worldFor(s.band), r = w.build(s);
-      if (s.kind === 'transition') return r;
       if (!r.spatial) {
         const adapt = (b, id) => {
           const a = E.prepare(b, { fillId: id, deferCapabilities: true });
@@ -166,19 +97,11 @@
     peer(s, cn) { return this.worldFor(s.band).peer(s, cn); }
     neighbours(s) { return this.worldFor(s.band).neighbours(s); }
     seamsBetween(a, b) {
-      if (a.band !== b.band || a.kind === 'transition' || b.kind === 'transition') return [];
+      if (a.band !== b.band) return [];
       this.build(a); this.build(b);
       return this.worldFor(a.band).seamsBetween(a, b);
     }
     biomeAt(x, y) { return this.active.biomeAt(x, y); }
-    nearestTransition(direction, x, y) {
-      if (!['up', 'down'].includes(direction)) throw new Error('direction must be up or down');
-      const lower = direction === 'up' ? this.band : this.band - 1, R = C * CFG.regionCells;
-      const ri = Math.floor(x / R), rj = Math.floor(y / R), list = [];
-      for (let i = ri - 1; i <= ri + 1; i++) for (let j = rj - 1; j <= rj + 1; j++) list.push(this.transitionPlan(lower, i, j));
-      list.sort((a, b) => { const d = (p) => ((p.rect[0] + p.rect[2]) / 2 - x) ** 2 + ((p.rect[1] + p.rect[3]) / 2 - y) ** 2; return d(a) - d(b) || a.id.localeCompare(b.id); });
-      return list[0];
-    }
     /** Conservative planned ownership, including protected unused space.
      * This index is local to a query. Cache eviction cannot release ownership. */
     reservationPlan(i, j, bandMin, bandMax) {
@@ -188,8 +111,7 @@
       for (let n = bandMin; n <= bandMax; n++) for (const s of this.cell(i, j, n).sites) {
         const owner = s.owner || s.id;
         if (owners.has(owner)) continue; owners.add(owner);
-        const p = s.transition, v = p ? { id: owner + ':envelope', kind: 'fill-envelope', rects: [p.rect], z0: p.lower * CFG.spacing - E.SLAB, z1: p.upper * CFG.spacing + 3 }
-          : { id: owner + ':envelope', kind: 'site-envelope', rects: s.rects, z0: n * CFG.spacing - E.SLAB, z1: n * CFG.spacing + CFG.ceilingLimit };
+        const v = { id: owner + ':envelope', kind: 'site-envelope', rects: s.rects, z0: n * CFG.spacing - E.SLAB, z1: n * CFG.spacing + CFG.ceilingLimit };
         const r = index.reserve(owner, [v]);
         if (!r.ok) throw new Error(owner + ' reservation overlaps ' + r.conflicts[0].owner);
       }
@@ -212,7 +134,7 @@
           const raw = bindings ? bindings[p.id] : p.connection;
           const opening = b.openings.find((o) => o.id === p.opening);
           if (!raw) {
-            if (site.kind === 'transition' && !bands.includes(Number(p.band.split(':')[1]))) verticalFrontier.set(pre + '/' + p.id,
+            if (!bands.includes(Number(p.band.split(':')[1]))) verticalFrontier.set(pre + '/' + p.id,
               { owner: pre, portal: p.id, band: p.band, state: 'outside-region', at: [p.at[0] + origin[0], p.at[1] + origin[1], p.floorZ], width: p.width });
             continue;
           }
@@ -286,11 +208,11 @@
       }
       const g = this.graph(i0, j0, i1, j1, bands);
       if (g.issues.length) throw new Error('invalid spatial connections: ' + g.issues[0]);
-      return { schema: 'br.world-elevation/0.1', units: 'metres', axes: 'XY horizontal, Z up', seed: this.seed, policy: { spacing: CFG.spacing, regionCells: CFG.regionCells },
+      return { schema: 'br.world-elevation/0.1', units: 'metres', axes: 'XY horizontal, Z up', seed: this.seed, policy: { spacing: CFG.spacing, verticalJourneys: 'none' },
         region: [i0, j0, i1, j1], bands: bands.map((n) => ({ id: bandId(n), elevation: n * CFG.spacing })), slices,
         layouts: [...layouts.values()].sort((a, b) => a.owner.localeCompare(b.owner)), reservations: [...reservations.values()].sort((a, b) => a.owner.localeCompare(b.owner)),
         navigation: g.navigation, portalMatches: g.matches, frontier: g.dangling, verticalFrontier: g.verticalFrontier, issues: g.issues, unresolved: g.unresolved };
     }
   }
-  BR.BAND_CFG = CFG; BR.BandWorld = BandWorld;
+  BR.placeElevationBlueprint = placeBlueprint; BR.BAND_CFG = CFG; BR.BandWorld = BandWorld;
 })(typeof window !== 'undefined' ? window : globalThis);

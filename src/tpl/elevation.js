@@ -1,6 +1,6 @@
 /*
- * Experimental elevation contract and exploration-fill generator.
- * Bands are reference elevations; levels are display slices.
+ * Experimental elevation contract and compact connection variants.
+ * Bands are reference elevations; levels group actual floor elevations.
  * All geometry is in metres, Z up. See docs/elevation.md.
  */
 (function (root) {
@@ -8,7 +8,6 @@
   const BR = root.BR, TG = BR.TG;
   const E = BR.ELEV = { SCHEMA: 'br.elevation/0.1', SLAB: 0.25 };
   const EPS = 1e-7, clone = (v) => JSON.parse(JSON.stringify(v));
-  const snap = (n) => Math.round(n * 2) / 2;
   const round = (n) => Math.round(n * 1000) / 1000;
   const overlap = (a, b) => a[0] < b[2] - EPS && b[0] < a[2] - EPS && a[1] < b[3] - EPS && b[1] < a[3] - EPS;
   const inside = (rs, p) => rs.some((r) => p[0] >= r[0] - EPS && p[0] <= r[2] + EPS && p[1] >= r[1] - EPS && p[1] <= r[3] + EPS);
@@ -71,6 +70,7 @@
   }
 
   function refresh(b, options) {
+    if (E.invalidateView) E.invalidateView(b);
     const elevations = [...new Set(b.rooms.map((r) => r.floorZ))].sort((a, c) => a - c);
     b.levels = elevations.map((z, index) => ({ index, elevation: z, height: Math.max(...b.rooms.filter((r) => r.floorZ === z).map((r) => r.ceiling)), band: (b.rooms.find((r) => r.floorZ === z) || {}).band }));
     const lv = (z) => elevations.indexOf(z), rooms = new Map(b.rooms.map((r) => [r.id, r]));
@@ -184,168 +184,6 @@
     const q = r.rects[0], pts = [[q[0], q[1]], [q[2], q[1]], [q[2], q[3]], [q[0], q[3]]];
     for (let k = 0; k < 4; k++) b.walls.push({ id: 'elev:w:' + r.id + ':' + k, kind: 'exterior', a: pts[k].slice(), b: pts[(k + 1) % 4].slice(), rooms: [r.id, null], thickness: 0.3, floorZ: r.floorZ, ceilingZ: r.ceilingZ });
   }
-  function buildWalls(b) {
-    b.walls = [];
-    for (const level of b.levels) {
-      const R = new TG.Raster(Math.round(b.site.w * 2), Math.round(b.site.h * 2), -1);
-      b.rooms.forEach((r, i) => { if (r.level === level.index) for (const q of r.rects) R.fill(q.map((v) => Math.round(v * 2)), i); });
-      for (const w of TG.boundaries(R, -1)) {
-        const ids = [w.a, w.b].map((i) => i < 0 ? null : b.rooms[i].id), owners = ids.filter(Boolean).map((id) => b.rooms.find((r) => r.id === id));
-        b.walls.push({ id: 'w' + b.walls.length, level: level.index, floorZ: level.elevation, ceilingZ: Math.max(...owners.map((r) => r.ceilingZ)), kind: ids.every(Boolean) ? 'interior' : 'exterior',
-          a: w.o === 'h' ? [w.s0 / 2, w.c / 2] : [w.c / 2, w.s0 / 2], b: w.o === 'h' ? [w.s1 / 2, w.c / 2] : [w.c / 2, w.s1 / 2], rooms: ids, thickness: ids.every(Boolean) ? 0.15 : 0.3 });
-      }
-    }
-  }
-  function opening(b, room, side, at, width, other, kind) {
-    const r = b.rooms.find((q) => q.id === room), bb = TG.bbox(r.rects), horizontal = side === 'N' || side === 'S', line = side === 'N' ? bb[1] : side === 'S' ? bb[3] : side === 'W' ? bb[0] : bb[2];
-    const wall = b.walls.find((w) => w.rooms.includes(room) && w.floorZ === r.floorZ && (horizontal ? w.a[1] === line && w.b[1] === line : w.a[0] === line && w.b[0] === line) && at >= Math.min(horizontal ? w.a[0] : w.a[1], horizontal ? w.b[0] : w.b[1]) - EPS && at + width <= Math.max(horizontal ? w.a[0] : w.a[1], horizontal ? w.b[0] : w.b[1]) + EPS);
-    if (!wall) throw new Error('missing wall for ' + room + ' ' + side);
-    const op = { id: 'o' + b.openings.length, wall: wall.id, level: r.level, floorZ: r.floorZ, kind: kind || 'opening', a: horizontal ? [at, line] : [line, at], b: horizontal ? [at + width, line] : [line, at + width], width, height: 2.2, rooms: [room, other || null] };
-    if (kind === 'window') { delete op.height; op.sill = 1.1; op.head = 2.2; }
-    b.openings.push(op);
-    if (other) b.graph.edges.push([room, other, 'opening', op.id]);
-    return op;
-  }
-
-  /** Populate the shared owner's spare space at a reference elevation. The
-   * existing filler pipeline supplies enclosed rooms and 1 m walkable joins;
-   * only volumes intersecting this floor's slab/headroom are excluded. */
-  function populateBand(b, band, seed, attachments) {
-    const z = b.bands.find((v) => v.id === band).elevation, ceiling = 2.4;
-    const mask = new TG.Raster(Math.round(b.site.w * 2), Math.round(b.site.h * 2), 1);
-    for (const v of b.volumes) if (v.z0 < z + ceiling - EPS && z - E.SLAB < v.z1 - EPS)
-      for (const q of v.rects) mask.fill(q.map((n) => Math.round(n * 2)), 0);
-    const rects = TG.rectsWhere(mask, (v) => v === 1).map((q) => q.map((n) => n / 2));
-    const bb = TG.bbox(rects), site = { rects }, prefix = 'infill:' + band + ':';
-    const connections = attachments.map((a, i) => {
-      const q = TG.bbox(b.rooms.find((r) => r.id === a.room).rects), horizontal = a.side === 'N' || a.side === 'S';
-      const line = a.side === 'N' ? q[1] : a.side === 'S' ? q[3] : a.side === 'W' ? q[0] : q[2];
-      return { id: String(i), side: TG.opposite(a.side), at: a.at - bb[horizontal ? 0 : 1],
-        line: line - bb[horizontal ? 1 : 0], width: a.width, kind: 'opening', route: true };
-    });
-    const f = BR.FILL.generate({ filler: 'warren', seed, site, connections });
-    if (f.error || f.meta.issues.length) throw new Error('terraced infill: ' + (f.error || f.meta.issues.join('; ')));
-    const id = (v) => v == null ? null : prefix + v;
-    const pt = (p) => { p[0] += bb[0]; p[1] += bb[1]; };
-    const rr = (q) => { q[0] += bb[0]; q[2] += bb[0]; q[1] += bb[1]; q[3] += bb[1]; };
-    for (const r of f.rooms) {
-      r.id = id(r.id); r.rects.forEach(rr); r.floorZ = z; r.ceiling = ceiling; r.ceilingZ = round(z + ceiling); r.band = band;
-      r.tags.push('vertical-infill'); b.rooms.push(r); b.graph.nodes.push(r.id);
-    }
-    for (const w of f.walls) {
-      w.id = id(w.id); w.rooms = w.rooms.map(id); pt(w.a); pt(w.b); w.floorZ = z; w.ceilingZ = round(z + ceiling); b.walls.push(w);
-    }
-    for (const o of f.openings) {
-      o.id = id(o.id); o.wall = id(o.wall); o.rooms = o.rooms.map(id); pt(o.a); pt(o.b); o.floorZ = z;
-      if (o.swingInto) o.swingInto = id(o.swingInto);
-      // Filler portals become internal doors to the authored core, never new
-      // world entrances. Their coincident core opening cuts both wall faces.
-      delete o.portal; b.openings.push(o);
-    }
-    b.columns = b.columns || [];
-    for (const c of f.columns) { c.id = id(c.id); c.room = id(c.room); rr(c.rect); c.floorZ = z; b.columns.push(c); }
-    for (const [a, c, kind, op] of f.graph.edges) if (a !== 'outside' && c !== 'outside') b.graph.edges.push([id(a), id(c), kind, id(op)]);
-    for (const p of f.portals) {
-      const a = attachments[Number(p.connection)], other = id(p.room);
-      const op = b.openings.find((o) => o.id === id(p.opening));
-      op.rooms = op.rooms.map((r) => r || a.room);
-      opening(b, a.room, a.side, a.at, a.width, other);
-    }
-  }
-
-  /** A shared multi-band fill. Four ramps and intervening rooms wrap an atrium;
-   * the last ramp passes above/below the ground gallery. A compact side pocket
-   * in the upward example crosses the neighboring band's elevation WITHOUT a
-   * portal into that band. Clear height extends upward in both directions. */
-  function generate(spec) {
-    spec = spec || {};
-    const seed = spec.seed >>> 0, sign = spec.direction === 'down' ? -1 : 1;
-    const rise = spec.rise === undefined ? 8 : spec.rise, factor = rise / 8;
-    if (!Number.isFinite(rise) || rise < 8) throw new Error('terraced fill rise must be at least 8 m');
-    if (spec.direction !== undefined && !['up', 'down'].includes(spec.direction)) throw new Error('connection direction must be up or down');
-    const W = spec.site ? spec.site.w : 40, H = spec.site ? spec.site.h : 36;
-    if (![W, H].every(Number.isFinite) || W < 40 || H < 36 || W * 2 % 1 || H * 2 % 1) throw new Error('terraced fill needs a rectangular site at least 40 × 36 m, on the 0.5 m grid');
-    const x = (v) => snap(v * W / 40), y = (v) => snap(v * H / 36), rect = (r) => [x(r[0]), y(r[1]), x(r[2]), y(r[3])], point = (p) => [x(p[0]), y(p[1]), p[2] * sign * factor];
-    const rng = new BR.Rng(BR.hash4(seed, 0xe1e7, 0, 0)), dest = sign > 0 ? 'upper' : 'lower';
-    const b = { schema: E.SCHEMA, kind: 'exploration-fill', engine: 'elevation', archetype: 'terraced_atrium', name: 'Terraced atrium', seed, approach: 'S', grid: 0.5,
-      fillId: spec.fillId || 'fill:terraced_atrium:' + seed, site: { w: W, h: H, rects: [[0, 0, W, H]] },
-      bands: [{ id: 'ground', elevation: 0 }, { id: dest, elevation: rise * sign }], rooms: [], walls: [], openings: [], portals: [], verticals: [], holes: [], connectors: [], voids: [], route: [],
-      graph: { nodes: ['outside'], edges: [] }, meta: { plan: { type: 'terraced_atrium' }, score: 100, terms: {}, mutations: [], issues: [], autoDoors: [], program: ['vertical exploration', 'reserved atrium', 'compact stacked pocket'] } };
-    const room = (id, name, q, z, ceiling, band) => { const r = { id, type: 'room', name, zone: 'circulation', rects: [rect(q)], floorZ: z * sign * factor, ceiling, ceilingZ: round(z * sign * factor + ceiling), band: band || 'ground', tags: ['backrooms', 'vertical-exploration'], area: round((x(q[2]) - x(q[0])) * (y(q[3]) - y(q[1]))) }; b.rooms.push(r); b.graph.nodes.push(id); return r; };
-    room('entry', 'Ground entrance', [0, 24, 8, 36], 0, 2.8);
-    room('gallery', 'Ground gallery', [0, 16, 8, 24], 0, 2.8);
-    room('middle', 'Intermediate hall', [20, 16, 28, 24], 2, 2.6);
-    room('side', 'Side rooms', [28, 16, 28 + rng.int(5, 8), 24], 2, 2.6);
-    room('turn', 'Turning gallery', [20, 0, 28, 4], 4, 2.3);
-    const pocket = room('pocket', 'Compact pocket', [28, 0, 28 + rng.int(5, 8), 4], 4, 2.25);
-    room('overlook', 'Atrium overlook', [0, 0, 8, 12], 6, 2.8);
-    room('arrival', (sign > 0 ? 'Upper' : 'Lower') + ' band arrival', [0, 24, 8, 36], 8, 2.8, dest);
-    const stack = room('stack', 'Stacked pocket', [28, 0, pocket.rects[0][2] / (W / 40), 4], 7, 2.25);
-    // Exactly matching masks, including non-integral scaling at larger sites.
-    stack.rects = clone(pocket.rects); stack.area = pocket.area;
-    function ramp(id, from, to, A, B, footprint) {
-      const pa = point(A), pb = point(B), a = b.rooms.find((r) => r.id === from), c = b.rooms.find((r) => r.id === to);
-      const q = rect(footprint), width = Math.min(q[2] - q[0], q[3] - q[1]);
-      // A snapped footprint can have a quarter-metre center. Derive it from
-      // the edges so the full ramp width still fits its openings/reservation.
-      if (pa[0] !== pb[0]) pa[1] = pb[1] = (q[1] + q[3]) / 2;
-      else pa[0] = pb[0] = (q[0] + q[2]) / 2;
-      b.connectors.push({ id, kind: 'ramp', from: 's:' + from, to: 's:' + to, state: 'connected', direction: 'both', width, clearance: 2.2,
-        architecture: { slab: E.SLAB, sideWalls: { height: 2.2, thickness: 0.15 }, ceiling: true }, landings: [pa.slice(), pb.slice()], path: [pa, pb],
-        reservation: prism([q], Math.min(a.floorZ, c.floorZ) - E.SLAB, Math.max(a.floorZ, c.floorZ) + 2.2, 'connector', 'volume:' + id) });
-      b.graph.edges.push([from, to, 'ramp', id]);
-    }
-    ramp('ramp:1', 'gallery', 'middle', [8, 19, 0], [20, 19, 2], [8, 18, 20, 20]);
-    ramp('ramp:2', 'middle', 'turn', [23, 16, 2], [23, 4, 4], [22, 4, 24, 16]);
-    ramp('ramp:3', 'turn', 'overlook', [20, 2, 4], [8, 2, 6], [8, 1, 20, 3]);
-    ramp('ramp:4', 'overlook', 'arrival', [4, 12, 6], [4, 24, 8], [3, 12, 5, 24]);
-    const q = pocket.rects[0], landing = [q[2] - 1.5, q[1] + 0.5, q[2] - 0.5, q[1] + 1.5], hatch = [landing[0] + 0.5, landing[1], landing[2], landing[1] + 0.5];
-    const ladder = ladderConnector('pocket:ladder', pocket, stack, landing, hatch);
-    b.connectors.push(ladder); b.graph.edges.push([pocket.id, stack.id, 'ladder', ladder.id]);
-    addHoles(b, ladder.id, 's:' + (sign > 0 ? pocket.id : stack.id), 's:' + (sign > 0 ? stack.id : pocket.id), hatch);
-    b.voids.push(prism([rect([8, 4, 20, 16])], Math.min(0, rise * sign) - E.SLAB, Math.max(0, rise * sign) + 3, 'void', 'atrium'));
-    refresh(b); buildWalls(b);
-    opening(b, 'entry', 'N', x(3), x(5) - x(3), 'gallery');
-    opening(b, 'middle', 'E', y(18), y(20) - y(18), 'side');
-    opening(b, 'turn', 'E', y(1), y(3) - y(1), 'pocket');
-    for (const [rid, side, at, wide] of [['gallery', 'E', y(18), y(20) - y(18)], ['middle', 'W', y(18), y(20) - y(18)], ['middle', 'N', x(22), x(24) - x(22)], ['turn', 'S', x(22), x(24) - x(22)], ['turn', 'W', y(1), y(3) - y(1)], ['overlook', 'E', y(1), y(3) - y(1)], ['overlook', 'S', x(3), x(5) - x(3)], ['arrival', 'N', x(3), x(5) - x(3)]]) opening(b, rid, side, at, wide);
-    opening(b, 'overlook', 'E', y(5), y(10) - y(5), null, 'window');
-    for (const [rid, side, at, wide, main] of [['entry', 'S', x(3), x(5) - x(3), true], ['arrival', 'W', y(28), y(30) - y(28), false]]) {
-      const op = opening(b, rid, side, at, wide), r = b.rooms.find((q) => q.id === rid), id = 'p' + b.portals.length;
-      op.portal = id;
-      b.portals.push({ id, opening: op.id, room: rid, role: 'both', kind: 'opening', side, width: wide, clear: 1.2, main, state: 'landing', band: r.band, tags: ['band-landing'] });
-      b.graph.edges.push([rid, 'outside', 'opening', op.id]);
-    }
-    const ramps = b.connectors.filter((c) => c.kind === 'ramp');
-    b.route = [point([4, 36, 0]), point([4, 19, 0]), ...clone(ramps[0].path), point([23, 19, 2]), ...clone(ramps[1].path), point([23, 2, 4]), ...clone(ramps[2].path), point([4, 2, 6]), ...clone(ramps[3].path), point([4, 29, 8]), point([0, 29, 8])];
-    if (spec.infill) {
-      const east = (rid) => ({ room: rid, side: 'E', at: y(28), width: y(30) - y(28) });
-      populateBand(b, 'ground', BR.hash4(seed, 0xe1f1, 0, 0), [east('entry'), { room: 'gallery', side: 'N', at: x(3), width: x(5) - x(3) }]);
-      populateBand(b, dest, BR.hash4(seed, 0xe1f1, 1, 0), [east('arrival')]);
-      b.meta.program.push('connected reference-floor infill');
-    }
-    if (rng.f() < 0.5) {
-      const rp = (p) => { p[0] = round(W - p[0]); }, rr = (r) => { const a = r[0]; r[0] = round(W - r[2]); r[2] = round(W - a); };
-      for (const r of b.rooms) r.rects.forEach(rr);
-      for (const c of b.columns || []) rr(c.rect);
-      for (const w of b.walls.concat(b.openings)) { rp(w.a); rp(w.b); }
-      for (const p of b.portals) if (p.side === 'W' || p.side === 'E') p.side = TG.opposite(p.side);
-      for (const c of b.connectors) { c.path.forEach(rp); c.landings.forEach(rp); c.reservation.rects.forEach(rr); }
-      for (const h of b.holes) rr(h.rect);
-      for (const v of b.voids) v.rects.forEach(rr);
-      b.route.forEach(rp);
-    }
-    refresh(b);
-    const selectedDirection = sign > 0 ? 'up' : 'down';
-    b.capabilities[selectedDirection].selected = true;
-    b.capabilities[selectedDirection].connections = b.connectors.filter((c) => c.kind === 'ramp').map((c) => c.id);
-    const check = validate(b);
-    b.meta.issues = check.errors.map((e) => 'ERROR ' + e).concat(check.warnings);
-    if (check.errors.length) throw new Error(check.errors.join('; '));
-    if (spec.reservations) { const claim = spec.reservations.reserve(b.fillId, b.volumes); if (!claim.ok) throw new Error('fill reservation conflicts with ' + claim.conflicts[0].owner); }
-    return b;
-  }
-
   function reachable(b, start) {
     const adj = new Map(b.navigation.nodes.map((n) => [n, []]));
     for (const e of b.navigation.edges) {
@@ -424,5 +262,5 @@
     return { errors: [...new Set(errors)], warnings: [...new Set(warnings)] };
   }
 
-  Object.assign(E, { prepare, generate, ladderVariant, refresh, capabilities, validate, reachable, ReservationIndex, volumeOverlap });
+  Object.assign(E, { prepare, ladderVariant, refresh, capabilities, validate, reachable, ReservationIndex, volumeOverlap });
 })(typeof window !== 'undefined' ? window : globalThis);
