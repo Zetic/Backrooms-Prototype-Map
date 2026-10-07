@@ -154,10 +154,17 @@
     const density = cellDensity(seed, i, j);
     const ha = ((ux1 - ux0) * (uy1 - uy0)) / 10000;
     const placed = [], lots = [];
+    const claims = W.plannedLots ? W.plannedLots(i, j) : [];
     const near = (a, b, g) => a[0] < b[2] + g && b[0] < a[2] + g && a[1] < b[3] + g && b[1] < a[3] + g;
     /** can a lot (lot = true) or a POI inside a filler go here? */
     const free = (b, lot) => {
       if (lot ? b[0] < ux0 + lm || b[1] < uy0 + lm || b[2] > ux1 - lm || b[3] > uy1 - lm : b[0] < ux0 || b[1] < uy0 || b[2] > ux1 || b[3] > uy1) return false;
+      for (const L of claims) {
+        if (near(b, L.rect, lot ? CFG.lotGap : CFG.lotClear)) return false;
+        const axis = L.transition.split === 'h' ? 1 : 0;
+        const clear = lot ? CFG.lotGap : CFG.lotClear;
+        if ([L.rect[axis], L.rect[axis + 2]].some((c) => b[axis] < c + clear && b[axis + 2] > c - clear)) return false;
+      }
       for (const L of lots) if (near(b, L.rect, lot ? CFG.lotGap : CFG.lotClear)) return false;
       for (const p of placed) if (p.mode === 'inside' && near(b, p.bbox, lot ? CFG.lotClear : CFG.gap)) return false;
       return true;

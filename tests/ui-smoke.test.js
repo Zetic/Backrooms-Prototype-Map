@@ -3,7 +3,9 @@
 // the call). This is not a browser-engine test.
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
 const { BR, harness } = require('./helpers'), { check, finish } = harness();
+require('../src/tpl/elevation-view');
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+let exported = null, download = null;
 class Element {
   constructor(tag = 'DIV') {
     this.tagName = tag.toUpperCase(); this.events = {}; this.style = {}; this.value = ''; this.checked = false; this.innerHTML = ''; this.textContent = ''; this.children = [];
@@ -14,6 +16,7 @@ class Element {
   dispatch(name, extra = {}) { for (const fn of this.events[name] || []) fn({ target: this, preventDefault() {}, ...extra }); }
   appendChild(el) { this.children.push(el); }
   setPointerCapture() {}
+  click() { if (this.tagName === 'A') download = { href: this.href, name: this.download }; this.dispatch('click'); }
   getContext() { return {}; }
 }
 const elements = new Map();
@@ -31,6 +34,8 @@ BR.draw = (ctx, W, view, opts) => {
 };
 const context = {
   window, document, location, history, URLSearchParams, console,
+  Blob: class extends Blob { constructor(parts, options) { super(parts, options); exported = JSON.parse(parts.join('')); } },
+  URL: { createObjectURL: () => 'blob:world-test', revokeObjectURL() {} },
   performance: { now: () => ++clock }, requestAnimationFrame: (fn) => frames.push(fn),
   setTimeout: (fn) => { timers.set(++timerID, fn); return timerID; }, clearTimeout: (id) => timers.delete(id)
 };
@@ -55,4 +60,22 @@ elements.get('seed').value = '7'; elements.get('seed').dispatch('change'); flush
 check('changing the seed makes a new world', window.__world().seed === 7);
 elements.get('home').dispatch('click'); flush();
 check('the origin button goes home', last.view.cx === 0 && last.view.cy === 0);
+elements.get('find-up').dispatch('click'); flush();
+const journey = window.__world().siteAt(last.view.cx, last.view.cy);
+check('find up locates a real shared vertical fill', journey.kind === 'transition' && journey.transition.lower === 0);
+elements.get('c').dispatch('pointermove', { clientX: 450, clientY: 300 }); flush();
+check('hovering the fill explains its shared bands and actual floor', /bands 0 ↔ 1/.test(elements.get('info').innerHTML) && /clear height/.test(elements.get('info').innerHTML));
+elements.get('band-up').dispatch('click'); flush();
+check('upper band selection preserves XY and changes world and URL', window.__world().band === 1 && new URLSearchParams(location.hash.slice(1)).get('band') === '1' && window.__world().siteAt(last.view.cx, last.view.cy).owner === journey.owner);
+elements.get('floor').value = '-4'; elements.get('floor').dispatch('change'); flush();
+check('individual floor inspection is separate from band membership', last.opts.floor === -4 && window.__world().band === 1 && new URLSearchParams(location.hash.slice(1)).get('floor') === '-4');
+elements.get('o-ghost').checked = true; elements.get('o-ghost').dispatch('change'); flush();
+check('ghost floors reach the renderer and URL', last.opts.ghost && new URLSearchParams(location.hash.slice(1)).get('ghost') === '1');
+elements.get('export-world').dispatch('click'); flush();
+check('world JSON export includes geometry, 3D ownership and matched connections', exported?.schema === 'br.world-elevation/0.1' && exported.bands.length === 3 && exported.portalMatches.length > 0 && exported.issues.length === 0 && download?.name.endsWith('.json'));
+elements.get('band-down').dispatch('click'); flush();
+check('switching bands resets to its stable reference floor', window.__world().band === 0 && last.opts.floor === 0);
+elements.get('find-down').dispatch('click'); flush();
+check('find down locates a connection into the lower network', window.__world().siteAt(last.view.cx, last.view.cy).transition.lower === -1);
+for (const m of html.matchAll(/<script src="([^"]+)"/g)) check('map script exists: ' + m[1], fs.existsSync(path.join(__dirname, '..', m[1])));
 finish();

@@ -1,5 +1,11 @@
 # The template-first world
 
+The main map now applies this horizontal planner within stable elevation bands.
+[Elevation world planning](elevation-world.md) describes shared vertical fills,
+reservations, external portal matching, band/floor controls and the world export.
+The flat `BR.World` described below remains the underlying planner and regression
+baseline; `BR.BandWorld` coordinates its band instances.
+
 Every site on the infinite plane is built by a template from its outline and
 its connections. Nothing else draws floor or walls. Plain Backrooms sites are
 built by **fillers** ([docs/fillers.md](fillers.md)). Points of interest are

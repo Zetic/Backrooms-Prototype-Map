@@ -132,11 +132,12 @@ needing authored physical paths; the adapter must not pretend to resolve them.
 
 ### M2 — Deterministic band planning and matching
 
-Add band-aware world ownership, sparse planned transition fills, neighboring
-reservations, and exact external portal matching. Start with ground zero and
-one adjacent band, then extend to both directions. Test arbitrary generation
-order, chunk boundaries, eviction, and reachable regional topology. Map controls
-inspect bands separately from individual floor heights.
+**Implemented.** The main map now uses band-aware world ownership, sparse planned
+transition fills, shared reservations, and exact external portal matching.
+Networks extend in both directions. Generation order, chunk boundaries, eviction
+and regional topology are tested. Map controls inspect bands separately from
+individual floor heights. See [M2 implementation and world export](elevation-world.md)
+for the initial spacing/rarity policy, inspection controls and remaining scope.
 
 ### M3 — Authored template variants and elevation policy
 

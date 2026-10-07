@@ -1,6 +1,7 @@
 # Backrooms map prototype
 
-An infinite, deterministic 2-D Backrooms map, built entirely from templates.
+An infinite, deterministic Backrooms map with elevation bands, built entirely
+from templates and inspected in 2-D.
 Open `index.html` in a browser. There is no build step and no runtime
 dependency.
 
@@ -91,7 +92,9 @@ a fill explored vertically between two stable reference bands, local stacked
 pockets, shared spatial reservations, and optional up/down ladder variants of
 every template and filler. Select floor elevations, ghost overlapping floors,
 inspect the main route profile, and export `br.elevation/0.1` JSON. The infinite
-map's generation remains flat while the band planner is developed.
+map now generates connected bands above and below ground zero. Use its band and
+floor controls, find up/down fills, and export regional elevation JSON.
+[Elevation world planning, reservations and export](docs/elevation-world.md).
 [Elevation design, data contract, and milestones](docs/elevation.md).
 
 ## Controls (`index.html`)
@@ -117,7 +120,8 @@ The URL hash keeps the seed, position, zoom and toggles, for example
 | `seams.js` | Where two blueprints end up wall to wall: each shared wall recorded once, and the seam rules that sometimes cut a window or door through it (a house against the backrooms) |
 | `render.js` | The map: tile cache, detail / plan / far views, overlays |
 | `tpl/` | The template system: kit grid, framework, the shared catalogue of room and zone types (`catalogue.js`), House, Rooms and Zone engines, the composite pipeline (`composite.js`: templates built inside a template and merged into one blueprint) and the Neighborhood and Park engines, archetypes, fillers, lots (`lot.js`: settings, the yard, and the adapter that builds templates inside bigger ones), blueprint renderer |
-| `tpl/elevation.js`, `tpl/elevation-view.js`, `elevation-lab.js` | Experimental stacked surfaces, reservations, vertical fill and connection variants; independent JSON renderer and lab controller. Loaded by the lab only |
+| `tpl/elevation.js`, `tpl/elevation-view.js`, `elevation-lab.js` | Stacked surfaces, reservations, physical fill/connection variants, JSON renderer and standalone lab |
+| `band-world.js` | Deterministic reference-band networks, sparse shared vertical fills, spatial reservations, exact portal matching and canonical world export |
 
 ```js
 const W = new BR.World(31337);
