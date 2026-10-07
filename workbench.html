@@ -268,41 +268,52 @@
     return s;
   }
   /**
-   * A template in its setting (LOT, src/tpl/lot.js): on its own lot (a yard
-   * round a house; a flush lot is the template alone, its doors on the edge)
-   * or inside a filler's site. The result wraps the building: { lot: true,
-   * site, setting (br.filler or null), buildings: [{ origin, b }], main, conns }.
+   * A template in its setting (LOT, src/tpl/lot.js): on its own lot (a house
+   * behind its front yard; a flush lot is the template alone, its doors on
+   * the edge) or inside a filler's site. The result wraps the building:
+   * { lot: true, site, setting (br.filler or null), settingAt (where the
+   * setting's frame sits), buildings: [{ origin, b }], main, conns }.
    */
   function buildLot(A, seed) {
     const s = specFor(A, seed), r = new BR.Rng(BR.hash4(seed, TG.hashStr(A.id), 0x6c6f74, 0));
-    const one = (rects, toBack) => [{ id: 'b', archetype: A.id, seed, approach: s.approach, rects, wrongness: s.wrongness, toBack }];
-    let spec = null;
-    if (state.setting === 'lot') {
-      const m = LOT.margins(A, r, r.f());
-      if (LOT.setting(A).kind === 'yard') {
-        const L = LOT.around(s.site.rects, s.approach, m), bb = TG.bbox(L.rects);
-        spec = { seed, site: { rects: L.rects }, filler: 'yard', buildings: one(L.building, true), lots: [{ rect: bb, front: s.approach, kind: 'yard' }] };
+    const t0 = performance.now(), wrap = (L, kind, main) => (!L.buildings.length
+      ? { error: L.issues[0] || 'no layout', site: { w: L.site.w, h: L.site.h, rects: L.site.rects }, meta: {} }
+      : { schema: LOT.SCHEMA, lot: true, kind, archetype: A.id, seed, site: L.site, setting: L.setting, settingAt: L.at, buildings: L.buildings, main: main || L.buildings[0].b,
+        conns: L.conns, issues: L.issues, meta: { ms: Math.round((performance.now() - t0) * 10) / 10 } });
+    if (state.setting === 'lot' && LOT.setting(A).kind === 'yard') {
+      // the house first, then its lot round what was built (LOT.yard): the
+      // lot meets the world at the end of the lane and at each door off the
+      // front, as it does on the map
+      const b = LOT.template({ archetype: A.id, seed, approach: s.approach, rects: s.site.rects, wrongness: s.wrongness });
+      if (b.error) return b;
+      const Y = LOT.yard(b, s.approach, LOT.margins(A, r, r.f())), f = s.approach, h = f === 'N' || f === 'S', line = f === 'N' || f === 'W' ? 0 : h ? Y.h : Y.w;
+      const spans = Y.yard.filter((q) => (h ? (f === 'N' ? q[1] : q[3]) : f === 'W' ? q[0] : q[2]) === line).map((q) => (h ? [q[0], q[2]] : [q[1], q[3]])).sort((p, q) => p[0] - q[0]), lane = [];
+      for (const sp of spans) { const t = lane[lane.length - 1]; if (t && t[1] === sp[0]) t[1] = sp[1]; else lane.push(sp.slice()); }
+      const connections = [], edge = {};
+      const best = lane.sort((p, q) => q[1] - q[0] - (p[1] - p[0]))[0];
+      if (best) { const wd = Math.max(1, Math.min(2, best[1] - best[0] - 1)); connections.push({ id: 'front', side: f, at: Math.round((best[0] + (best[1] - best[0] - wd) / 2) * 2) / 2, width: wd, line, route: true }); }
+      for (const d of Y.doors) {
+        const id = 'edge ' + d.portal;
+        if (d.adapter) connections.push({ id, side: d.side, at: d.s0, width: d.s1 - d.s0, line: d.c });
+        else edge[d.portal] = id;
       }
-    } else {
-      const bb = TG.bbox(s.site.rects), p = [r.int(3, 9), r.int(3, 9), r.int(3, 9), r.int(3, 9)];
-      const rects = [[0, 0, bb[2] - bb[0] + p[0] + p[2], bb[3] - bb[1] + p[1] + p[3]]];
-      spec = { seed, site: { rects }, buildings: one(s.site.rects.map((q) => [q[0] - bb[0] + p[0], q[1] - bb[1] + p[1], q[2] - bb[0] + p[0], q[3] - bb[1] + p[1]])) };
+      return wrap(LOT.build({ seed, site: { rects: [[0, 0, Y.w, Y.h]] }, filler: 'yard', buildings: [{ id: 'b', b, origin: Y.origin, edge }], connections,
+        hint: { yard: Y.yard, adapters: Y.doors.filter((d) => d.adapter).map((d) => d.adapter) } }), 'yard', b);
     }
-    const t0 = performance.now();
-    if (!spec) {
+    if (state.setting === 'lot') {
       // flush: the template alone; its doors are the lot's connections
       const b = TPL.generate(Object.assign({}, s, { flush: true }));
       if (b.error) return b;
-      return { schema: LOT.SCHEMA, lot: true, kind: 'flush', archetype: A.id, seed, site: b.site, setting: null, buildings: [{ origin: [0, 0], b }], main: b, conns: [], issues: [], meta: { ms: b.meta.ms } };
+      return { schema: LOT.SCHEMA, lot: true, kind: 'flush', archetype: A.id, seed, site: b.site, setting: null, settingAt: [0, 0], buildings: [{ origin: [0, 0], b }], main: b, conns: [], issues: [], meta: { ms: b.meta.ms } };
     }
-    spec.connections = connsFor(spec.site, seed);
-    const L = LOT.build(spec);
-    if (!L.buildings.length) return { error: L.issues[0] || 'no layout', site: { w: L.site.w, h: L.site.h, rects: L.site.rects }, meta: {} };
-    return { schema: LOT.SCHEMA, lot: true, kind: state.setting === 'lot' ? 'yard' : 'filler', archetype: A.id, seed, site: L.site, setting: L.setting,
-      buildings: L.buildings, main: L.buildings[0].b, conns: L.conns, issues: L.issues, meta: { ms: Math.round((performance.now() - t0) * 10) / 10 } };
+    // inside a filler: a few metres of filler round it on each side
+    const bb = TG.bbox(s.site.rects), p = [r.int(3, 9), r.int(3, 9), r.int(3, 9), r.int(3, 9)];
+    const site = { rects: [[0, 0, bb[2] - bb[0] + p[0] + p[2], bb[3] - bb[1] + p[1] + p[3]]] };
+    const rects = s.site.rects.map((q) => [q[0] - bb[0] + p[0], q[1] - bb[1] + p[1], q[2] - bb[0] + p[0], q[3] - bb[1] + p[1]]);
+    return wrap(LOT.build({ seed, site, connections: connsFor(site, seed), buildings: [{ id: 'b', archetype: A.id, seed, approach: s.approach, rects, wrongness: s.wrongness }] }), 'filler');
   }
   /** a lot's one-line description */
-  const lotLabel = (b) => (b.kind === 'yard' ? 'in its yard' : b.kind === 'flush' ? 'its own lot, flush' : 'inside a ' + (b.setting ? b.setting.name.toLowerCase() : 'filler'));
+  const lotLabel = (b) => (b.kind === 'yard' ? 'behind its front yard' : b.kind === 'flush' ? 'its own lot, flush' : 'inside a ' + (b.setting ? b.setting.name.toLowerCase() : 'filler'));
   /** the building inside a lot wrapper (or the blueprint itself) */
   const core = (b) => (b && b.lot ? b.main : b);
   /** draw a blueprint, or a lot: every floor first, then every wall */
@@ -311,7 +322,7 @@
     const hl = (pre) => (o.highlight && String(o.highlight).indexOf(pre) === 0 ? String(o.highlight).slice(pre.length) : null);
     const at = (origin, layer, site, pre) => Object.assign({}, o, { ox: o.ox + origin[0] * o.scale, oy: o.oy + origin[1] * o.scale, layer, site, highlight: hl(pre) });
     for (const layer of ['floors', 'walls']) {
-      if (b.setting) TPL.drawBuilding(g, b.setting, at([0, 0], layer, true, 's:'));
+      if (b.setting) TPL.drawBuilding(g, b.setting, at(b.settingAt || [0, 0], layer, true, 's:'));
       b.buildings.forEach((B, k) => TPL.drawBuilding(g, B.b, at(B.origin, layer, !b.setting, 'b' + k + ':')));
     }
   }
@@ -699,7 +710,7 @@
       const r = cv.getBoundingClientRect();
       const x = ((e.clientX - r.left) * dpr - view.ox) / view.s, y = ((e.clientY - r.top) * dpr - view.oy) / view.s;
       let hit = null, key = null;
-      const parts = detailB.lot ? (detailB.setting ? [['s:', detailB.setting, [0, 0]]] : []).concat(detailB.buildings.map((B, k) => ['b' + k + ':', B.b, B.origin])) : [['', detailB, [0, 0]]];
+      const parts = detailB.lot ? (detailB.setting ? [['s:', detailB.setting, detailB.settingAt || [0, 0]]] : []).concat(detailB.buildings.map((B, k) => ['b' + k + ':', B.b, B.origin])) : [['', detailB, [0, 0]]];
       for (const [pre, bp, o] of parts) for (const rm of bp.rooms) if ((rm.level || 0) === level) for (const q of rm.rects) if (x - o[0] >= q[0] && x - o[0] < q[2] && y - o[1] >= q[1] && y - o[1] < q[3]) { hit = rm; key = pre + rm.id; }
       $('dhover').innerHTML = hit ? '<b>' + esc(hit.name) + '</b> · ' + hit.area.toFixed(1) + ' m² · ceiling ' + hit.ceiling + ' m · ' + esc(hit.zone || '') + '<br><span class="k">' + esc((hit.tags || []).join(', ')) + '</span>' : '';
       if (key !== hoverRoom) { hoverRoom = key; drawDetail(); }

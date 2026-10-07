@@ -14,9 +14,10 @@
  *   rhythm    a slow noise field scales density between busy and quiet
  *             stretches, and a few cells are left almost empty on purpose
  *   settings  how each POI sits in the world (src/tpl/lot.js):
- *               yard    a house on its own lot, in a yard sized by the biome,
- *                       sometimes with a small template or two in the yard
- *                       (sheds)
+ *               yard    a house on its own lot, built now so the lot fits it:
+ *                       solid round its back and sides, a front yard sized
+ *                       by the biome, passages from its other doors to the
+ *                       lot edge
  *               flush   a template at least a block (8 m) across on its own
  *                       lot, its door on the lot edge
  *               inside  a smaller template inside a filler's site; small
@@ -43,7 +44,6 @@
     lotMargin: 8, lotGap: 8,          // lots keep a block's width (8 m) from the cell edge and from each other,
     lotClear: 10,                     // and a block's width plus 2 m from a POI inside a filler, so the world can cut them out
     flushMin: 8,                      // a template at least this big both ways may be its own (flush) lot
-    sheds: [0.45, 0.25], shedGap: [2, 4],   // chance a house gets a small template in its yard, then a second
     // POIs per hectare at density 1; cluster = chance it sits beside a bigger POI
     tiers: {
       huge:   { perHa: 0.004 },
@@ -128,13 +128,17 @@
    * POIs of planning cell (i, j), and the lots they sit on:
    * { i, j, density, rect, pois: [P], lots: [L] }
    * P: { id, i, j, k, tier, archetype, name, engine, approach, shape, w, h,
-   *      bbox, rects, cx, cy, seed, cluster, mode, lot }
-   * L: { id, kind ('yard' | 'flush'), rect, approach, pois: [P] }
-   * bbox / rects / rect are world metres (whole metres). w x h is the
-   * canonical size of the template's site (w along the main side).
-   * mode: 'yard' (a house on its own lot, in a yard), 'shed' (a small
-   * template in a house's yard), 'flush' (its own lot, door on the edge) or
-   * 'inside' (inside a filler's site).
+   *      bbox, rects, cx, cy, seed, cluster, mode, lot, origin? }
+   * L: { id, kind ('yard' | 'flush'), rect, approach, pois: [P],
+   *      yard?, doors? (a yard lot: its front yard rects and the doors that
+   *      are connections on its edge, LOT.yard), b (the built house, not
+   *      enumerable) }
+   * bbox / rects / rect are world metres (lots whole metres). w x h is the
+   * canonical size of the template's site (w along the main side). A yard
+   * POI's rects are the footprint its house was built with, and origin is
+   * where that building's site frame sits.
+   * mode: 'yard' (a house on its own lot, behind a front yard), 'flush' (its
+   * own lot, door on the edge) or 'inside' (inside a filler's site).
    */
   function buildPOICell(W, i, j) {
     const seed = W.seed, C = CFG.cell, cat = catalogue(), LOT = BR.LOT;
@@ -187,33 +191,28 @@
           let px = rng.range(ux0, ux1), py = rng.range(uy0, uy1);
 
           if (kind === 'yard') {
-            // the house and up to two small templates in its yard, in the lot's
-            // canonical frame (main side at the bottom), then the margins round them
-            const parts = [{ arch, tier, cw, ch, shape, rects: canon.rects, r: [0, 0, cw, cd] }];
-            const smalls = cat.small.concat(cat.tiny);
-            const sheds = smalls.length && rng.f() < CFG.sheds[0] ? (rng.f() < CFG.sheds[1] ? 2 : 1) : 0;
-            const first = rng.f() < 0.5;
-            for (let s = 0; s < sheds; s++) {
-              const sa = pickArch(smalls), ss = sa.site || { w: [2, 4], h: [2, 4] };
-              const sw = sizeIn(rng, ss.w), sd = sizeIn(rng, ss.h), g = rng.int(CFG.shedGap[0], CFG.shedGap[1]);
-              if (sd > cd) continue;   // deeper than the house: it would push the lot out behind it
-              const y0 = cd - sd - rng.int(0, cd - sd), left = (s === 0) === first;
-              const x0 = left ? -g - sw : cw + g;
-              parts.push({ arch: sa, tier: BR.TPL.sizeClass(sa), cw: sw, ch: sd, shape: 'rect', rects: [[0, 0, sw, sd]], r: [x0, y0, x0 + sw, y0 + sd] });
+            // the house is built now: its lot is sized round what was built,
+            // and its doors decide where the lot meets the world (LOT.yard)
+            const k = placed.length, O = BR.TG.orient(approach, cw, cd), site = canon.rects.map((q) => O.rect(q));
+            const b = LOT.template({ archetype: arch.id, seed: hash4(seed, i, j, (k << 8) ^ S.TPL), approach, rects: site, tries: CFG.buildTries });
+            if (b.error) continue;
+            const Y = LOT.yard(b, approach, LOT.margins(arch, rng, BR.openness ? BR.openness(seed, px, py) : 0.5));
+            let rect = null;
+            for (let t = 0; t < CFG.attempts && !rect; t++) {
+              if (t) { px = rng.range(ux0, ux1); py = rng.range(uy0, uy1); }
+              const x0 = Math.round(px - Y.w / 2), y0 = Math.round(py - Y.h / 2);
+              if (free([x0, y0, x0 + Y.w, y0 + Y.h], true)) rect = [x0, y0, x0 + Y.w, y0 + Y.h];
             }
-            const core = BR.TG.bbox(parts.map((q) => q.r));
-            const mg = LOT.margins(arch, rng, BR.openness ? BR.openness(seed, px, py) : 0.5);
-            const lc = [core[0] - mg.left, core[1] - mg.back, core[2] + mg.right, core[3] + mg.front];
-            const LW = lc[2] - lc[0], LH = lc[3] - lc[1], O = BR.TG.orient(approach, LW, LH);
-            const x0 = Math.round(px - O.w / 2), y0 = Math.round(py - O.h / 2), rect = [x0, y0, x0 + O.w, y0 + O.h];
-            if (!free(rect, true)) continue;
-            const L = { id: i + ',' + j + ':L' + lots.length, kind, rect, approach, pois: [] };
-            parts.forEach((q, s) => {
-              const rs = q.rects.map((r) => O.rect([r[0] + q.r[0] - lc[0], r[1] + q.r[1] - lc[1], r[2] + q.r[0] - lc[0], r[3] + q.r[1] - lc[1]])).map((r) => [r[0] + x0, r[1] + y0, r[2] + x0, r[3] + y0]);
-              const P = add(poi(q.arch, q.tier, approach, q.shape, q.cw, q.ch, rs, s ? 'shed' : 'yard', s ? L.pois[0].id : null));
-              P.lot = L.id;
-              L.pois.push(P);
-            });
+            if (!rect) continue;
+            const hx = rect[0] + Y.origin[0], hy = rect[1] + Y.origin[1], mv = (q) => [q[0] + hx, q[1] + hy, q[2] + hx, q[3] + hy];
+            const P = add(poi(arch, tier, approach, shape, cw, ch, b.footprint[0].rects.map(mv), kind, null));
+            P.origin = [hx, hy];
+            const L = { id: i + ',' + j + ':L' + lots.length, kind, rect, approach, pois: [P],
+              yard: Y.yard.map((q) => [q[0] + rect[0], q[1] + rect[1], q[2] + rect[0], q[3] + rect[1]]),
+              doors: Y.doors.map((d) => Object.assign({}, d, { c: d.c + (d.o === 'h' ? rect[1] : rect[0]), s0: d.s0 + (d.o === 'h' ? rect[0] : rect[1]), s1: d.s1 + (d.o === 'h' ? rect[0] : rect[1]),
+                adapter: d.adapter && [d.adapter[0] + rect[0], d.adapter[1] + rect[1], d.adapter[2] + rect[0], d.adapter[3] + rect[1]] })) };
+            Object.defineProperty(L, 'b', { value: b, enumerable: false });
+            P.lot = L.id;
             lots.push(L);
             break;
           }

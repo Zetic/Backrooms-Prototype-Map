@@ -42,7 +42,7 @@
     const at = (origin, layer, labels) => ({ scale: tz, ox: (origin[0] - x0) * tz, oy: (origin[1] - y0) * tz, site: false, portals: false, labels, layer });
     const lab = opts.labels !== false && tz >= LOD.labels;
     for (const layer of ['floors', 'walls']) for (const r of ready) {
-      if (r.filler) TPL.drawBuilding(g, r.filler, at(r.origin, layer, false));
+      if (r.filler) TPL.drawBuilding(g, r.filler, at(r.fillerOrigin, layer, false));
       for (const B of r.buildings) TPL.drawBuilding(g, B.b, at(B.origin, layer, lab));
     }
     return complete;

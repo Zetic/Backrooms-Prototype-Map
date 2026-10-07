@@ -22,11 +22,12 @@
  *               site, so a cell has no gaps and no overlaps
  *   5. graph    a random spanning tree over the sites' shared edges plus a
  *               few loops; each edge is an exact opening on the shared line.
- *               A yard is entered from its front; a flush lot only through
- *               its own doors. The border openings join each cell to its
+ *               A yard lot is joined only at the end of its lane (always)
+ *               and of its doors' passages; a flush lot only through its
+ *               own doors. The border openings join each cell to its
  *               neighbours, so the whole plane is one connected graph
  *   6. build    each site is built from its connections: a filler from the
- *               pool (round any POI inside it), the yard round a house, or a
+ *               pool (round any POI inside it), a house's front yard, or a
  *               flush building alone (src/tpl/lot.js)
  *
  * Biome: one slow noise field, openness, tilts the filler weights between
@@ -44,7 +45,7 @@
     border: { n: [2, 4], end: 8, widths: [[1.5, 0.6], [2, 0.3], [2.5, 0.1]] },
     block: { min: 8, max: [18, 32], pStop: 0.4, tries: 12, clear: 2 },
     merge: { p: 0.3, maxArea: 900, maxSide: 40, minShared: 4 },
-    edge: { end: 1, widths: [[1.5, 0.55], [2, 0.25], [1, 0.1], [3, 0.1]] },
+    edge: { end: 1, lotEnd: 0.5, widths: [[1.5, 0.55], [2, 0.25], [1, 0.1], [3, 0.1]] },
     loops: [0.1, 0.3],                                    // chance a non-tree edge is opened, deep warren .. open stretch
     biome: { scale: 380, k: 1.7 },
     limits: { cells: 400, builds: 2500 }
@@ -220,26 +221,42 @@
       };
     });
 
-    // a flush lot the cuts could not free (rare) is left out: its doors would
-    // open onto the site round it
+    // a lot the cuts could not free as a site of its own (rare) is left out:
+    // its doors would open onto the site round it
     for (const s of sites) {
-      const bad = s.kind === 'lot' ? s.lots.filter((L) => L.kind === 'flush') : [];
-      if (!bad.length) continue;
-      for (const L of bad) { dropped.add(L.pois[0].id); lots.splice(lots.indexOf(L), 1); }
-      s.lots = s.lots.filter((L) => bad.indexOf(L) < 0);
+      if (!s.lots.length || s.kind === 'flush') continue;
+      const L0 = s.lots[0];
+      if (s.lots.length === 1 && s.rects.length === 1 && s.rects[0].every((v, t) => v === L0.rect[t])) continue;
+      for (const L of s.lots) { dropped.add(L.pois[0].id); lots.splice(lots.indexOf(L), 1); }
+      s.lots = [];
       s.pois = s.pois.filter((P) => !dropped.has(P.id));
-      if (!s.lots.length) s.kind = 'filler';
+      s.kind = 'filler';
     }
 
     // ---- graph: shared segments per site pair, merged where they run on. A
-    // flush lot is joined only through its own doors
+    // flush lot is joined only through its own doors; a yard lot through its
+    // doors and where its front yard reaches the lot edge
     const pairs = new Map();
+    const yardSpans = (s, o, c) => {
+      const out = [];
+      for (const q of s.lots[0].yard) {
+        if (o === 'v' ? q[0] === c || q[2] === c : q[1] === c || q[3] === c) out.push(o === 'v' ? [q[1], q[3]] : [q[0], q[2]]);
+      }
+      return out;
+    };
     for (const e of adj) {
       const A = siteOf[e.a], Bk = siteOf[e.b];
       if (A === Bk || sites[A].kind === 'flush' || sites[Bk].kind === 'flush') continue;
       const key = A < Bk ? A + '|' + Bk : Bk + '|' + A;
+      let spans = [[e.s0, e.s1]];
+      for (const k of [A, Bk]) if (sites[k].kind === 'lot') {
+        const ys = yardSpans(sites[k], e.o, e.c), next = [];
+        for (const [a, b] of spans) for (const [p, q] of ys) { const lo = Math.max(a, p), hi = Math.min(b, q); if (hi > lo) next.push([lo, hi]); }
+        spans = next;
+      }
+      if (!spans.length) continue;
       if (!pairs.has(key)) pairs.set(key, []);
-      pairs.get(key).push({ o: e.o, c: e.c, s0: e.s0, s1: e.s1, lo: A, hi: Bk });
+      for (const [a, b] of spans) pairs.get(key).push({ o: e.o, c: e.c, s0: a, s1: b, lo: A, hi: Bk });
     }
     const E = [], EG = CFG.edge, grng = new Rng(hash4(seed, i, j, S.GRAPH));
     for (const key of [...pairs.keys()].sort()) {
@@ -248,11 +265,14 @@
         const t = out[out.length - 1];
         if (t && t.o === s.o && t.c === s.c && t.lo === s.lo && t.s1 === s.s0) t.s1 = s.s1; else out.push(Object.assign({}, s));
       }
-      const usable = out.filter((s) => s.s1 - s.s0 >= 2 * EG.end + 1);
-      if (usable.length) E.push({ key, segs: usable, w: grng.f() });
+      // a yard's lane has walls of its own either side, so a connection may
+      // run closer to the ends of its stretch
+      const [ka, kb] = key.split('|').map(Number), end = sites[ka].kind === 'lot' || sites[kb].kind === 'lot' ? EG.lotEnd : EG.end;
+      const usable = out.filter((s) => s.s1 - s.s0 >= 2 * end + 1);
+      if (usable.length) E.push({ key, segs: usable, w: grng.f(), end });
     }
-    // a yard is entered from the front: one neighbour across its front is
-    // joined first, on the stretch in front of the lot
+    // a yard is entered from the front: one neighbour across the end of its
+    // lane is always joined there
     for (const s of sites) {
       const L = s.kind === 'lot' && s.lots.find((q) => q.kind === 'yard');
       if (!L) continue;
@@ -266,18 +286,18 @@
           const mine = (f === 'S' || f === 'E') ? g.lo === s.k : g.hi === s.k;
           const ahead = f === 'S' ? g.c >= q[3] : f === 'N' ? g.c <= q[1] : f === 'E' ? g.c >= q[2] : g.c <= q[0];
           const s0 = Math.max(g.s0, lo), s1 = Math.min(g.s1, hi);
-          if (g.o === (vert ? 'v' : 'h') && mine && ahead && s1 - s0 >= 2 * EG.end + 1.5) front.push(Object.assign({}, g, { s0, s1 }));
+          if (g.o === (vert ? 'v' : 'h') && mine && ahead && s1 - s0 >= 2 * e.end + 1) front.push(Object.assign({}, g, { s0, s1 }));
         }
         if (front.length && (!best || e.w < best.e.w)) best = { e, front };
       }
-      if (best) { best.e.w -= 2; best.e.segs = best.front; }
+      if (best) { best.e.w -= 2; best.e.segs = best.front; best.e.force = true; }
     }
     E.sort((p, q) => p.w - q.w || (p.key < q.key ? -1 : 1));
     const conns = [], tree = makeUF(sites.length), cellOpen = openness(seed, (x0 + x1) / 2, (y0 + y1) / 2);
     const pLoop = CFG.loops[0] + (CFG.loops[1] - CFG.loops[0]) * cellOpen;
     const at = (x, y) => sites.findIndex((s) => s.rects.some((q) => x >= q[0] && x < q[2] && y >= q[1] && y < q[3]));
     for (const s of sites) {
-      if (s.kind !== 'flush') continue;
+      if (s.kind !== 'flush' && s.kind !== 'lot') continue;
       const L = s.lots[0];
       L.portalConns = {};
       for (const d of L.doors) {
@@ -292,17 +312,18 @@
     }
     const place = (e, route) => {
       let w = pickW(grng, EG.widths);
-      let fit = e.segs.filter((s) => s.s1 - s.s0 >= w + 2 * EG.end);
+      let fit = e.segs.filter((s) => s.s1 - s.s0 >= w + 2 * e.end);
       if (!fit.length) { w = 1; fit = e.segs; }
       let tot = 0;
       for (const s of fit) tot += s.s1 - s.s0;
       let t = grng.f() * tot, s = fit[fit.length - 1];
       for (const q of fit) { t -= q.s1 - q.s0; if (t < 0) { s = q; break; } }
-      const lo = s.s0 + EG.end, hi = s.s1 - EG.end - w;
+      const lo = s.s0 + e.end, hi = s.s1 - e.end - w;
       const p = Math.round((lo + grng.f() * (hi - lo)) * 2) / 2;
       conns.push({ id: i + ',' + j + ':e' + conns.length, o: s.o, c: s.c, s0: p, s1: p + w, a: sites[s.lo].id, b: sites[s.hi].id, route, cross: false });
     };
-    for (const e of E) { const [a, b] = e.key.split('|').map(Number); if (tree.union(a, b)) { e.tree = true; place(e, true); } }
+    // the tree, and a yard's front even when one of its doors joined it already
+    for (const e of E) { const [a, b] = e.key.split('|').map(Number); if (tree.union(a, b) || e.force) { e.tree = true; place(e, true); } }
     for (const e of E) if (!e.tree && grng.f() < pLoop) place(e, false);
 
     // ---- border connections: owned by the block whose edge holds them
@@ -335,11 +356,13 @@
   // ------------------------------------------------------------- build
   /**
    * A site's blueprints: { site, origin, filler (br.filler, or null for a
-   * flush lot), buildings: [{ poi, origin, b (br.building), conns:
-   * { portalId: connId } }], conns (the site's connections, its own frame),
-   * issues, ms }.
+   * flush lot), fillerOrigin (where the filler's frame sits: a house flush
+   * with the lot edge moves it off the site's corner), buildings: [{ poi,
+   * origin, b (br.building), conns: { portalId: connId } }], conns (the
+   * site's connections, its own frame), issues, ms }.
    *   filler  a pool filler, built round any POI inside it
-   *   lot     the yard, built round its house and sheds
+   *   lot     a house and its front yard: the house's doors on the lot edge
+   *           are the site's connections, the rest open onto the yard
    *   flush   the building alone: its doors are the site's connections
    * Inside a filler or a yard, buildings come first: their footprints leave
    * the site and their doors become connections it honours (LOT.build).
@@ -348,21 +371,26 @@
     const t0 = now(), ox = site.bbox[0], oy = site.bbox[1];
     const cell = W.cell(site.i, site.j);
     const conns = site.conns.map((id) => connFor(site, cell.connById.get(id)));
-    const out = { site, origin: [ox, oy], filler: null, buildings: [], conns, issues: [], ms: 0 };
+    const out = { site, origin: [ox, oy], filler: null, fillerOrigin: [ox, oy], buildings: [], conns, issues: [], ms: 0 };
     if (site.kind === 'flush') {
       const L = site.lots[0], P = L.pois[0];
       out.buildings.push({ poi: P, origin: [P.bbox[0], P.bbox[1]], b: L.b, conns: Object.assign({}, L.portalConns) });
       out.ms = now() - t0;
       return out;
     }
-    const byId = new Map(site.pois.map((P) => [P.id, P])), pre = new Map();
-    for (const L of site.lots) if (L.b) pre.set(L.pois[0].id, L.b);
-    const r = BR.LOT.build({
-      seed: site.seed, site: { rects: local(site.rects, ox, oy) }, filler: W.fillerOf(site), connections: conns,
-      buildings: site.pois.map((P) => ({ id: P.id, archetype: P.archetype, seed: P.seed, approach: P.approach, rects: local(P.rects, ox, oy), flush: P.mode === 'flush', toBack: P.mode === 'yard', b: pre.get(P.id) })),
-      lots: site.lots.map((L) => ({ rect: local([L.rect], ox, oy)[0], front: L.approach, kind: L.kind }))
-    });
+    const byId = new Map(site.pois.map((P) => [P.id, P]));
+    let spec;
+    if (site.kind === 'lot') {
+      // the house was built with the plan; doors on the lot edge are the
+      // site's own connections, the others the yard's to honour
+      const L = site.lots[0], P = L.pois[0], edge = {}, direct = new Set();
+      for (const d of L.doors) if (!d.adapter && L.portalConns[d.portal]) { edge[d.portal] = L.portalConns[d.portal]; direct.add(L.portalConns[d.portal]); }
+      spec = { connections: conns.filter((c) => !direct.has(c.id)), buildings: [{ id: P.id, b: L.b, origin: [P.origin[0] - ox, P.origin[1] - oy], edge }],
+        hint: { yard: local(L.yard, ox, oy), adapters: local(L.doors.filter((d) => d.adapter).map((d) => d.adapter), ox, oy) } };
+    } else spec = { connections: conns, buildings: site.pois.map((P) => ({ id: P.id, archetype: P.archetype, seed: P.seed, approach: P.approach, rects: local(P.rects, ox, oy) })) };
+    const r = BR.LOT.build(Object.assign({ seed: site.seed, site: { rects: local(site.rects, ox, oy) }, filler: W.fillerOf(site) }, spec));
     out.filler = r.setting;
+    out.fillerOrigin = [ox + r.at[0], oy + r.at[1]];
     out.conns = r.conns;
     out.issues = r.issues;
     out.buildings = r.buildings.map((B) => ({ poi: byId.get(B.id), origin: [B.origin[0] + ox, B.origin[1] + oy], b: B.b, conns: B.conns }));

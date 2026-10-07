@@ -32,8 +32,9 @@ own coordinates, so any part of the map comes out the same in any order:
 4. A spanning tree of exact openings joins the sites, plus a few loops. The
    border openings join the cells, so the whole map is one connected graph.
 5. Each site is built from its connections: a filler from the pool (built
-   round any small POI inside it), a house in its yard, or a flush building
-   whose doors are the connections.
+   round any small POI inside it), a house behind its front yard (solid round
+   its back and sides, a lane out to the lot edge), or a flush building whose
+   doors are the connections.
 
 A slow biome field tilts the filler weights between deep warrens and open
 stretches. Unbuilt cells are solid, so the map is mostly enclosed, with open
@@ -83,7 +84,7 @@ The URL hash keeps the seed, position, zoom and toggles, for example
 | Module | Responsibility |
 |---|---|
 | `core.js` | Seeded hashing, PRNG, noise, union-find |
-| `poi.js` | POI placement per cell: tiers, density rhythm, settings (yard lots, flush lots, inside fillers), sheds, clusters, sites; `buildPOI` |
+| `poi.js` | POI placement per cell: tiers, density rhythm, settings (yard lots built round their house, flush lots, inside fillers), clusters, sites; `buildPOI` |
 | `world.js` | Cell plans (borders, blocks, sites, connection graph), site builds, bounded caches, queries |
 | `render.js` | The map: tile cache, detail / plan / far views, overlays |
 | `tpl/` | The template system: kit grid, framework, House and Rooms engines, archetypes, fillers, lots (`lot.js`: settings, the yard, and the adapter that builds templates inside bigger ones), blueprint renderer |

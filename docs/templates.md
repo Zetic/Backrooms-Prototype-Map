@@ -115,44 +115,62 @@ Every template takes connections on its site edges, the way fillers do. A
 template sits in the world in one of three settings:
 
 * **yard**: its own lot, with a setting its recipe designs. Houses get a
-  yard: the house toward the back, one big room round it with open floor in
-  front of the front door, and that room's walls on the lot edge. The yard is
-  sized by the biome.
+  front yard and nothing else: solid round the back and sides of the house,
+  a strip across its front a little wider than it (so the house stands half
+  way into it), and a lane from the strip out to the lot edge, where the lot
+  meets the rest of the backrooms. A door off the front gets a short passage
+  through the solid to the lot edge. The yard is sized by the biome.
 * **flush**: its own lot and nothing else. The door is the edge: the
   template is built with `flush: true`, fills its site, and the world puts its
   connection exactly on the template's door. Only templates at least one
   block (8 m) across both ways may be flush.
 * **inside**: inside a bigger template. A template smaller than a block goes
-  in a filler's site, or in a house's yard like a shed. The bigger template
-  builds round it and takes its doors as connections.
+  in a filler's site. The filler builds round it and takes its doors as
+  connections.
 
 `LOT.setting(archetype)` is the recipe's setting: `archetype.setting` if it
 sets one, else a yard for houses and flush for the rest (which the world
 turns into inside when the template is smaller than a block).
+
+A house's lot is sized round the house once it is built:
+
+```js
+const b = BR.LOT.template({ archetype: 'ranch', seed: 99, approach: 'S', rects: [[0, 0, 24, 14]] });
+const m = BR.LOT.margins(BR.TPL.archetypes.ranch, rng, openness);   // { front, side, back, apron, reach, wrap, laneW }
+const Y = BR.LOT.yard(b, 'S', m);
+// -> { w, h, origin (the house's frame in the lot), yard: [rects], doors: [{ portal, side, o, c, s0, s1, main, adapter }], into: [portal ids] }
+```
+
+`yard` is the front yard (strip and lane). `doors` are the doors that meet
+the lot edge: each has an `adapter`, the passage from the door straight out
+to the edge, where the world puts its connection. `into` are the doors that
+open onto the yard.
 
 `LOT.build` is the connection adapter:
 
 ```js
 BR.LOT.build({
   seed: 1234,
-  site: { rects: [[0, 0, 30, 26]] },          // metres, the surrounding site
+  site: { rects: [[0, 0, Y.w, Y.h]] },        // metres, the surrounding site
   filler: 'yard',                             // or a pool filler; picked from the pool when left out
-  connections: [{ id: 'n1', side: 'S', at: 12, width: 2 }],   // the site's edge connections
-  buildings: [{ id: 0, archetype: 'ranch', seed: 99, approach: 'S', rects: [[4, 2, 26, 15]] }],
-  lots: [{ rect: [0, 0, 30, 26], front: 'S', kind: 'yard' }]   // the yard filler's hint
+  connections: [{ id: 'n1', side: 'S', at: 12, width: 2, line: Y.h }],   // the site's edge connections
+  buildings: [{ id: 0, b, origin: Y.origin, edge: {} }],   // or { id, archetype, seed, approach, rects } to build it here
+  hint: { yard: Y.yard, adapters: Y.doors.map((d) => d.adapter) }      // the yard filler's hint
 })
-// -> { schema: 'br.lot/0.1', site, setting (br.filler), buildings: [{ id, origin, b, conns }], conns, issues, ms }
+// -> { schema: 'br.lot/0.1', site, setting (br.filler), at, buildings: [{ id, origin, b, conns }], conns, issues, ms }
 ```
 
-1. Each building is built by its own template (`LOT.template`, three seeds).
-   A template fills its site from the front, so a house in a yard
-   (`toBack: true`) moves back against its site's back edge, leaving the
-   open floor in front.
+1. Each building is given built (`b`, with its `origin` in the site), or is
+   built here by its own template (`LOT.template`, three seeds).
 2. Its footprint, and any courtyard it closes off, leave the surrounding site.
 3. Each ground-floor portal becomes a connection of the surrounding site
-   (`P{id}:{portalId}`), at the exact place and width of the door.
+   (`P{id}:{portalId}`), at the exact place and width of the door, unless
+   `edge` maps it to one of the site's own connections (a door on the site
+   edge).
 4. The surrounding filler honours those and the site's own edge connections.
    Where one lands on solid, the filler carves a passage to the nearest floor.
+   It works in the frame of what the buildings leave; `at` is where that
+   frame's origin sits in the site.
 
 The workbench shows templates in their setting (section 8).
 
@@ -291,7 +309,8 @@ connections, by count or exactly (fillers and lots).
 **Setting** (templates):
 
 * **its own lot**: the template in its own setting, as the world places it. A house
-  stands in its yard; a block-sized template is flush, its doors on the edge.
+  stands behind its front yard, with connections at the end of its lane and of
+  its doors' passages; a block-sized template is flush, its doors on the edge.
 * **inside a filler**: the template inside a filler from the pool, 3–9 m of site
   round it, with the filler taking its doors as connections.
 * **template only**: the template alone, as `TPL.generate` builds it.

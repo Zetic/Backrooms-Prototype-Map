@@ -61,12 +61,12 @@
   <div class="sec">Map</div>
   <div id="legend">
     <div><i style="background:#ecd9b4"></i>Backrooms floor</div>
-    <div><i style="background:#d9d4c7"></i>Yard round a house</div>
+    <div><i style="background:#d9d4c7"></i>Front yard</div>
     <div><i style="background:#3b3934"></i>Solid</div>
     <div><i style="background:#c4a068"></i>POI site (far)</div>
     <div><i style="background:#988462"></i>Site (far)</div>
   </div>
-  <div class="note">Every site is built by a template from its connections: a filler from the Backrooms pool, a house in its own yard, or a small template on its own lot. Smaller templates sit inside fillers and yards. Zoom in past 1 px/m to see blueprints.</div>
+  <div class="note">Every site is built by a template from its connections: a filler from the Backrooms pool, a house behind its front yard, or a block-sized template on its own lot. Smaller templates sit inside fillers. Zoom in past 1 px/m to see blueprints.</div>
   <div class="sec">Show</div>
   <div class="grid2">
     <label class="tg"><input type="checkbox" id="o-labels" checked> Room labels</label>
@@ -184,7 +184,7 @@
     const P = world.poiAt(x, y);
     if (P) {
       const B = world.hasBuild(s) ? world.build(s).buildings.find((q) => q.poi.id === P.id) : null;
-      const SET = { yard: 'in its yard', shed: 'in a yard', flush: 'on its own lot', inside: 'inside the filler' };
+      const SET = { yard: 'behind its front yard', flush: 'on its own lot', inside: 'inside the filler' };
       html += '<br><b>' + esc(P.name) + '</b> · ' + P.tier + ' POI ' + SET[P.mode] + ' · faces ' + ({ N: 'north', S: 'south', E: 'east', W: 'west' })[P.approach];
       if (B) html += '<br>' + B.b.rooms.length + ' rooms · ' + Object.keys(B.conns).length + (Object.keys(B.conns).length === 1 ? ' door' : ' doors') + ' · score ' + B.b.meta.score;
     }
