@@ -48,6 +48,18 @@ Open `workbench.html` to:
 
 [Template contract, pipeline and how to add archetypes](docs/templates.md)
 
+## Fillers (the plain Backrooms between POIs)
+
+For the template-first world, every site no POI claims is built by a
+**filler** from its outline and its connections: a warren, a winding
+passage, an enfilade, a cell cluster, a ring, a broken room, a ragged hall or
+a pillar hall. The pool leans enclosed (70 / 20 / 10 enclosed / mixed /
+open), each filler takes about 1 ms, and every connection is honoured
+exactly. Open `fillers.html` to try them. They are not wired into the old
+map.
+
+[Filler pool, contract and pipeline](docs/fillers.md)
+
 ## Points of interest on the map
 
 The map places POIs itself (`src/poi.js`). This is a plan layer that is cheap
