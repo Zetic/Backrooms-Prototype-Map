@@ -2,11 +2,11 @@
  * render.js - the map: every site's blueprint, drawn into cached tiles.
  * Presentation only; all geometry comes from world.js.
  *
- *   detail  (>= 1 px/m)   each site's blueprints (its filler and any POI
- *                         buildings), every floor first, then every wall, so
+ *   detail  (>= 1 px/m)   each site's blueprints (its filler or yard and any
+ *                         POI buildings), every floor first, then every wall, so
  *                         neighbours never paint over each other's walls
  *   plan    (0.12-1 px/m) the cell plans alone, nothing built: each site a
- *                         flat tone, POI sites picked out
+ *                         flat tone, lots and POIs picked out
  *   far     (< 0.12 px/m) a raster of the biome (openness) and POI density
  *
  * Cells a filler leaves unbuilt stay the dark background: the solid mass
@@ -18,14 +18,14 @@
 
   const BG = '#3b3934';
   const LOD = { detail: 1, plan: 0.12, labels: 7 };
-  const PLAN = { site: [138, 128, 104], host: [152, 132, 96], poi: [196, 160, 104], line: 'rgba(30,27,24,0.55)' };
+  const PLAN = { site: [138, 128, 104], lot: [152, 132, 96], poi: [196, 160, 104], line: 'rgba(30,27,24,0.55)' };
   const COL = { route: '#e8913a', loop: '#3fb6bf', cross: '#e0609a', portal: '#3fbf6f', hover: 'rgba(255,255,255,0.95)', outline: 'rgba(255,255,255,0.35)' };
   const now = () => (typeof performance !== 'undefined' ? performance : Date).now();
   const css = (c) => 'rgb(' + c.map((v) => Math.round(v)).join(',') + ')';
 
   /** a plan-view tone for a site: a little darker the more enclosed its biome, a touch of noise per site */
   function planTone(s) {
-    const base = s.host ? PLAN.host : PLAN.site, k = 0.86 + 0.18 * s.openness + ((s.seed & 255) / 255 - 0.5) * 0.06;
+    const base = s.kind !== 'filler' ? PLAN.lot : PLAN.site, k = 0.86 + 0.18 * s.openness + ((s.seed & 255) / 255 - 0.5) * 0.06;
     return css(base.map((v) => Math.min(255, v * k)));
   }
 
@@ -42,7 +42,7 @@
     const at = (origin, layer, labels) => ({ scale: tz, ox: (origin[0] - x0) * tz, oy: (origin[1] - y0) * tz, site: false, portals: false, labels, layer });
     const lab = opts.labels !== false && tz >= LOD.labels;
     for (const layer of ['floors', 'walls']) for (const r of ready) {
-      TPL.drawBuilding(g, r.filler, at(r.origin, layer, false));
+      if (r.filler) TPL.drawBuilding(g, r.filler, at(r.fillerOrigin, layer, false));
       for (const B of r.buildings) TPL.drawBuilding(g, B.b, at(B.origin, layer, lab));
     }
     return complete;
@@ -51,7 +51,7 @@
   function paintPlanSite(g, s, x0, y0, tz) {
     g.fillStyle = planTone(s);
     for (const q of s.rects) g.fillRect((q[0] - x0) * tz, (q[1] - y0) * tz, (q[2] - q[0]) * tz, (q[3] - q[1]) * tz);
-    if (s.host) {
+    if (s.pois.length) {
       g.fillStyle = css(PLAN.poi);
       for (const P of s.pois) for (const q of P.rects) g.fillRect((q[0] - x0) * tz, (q[1] - y0) * tz, (q[2] - q[0]) * tz, (q[3] - q[1]) * tz);
     }
@@ -217,7 +217,7 @@
         ctx.strokeStyle = COL.portal;
         ctx.beginPath(); ctx.moveTo(P(a[0]), Q(a[1])); ctx.lineTo(P(mid[0]), Q(mid[1])); ctx.stroke();
       }
-      ctx.fillStyle = s.host ? COL.portal : '#ffffff';
+      ctx.fillStyle = s.kind !== 'filler' ? COL.portal : '#ffffff';
       ctx.beginPath(); ctx.arc(P(a[0]), Q(a[1]), px * 4, 0, Math.PI * 2); ctx.fill();
     }
   }

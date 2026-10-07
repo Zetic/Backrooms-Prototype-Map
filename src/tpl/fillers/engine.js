@@ -15,11 +15,16 @@
  *               opening); one the layout left solid is carved open
  *   2. clean    no slivers under 1 m, no room in two pieces, no crumbs
  *   3. join     one connected floor: solid gaps are bridged by passages
- *   4. openings portals exactly where the world asked, then a spanning
+ *   4. 1 m      a walker 1 m wide gets everywhere: a diagonal step is
+ *               filled out beside, a room pinched under 1 m becomes two
+ *               rooms, floor no walker stands on turns solid, and rooms
+ *               that share no straight 1 m of wall count as apart and get
+ *               the pinch widened or a passage between them
+ *   5. openings portals exactly where the world asked, then a spanning
  *               tree of openings between rooms, then a few loops
- *   5. furnish  the filler's partitions and columns, each kept only if
- *               every floor cell stays walkable
- *   6. output   metres, site frame (+x right, +y down)
+ *   6. furnish  the filler's partitions and columns, each kept only if
+ *               the 1 m walker still reaches every floor cell
+ *   7. output   metres, site frame (+x right, +y down)
  *
  * Cells a layout leaves unbuilt are solid: the mass between rooms that gives
  * the Backrooms its enclosed feel. All geometry is integer kit units
@@ -409,33 +414,7 @@
   function clean(P) {
     const W = P.W, H = P.H, R = P.R.a;
     const own = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? -2 : R[y * W + x]);
-    // is (x, y) inside a 2x2 block of room v? (cells of room `also` count too:
-    // a sliver moving over cell by cell is judged as if it had moved already)
-    const covered = (x, y, v, also) => {
-      const is = (a, b) => { const o = own(a, b); return o === v || (also !== undefined && o === also); };
-      for (let dy = -1; dy <= 0; dy++) for (let dx = -1; dx <= 0; dx++) {
-        if (is(x + dx, y + dy) && is(x + dx + 1, y + dy) && is(x + dx, y + dy + 1) && is(x + dx + 1, y + dy + 1)) return true;
-      }
-      return false;
-    };
-    // relaxed passes move slivers over whole; strict ones settle what is left
-    for (let pass = 0; pass < 12; pass++) {
-      const strict = pass >= 4;
-      let changed = 0;
-      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-        const i = y * W + x, v = R[i];
-        if (v < 0 || covered(x, y, v)) continue;
-        let to = VOID;
-        for (const n of [own(x - 1, y), own(x + 1, y), own(x, y - 1), own(x, y + 1)]) {
-          if (n < 0 || n === v) continue;
-          R[i] = n;
-          if (covered(x, y, n, strict ? undefined : v)) { to = n; break; }
-          R[i] = v;
-        }
-        R[i] = to; changed++;
-      }
-      if (!changed && strict) break;
-    }
+    slivers(P);
     // split rooms into 4-connected pieces; the biggest keeps the id
     const N = W * H, piece = new Int32Array(N).fill(-1), pieces = [];
     for (let i = 0; i < N; i++) {
@@ -457,7 +436,8 @@
       for (const j of p.cells) R[j] = nv;
       p.v = nv;
     });
-    // crumbs (< 2 m²) join the neighbour they share most edge with
+    // crumbs (< 2 m²) join the neighbour they share most edge with; one that
+    // only touches by a corner turns solid
     for (const p of pieces) {
       if (p.cells.length >= 8 || p.land) continue;
       const nb = new Map();
@@ -465,10 +445,50 @@
         const x = j % W, y = (j - x) / W;
         for (const n of [own(x - 1, y), own(x + 1, y), own(x, y - 1), own(x, y + 1)]) if (n >= 0 && n !== p.v) nb.set(n, (nb.get(n) || 0) + 1);
       }
-      let to = VOID, bn = 0;
+      let to = VOID, bn = 1;
       for (const [k, n] of nb) if (n > bn || (n === bn && k < to)) { to = k; bn = n; }
       for (const j of p.cells) R[j] = to;
     }
+  }
+
+  /**
+   * Slivers: a cell no 2 x 2 block of its own room covers (a 1 m walker
+   * cannot stand on it) goes to a neighbour whose block would cover it, or
+   * turns solid. Returns the cells changed.
+   */
+  function slivers(P) {
+    const W = P.W, H = P.H, R = P.R.a;
+    const own = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? -2 : R[y * W + x]);
+    // is (x, y) inside a 2x2 block of room v? (cells of room `also` count too:
+    // a sliver moving over cell by cell is judged as if it had moved already)
+    const covered = (x, y, v, also) => {
+      const is = (a, b) => { const o = own(a, b); return o === v || (also !== undefined && o === also); };
+      for (let dy = -1; dy <= 0; dy++) for (let dx = -1; dx <= 0; dx++) {
+        if (is(x + dx, y + dy) && is(x + dx + 1, y + dy) && is(x + dx, y + dy + 1) && is(x + dx + 1, y + dy + 1)) return true;
+      }
+      return false;
+    };
+    // relaxed passes move slivers over whole; strict ones settle what is left
+    let total = 0;
+    for (let pass = 0; pass < 12; pass++) {
+      const strict = pass >= 4;
+      let changed = 0;
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const i = y * W + x, v = R[i];
+        if (v < 0 || covered(x, y, v)) continue;
+        let to = VOID;
+        for (const n of [own(x - 1, y), own(x + 1, y), own(x, y - 1), own(x, y + 1)]) {
+          if (n < 0 || n === v) continue;
+          R[i] = n;
+          if (covered(x, y, n, strict ? undefined : v)) { to = n; break; }
+          R[i] = v;
+        }
+        R[i] = to; changed++;
+      }
+      total += changed;
+      if (!changed && strict) break;
+    }
+    return total;
   }
 
   /**
@@ -495,6 +515,213 @@
       const v = path.length <= 5 || P.rooms[from].type === 'passage' ? from : P.add('passage', ['bridge']);
       carved += paintPath(P, path.slice(1, -1), brush || 2, v);
     }
+    return carved;
+  }
+
+  /**
+   * Where a room steps diagonally so that two places a 1 m walker can stand
+   * meet only at a corner, fill a solid cell beside the step so it can walk
+   * round it. Returns the cells filled.
+   */
+  function unpinch(P) {
+    const W = P.W, H = P.H, R = P.R.a, M = P.mask.a;
+    const blk = (x, y, v) => x >= 0 && y >= 0 && x + 1 < W && y + 1 < H && R[y * W + x] === v && R[y * W + x + 1] === v && R[(y + 1) * W + x] === v && R[(y + 1) * W + x + 1] === v;
+    // fill the solid cells of block (x, y) for room v, if that is all it lacks
+    const fill = (x, y, v) => {
+      if (x < 0 || y < 0 || x + 1 >= W || y + 1 >= H) return 0;
+      const cells = [y * W + x, y * W + x + 1, (y + 1) * W + x, (y + 1) * W + x + 1];
+      if (!cells.every((i) => R[i] === v || (R[i] === VOID && M[i] === 1))) return 0;
+      let n = 0;
+      for (const i of cells) if (R[i] === VOID) { R[i] = v; n++; }
+      return n;
+    };
+    let n = 0;
+    for (let y = 0; y + 2 < H; y++) for (let x = 0; x + 1 < W; x++) {
+      const v = R[y * W + x];
+      if (v < 0 || !blk(x, y, v)) continue;
+      for (const dx of [-1, 1]) {
+        if (!blk(x + dx, y + 1, v) || blk(x + dx, y, v) || blk(x, y + 1, v)) continue;
+        n += fill(x + dx, y, v) || fill(x, y + 1, v);
+      }
+    }
+    return n;
+  }
+
+  /**
+   * Floor no 2 x 2 block of its own room covers (no 1 m walker stands on it,
+   * nor crosses into another room there) turns solid; never a landing.
+   * Returns the cells changed.
+   */
+  function unstood(P) {
+    const W = P.W, H = P.H, R = P.R.a, cov = new Uint8Array(W * H);
+    for (let y = 0; y + 1 < H; y++) for (let x = 0; x + 1 < W; x++) {
+      const i = y * W + x, v = R[i];
+      if (v >= 0 && R[i + 1] === v && R[i + W] === v && R[i + W + 1] === v) cov[i] = cov[i + 1] = cov[i + W] = cov[i + W + 1] = 1;
+    }
+    let n = 0;
+    for (let i = 0; i < W * H; i++) if (R[i] >= 0 && !cov[i] && !P.land[i]) { R[i] = VOID; n++; }
+    return n;
+  }
+
+  /**
+   * A room pinched under 1 m is two rooms: its 2 x 2 blocks (where a 1 m
+   * walker can stand) are grouped by 0.5 m steps, and each group but the
+   * biggest gets a room of its own. Returns the rooms split off.
+   */
+  function splitNecks(P) {
+    // splitting a piece off can pinch what is left, so until nothing splits
+    let n = 0;
+    for (let guard = 0; guard < 16; guard++) { const k = splitOnce(P); if (!k) break; n += k; }
+    return n;
+  }
+  function splitOnce(P) {
+    const W = P.W, H = P.H, R = P.R.a, BW = W - 1, BH = H - 1, L = P.land;
+    if (BW < 1 || BH < 1) return 0;
+    const NB = BW * BH, blk = new Int32Array(NB).fill(-1), up = new Int32Array(NB);
+    for (let y = 0; y < BH; y++) for (let x = 0; x < BW; x++) {
+      const i = y * W + x, v = R[i];
+      if (v >= 0 && R[i + 1] === v && R[i + W] === v && R[i + W + 1] === v) blk[y * BW + x] = v;
+    }
+    const find = (b) => { while (up[b] !== b) { up[b] = up[up[b]]; b = up[b]; } return b; };
+    for (let b = 0; b < NB; b++) up[b] = b;
+    for (let y = 0; y < BH; y++) for (let x = 0; x < BW; x++) {
+      const b = y * BW + x, v = blk[b];
+      if (v < 0) continue;
+      if (x + 1 < BW && blk[b + 1] === v) { const p = find(b), q = find(b + 1); if (p !== q) up[q] = p; }
+      if (y + 1 < BH && blk[b + BW] === v) { const p = find(b), q = find(b + BW); if (p !== q) up[q] = p; }
+    }
+    // a cell goes with a block of its room that covers it; a landing's cells
+    // with a block inside the landing, so a connection never spans two rooms
+    const comp = new Int32Array(W * H).fill(-1), size = new Int32Array(NB);
+    const inLand = (b) => { const bx = b % BW, j = (b - bx) / BW * W + bx; return L[j] && L[j + 1] && L[j + W] && L[j + W + 1]; };
+    let pieces = false;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x, v = R[i];
+      if (v < 0) continue;
+      let pick = -1;
+      for (let k = 0; k < 4; k++) {
+        const bx = x - 1 + (k & 1), by = y - 1 + (k >> 1);
+        if (bx < 0 || by < 0 || bx >= BW || by >= BH) continue;
+        const b = by * BW + bx;
+        if (blk[b] !== v) continue;
+        if (pick < 0) pick = b;
+        if (L[i] && inLand(b)) { pick = b; break; }
+      }
+      if (pick < 0) continue;
+      const c = find(pick);
+      comp[i] = c; size[c]++;
+    }
+    // per room the biggest group keeps the id
+    const best = new Int32Array(P.rooms.length).fill(-1);
+    for (let b = 0; b < NB; b++) {
+      if (!size[b]) continue;
+      const v = blk[b], k = best[v];
+      if (k < 0) best[v] = b; else { pieces = true; if (size[b] > size[k]) best[v] = b; }
+    }
+    if (!pieces) return 0;
+    const fresh = new Map();
+    for (let i = 0; i < W * H; i++) {
+      const c = comp[i], v = R[i];
+      if (c < 0 || best[blk[c]] === c) continue;
+      if (!fresh.has(c)) fresh.set(c, P.add(P.rooms[v].type, P.rooms[v].tags.slice()));
+      R[i] = fresh.get(c);
+    }
+    return fresh.size;
+  }
+
+  /** Rooms a 1 m walker can pass between: joined where they share a straight run of wall at least 1 m long. */
+  function passComponents(P) {
+    const N = P.W * P.H, R = P.R.a, uf = BR.makeUF(P.rooms.length);
+    for (const s of TG.boundaries(P.R, VOID)) if (s.a >= 0 && s.b >= 0 && s.s1 - s.s0 >= 2) uf.union(s.a, s.b);
+    const label = new Int32Array(N).fill(-1), map = new Map(), sizes = [];
+    for (let i = 0; i < N; i++) {
+      if (R[i] < 0) continue;
+      const r = uf.find(R[i]);
+      if (!map.has(r)) { map.set(r, sizes.length); sizes.push(0); }
+      label[i] = map.get(r); sizes[label[i]]++;
+    }
+    return { label, count: sizes.length, sizes };
+  }
+
+  /**
+   * Where a cell of piece `small` touches another piece across a 0.5 m pinch,
+   * paint solid cells so the two rooms share a straight 1 m of wall there,
+   * each side a 2 x 2 block of its own room. Returns the cells painted (0:
+   * no pinch could be widened).
+   */
+  function widenPinch(P, C, small, starts) {
+    // first from solid alone; else taking a cell or two from a third room
+    // (never a landing), which the next split settles
+    return widenWith(P, C, small, starts, false) || widenWith(P, C, small, starts, true);
+  }
+  function widenWith(P, C, small, starts, take) {
+    const W = P.W, R = P.R.a;
+    const okFor = (cells, v) => cells.every(([x, y]) => { const j = y * W + x, o = R[j]; return P.inSite(x, y) && (o === VOID || o === v || (take && !P.land[j] && C.label[j] !== small)); });
+    for (const i of starts) {
+      const x = i % W, y = (i - x) / W, a = R[i];
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const jx = x + dx, jy = y + dy;
+        if (!P.inSite(jx, jy)) continue;
+        const b = R[jy * W + jx];
+        if (b < 0 || C.label[jy * W + jx] === small) continue;
+        // px, py: across the pinch; the 2 x 2 blocks sit side by side on the
+        // line between i and j, shifted one cell to either side along it
+        const px = dy !== 0 ? 1 : 0, py = dx !== 0 ? 1 : 0;
+        for (const d of [-1, 0]) {
+          const blockA = [], blockB = [];
+          for (let t = 0; t < 2; t++) for (let u = 0; u < 2; u++) {
+            const along = d + t, back = u;
+            blockA.push([x + px * along - dx * back, y + py * along - dy * back]);
+            blockB.push([jx + px * along + dx * back, jy + py * along + dy * back]);
+          }
+          if (!okFor(blockA, a) || !okFor(blockB, b)) continue;
+          let n = 0;
+          for (const [cx, cy] of blockA) if (R[cy * W + cx] !== a) { R[cy * W + cx] = a; n++; }
+          for (const [cx, cy] of blockB) if (R[cy * W + cx] !== b) { R[cy * W + cx] = b; n++; }
+          if (n) return n;
+        }
+      }
+    }
+    return 0;
+  }
+
+  /**
+   * 4. 1 m everywhere: rooms are split at necks, and pieces a 1 m walker
+   * cannot pass between are bridged with 1 m passages, as in step 3. A
+   * filler built in pieces (each with its own connections) is only split.
+   * Returns the cells carved.
+   */
+  function necks(P, pieces) {
+    const R = P.R.a;
+    let carved = 0;
+    // diagonal steps are walked round where there is room, else split; then
+    // floor no 1 m walker can stand on turns solid
+    const settle = () => { unpinch(P); splitNecks(P); unstood(P); };
+    if (pieces) { settle(); return 0; }
+    for (let guard = 0; guard < 32; guard++) {
+      settle();
+      const C = passComponents(P);
+      if (C.count <= 1) return carved;
+      let small = 0;
+      for (let k = 1; k < C.count; k++) if (C.sizes[k] < C.sizes[small]) small = k;
+      const starts = [];
+      for (let i = 0; i < R.length; i++) if (C.label[i] === small) starts.push(i);
+      // where the piece touches another through a pinch, widen the pinch to
+      // 1 m; else a 1 m passage through the solid
+      const w = widenPinch(P, C, small, starts);
+      if (w) carved += w;
+      else {
+        // through solid only: a goal touching the piece is the pinch itself
+        const W = P.W, touch = new Uint8Array(R.length);
+        for (const i of starts) { const x = i % W; if (x > 0) touch[i - 1] = 1; if (x < W - 1) touch[i + 1] = 1; if (i >= W) touch[i - W] = 1; if (i + W < R.length) touch[i + W] = 1; }
+        const path = route(P, starts, { ok: (i) => P.mask.a[i] === 1 && R[i] === VOID, goal: (i) => R[i] >= 0 && C.label[i] !== small && !touch[i] });
+        if (!path || path.length <= 2) break;
+        const from = R[path[0]];
+        carved += paintPath(P, path.slice(1, -1), 2, path.length <= 5 || P.rooms[from].type === 'passage' ? from : P.add('passage', ['bridge']));
+      }
+      clean(P);
+    }
+    settle();
     return carved;
   }
 
@@ -571,9 +798,10 @@
     for (const e of edges) if (uf.find(e.a) !== uf.find(e.b)) link(e.a, e.b);
     let loops = 0;
     for (const e of edges) if (!linked.has(e.k) && rng.f() < (F.loops || 0) && link(e.a, e.b)) loops++;
-    // last resort: no wall at all between two rooms that could not share an opening
+    // last resort: no wall at all between two rooms that could not share an
+    // opening, where they share a straight run of 1 m or more
     for (const e of edges) {
-      if (uf.find(e.a) === uf.find(e.b)) continue;
+      if (uf.find(e.a) === uf.find(e.b) || !pairs.get(e.k).some((w) => w.s1 - w.s0 >= 2)) continue;
       for (const w of pairs.get(e.k)) w.kind = 'open';
       links.push({ a: e.a, b: e.b, kind: 'open', opening: null });
       linked.add(e.k); uf.union(e.a, e.b);
@@ -614,23 +842,31 @@
       const x = w.o === 'h' ? s : w.c + d, y = w.o === 'h' ? w.c + d : s;
       if (x >= 0 && y >= 0 && x < W && y < H) keep[y * W + x] = 1;
     }
+    // a walker 1 m wide stands on 2 x 2 cells of floor with nothing between
+    // them, and steps 0.5 m at a time onto another such spot. ok(): from the
+    // first connection (every connection, for a filler built in pieces) it
+    // reaches every floor cell
+    const stand = (x, y) => {
+      if (x < 0 || y < 0 || x + 1 >= W || y + 1 >= H) return false;
+      const i = y * W + x;
+      for (const j of [i, i + 1, i + W, i + W + 1]) if (R[j] < 0 || col[j]) return false;
+      return passV[y * (W + 1) + x + 1] && passV[(y + 1) * (W + 1) + x + 1] && passH[(y + 1) * W + x] && passH[(y + 1) * W + x + 1];
+    };
     const ok = () => {
-      let total = 0, first = -1;
-      for (let i = 0; i < N; i++) if (R[i] >= 0 && !col[i]) { total++; if (first < 0) first = i; }
-      if (first < 0) return false;
-      const seen = new Uint8Array(N), st = [first];
-      seen[first] = 1;
-      let n = 0;
+      const seen = new Uint8Array(N), cover = new Uint8Array(N), st = [];
+      const visit = (x, y) => { const i = y * W + x; if (!seen[i] && stand(x, y)) { seen[i] = 1; st.push(i); } };
+      const near = (i) => { const x = i % W, y = (i - x) / W; visit(x - 1, y - 1); visit(x, y - 1); visit(x - 1, y); visit(x, y); };
+      const starts = P.conns.length ? (P.pieces ? P.conns : P.conns.slice(0, 1)) : [];
+      for (const c of starts) { const q = c.landing; for (let y = q[1]; y < q[3]; y++) for (let x = q[0]; x < q[2]; x++) near(y * W + x); }
+      if (!starts.length) for (let i = 0; i < N && !st.length; i++) if (R[i] >= 0) near(i);
       while (st.length) {
-        const i = st.pop(); n++;
-        const x = i % W, y = (i - x) / W;
-        const go = (j, pass) => { if (pass && R[j] >= 0 && !col[j] && !seen[j]) { seen[j] = 1; st.push(j); } };
-        if (x + 1 < W) go(i + 1, passV[y * (W + 1) + x + 1]);
-        if (x > 0) go(i - 1, passV[y * (W + 1) + x]);
-        if (y + 1 < H) go(i + W, passH[(y + 1) * W + x]);
-        if (y > 0) go(i - W, passH[y * W + x]);
+        const i = st.pop(), x = i % W, y = (i - x) / W;
+        cover[i] = cover[i + 1] = cover[i + W] = cover[i + W + 1] = 1;
+        visit(x + 1, y); visit(x - 1, y); visit(x, y + 1); visit(x, y - 1);
       }
-      return n === total;
+      let any = false;
+      for (let i = 0; i < N; i++) if (R[i] >= 0 && !col[i]) { any = true; if (!cover[i]) return false; }
+      return any;
     };
     const api = {
       ok,
@@ -703,7 +939,7 @@
   /**
    * spec: { filler (id; picked from the pool when omitted), seed, site: { w, h } | { rects } (metres),
    *         connections: [{ id, side, at, width, line?, kind?, route? }], weights?,
-   *         hint? ({ hall: [rects] }, metres: where a host filler's hall goes) }
+   *         hint? (the filler's own; lists of rects in it are metres, e.g. the yard's { yard, adapters }) }
    * Returns a filler blueprint (docs/fillers.md) or { error }.
    */
   function generate(spec) {
@@ -728,21 +964,25 @@
     const rs = (salt) => new Rng(hash4(base, salt, 0, 0x66));
 
     const P = makePlan(S, conns, base);
-    P.hint = spec.hint && spec.hint.hall ? { hall: spec.hint.hall.map((q) => q.map(U)) } : null;
+    P.pieces = !!F.pieces;
+    // a hint is the filler's own business; lists of rects in it come in metres
+    const units = (v) => (Array.isArray(v) ? v.map((q) => (Array.isArray(q) && q.length === 4 && q.every((n) => typeof n === 'number') ? q.map(U) : q)) : v);
+    P.hint = spec.hint ? Object.fromEntries(Object.entries(spec.hint).map(([k, v]) => [k, units(v)])) : null;
     F.layout(P, rs(SALT.LAYOUT), F);
     land(P);
     clean(P);
     let carved = 0;
-    for (let round = 0; round < 6 && builtComponents(P).count > 1; round++) { carved += bridge(P, round < 2 ? 2 : 3); clean(P); }
+    if (!F.pieces) for (let round = 0; round < 6 && builtComponents(P).count > 1; round++) { carved += bridge(P, round < 2 ? 2 : 3); clean(P); }
     if (!builtComponents(P).count) P.paint(P.inner, P.add('room', ['fallback']));   // too small for the layout: one plain room
+    carved += necks(P, F.pieces);
     compact(P);
     const J = openings(P, rs(SALT.OPEN), F);
     const walk = walker(P, J);
     if (F.furnish) F.furnish(P, walk, rs(SALT.FURNISH));
     const issues = J.issues.slice();
-    if (builtComponents(P).count !== 1) issues.push('floor is not one piece');
+    if (!F.pieces && builtComponents(P).count !== 1) issues.push('floor is not one piece');
     if (!walk.ok()) issues.push('some floor cannot be walked to');
-    for (let v = 1; v < P.rooms.length; v++) if (J.uf.find(v) !== J.uf.find(0)) { issues.push('room graph is not connected'); break; }
+    if (!F.pieces) for (let v = 1; v < P.rooms.length; v++) if (J.uf.find(v) !== J.uf.find(0)) { issues.push('room graph is not connected'); break; }
     const crng = rs(SALT.CEIL);
     for (const rm of P.rooms) { const c = (TYPES[rm.type] || TYPES.room).ceil; rm.ceiling = Math.round(crng.range(c[0], c[1]) * 10) / 10; }
     const b = output(spec, S, P, J, F, seed);

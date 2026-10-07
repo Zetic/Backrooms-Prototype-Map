@@ -61,11 +61,12 @@
   <div class="sec">Map</div>
   <div id="legend">
     <div><i style="background:#ecd9b4"></i>Backrooms floor</div>
+    <div><i style="background:#d9d4c7"></i>Front yard</div>
     <div><i style="background:#3b3934"></i>Solid</div>
     <div><i style="background:#c4a068"></i>POI site (far)</div>
     <div><i style="background:#988462"></i>Site (far)</div>
   </div>
-  <div class="note">Every site is built by a template from its connections: a filler from the Backrooms pool, or a POI building inside a host hall. Zoom in past 1 px/m to see blueprints.</div>
+  <div class="note">Every site is built by a template from its connections: a filler from the Backrooms pool, a house behind its front yard, or a block-sized template on its own lot. Smaller templates sit inside fillers. Zoom in past 1 px/m to see blueprints.</div>
   <div class="sec">Show</div>
   <div class="grid2">
     <label class="tg"><input type="checkbox" id="o-labels" checked> Room labels</label>
@@ -88,6 +89,7 @@
 <script src="src/tpl/archetypes/room.js"></script>
 <script src="src/tpl/fillers/engine.js"></script>
 <script src="src/tpl/fillers/pool.js"></script>
+<script src="src/tpl/lot.js"></script>
 <script src="src/tpl/render2d.js"></script>
 <script src="src/poi.js"></script>
 <script src="src/world.js"></script>
@@ -172,17 +174,19 @@
     const bio = world.biomeAt(x, y);
     if (!s) { $('info').innerHTML = '<b>' + bio.name + '</b> · openness ' + bio.openness.toFixed(2); return; }
     const F = BR.FILL.fillers[world.fillerOf(s)], b = s.bbox;
-    let html = '<b>' + esc(F.name) + '</b> · ' + (s.host ? 'POI host' : F.feel + ' filler') + '<br>site ' + s.id + ' · ' + (b[2] - b[0]) + '×' + (b[3] - b[1]) + ' m · ' + s.area + ' m²' +
+    const what = s.kind === 'flush' ? '<b>' + esc(s.pois[0].name) + '</b> · its own lot, doors on the edge' : s.kind === 'lot' ? '<b>' + esc(s.pois[0].name) + '</b> · its own lot, in a yard' : '<b>' + esc(F.name) + '</b> · ' + F.feel + ' filler';
+    let html = what + '<br>site ' + s.id + ' · ' + (b[2] - b[0]) + '×' + (b[3] - b[1]) + ' m · ' + s.area + ' m²' +
       (s.rects.length > 1 ? ' · ' + s.rects.length + ' blocks' : '') + '<br>' + s.conns.length + (s.conns.length === 1 ? ' connection · ' : ' connections · ') + bio.name + ' (openness ' + s.openness.toFixed(2) + ')';
     if (world.hasBuild(s)) {
       const r = world.build(s), f = r.filler;
-      html += '<br>' + f.rooms.length + ' rooms · built ' + Math.round(f.meta.built * 100) + '% · ' + r.ms.toFixed(1) + ' ms' + (r.issues.length ? '<br><span style="color:#e0503f">' + esc(r.issues[0]) + '</span>' : '');
+      html += '<br>' + (f ? f.rooms.length + ' rooms · built ' + Math.round(f.meta.built * 100) + '% · ' : '') + r.ms.toFixed(1) + ' ms' + (r.issues.length ? '<br><span style="color:#e0503f">' + esc(r.issues[0]) + '</span>' : '');
     }
     const P = world.poiAt(x, y);
     if (P) {
       const B = world.hasBuild(s) ? world.build(s).buildings.find((q) => q.poi.id === P.id) : null;
-      html += '<br><b>' + esc(P.name) + '</b> · ' + P.tier + ' POI · ' + P.engine + ' engine · faces ' + ({ N: 'north', S: 'south', E: 'east', W: 'west' })[P.approach];
-      if (B) html += '<br>' + B.b.rooms.length + ' rooms · ' + Object.keys(B.conns).length + ' doors onto the hall · score ' + B.b.meta.score;
+      const SET = { yard: 'behind its front yard', flush: 'on its own lot', inside: 'inside the filler' };
+      html += '<br><b>' + esc(P.name) + '</b> · ' + P.tier + ' POI ' + SET[P.mode] + ' · faces ' + ({ N: 'north', S: 'south', E: 'east', W: 'west' })[P.approach];
+      if (B) html += '<br>' + B.b.rooms.length + ' rooms · ' + Object.keys(B.conns).length + (Object.keys(B.conns).length === 1 ? ' door' : ' doors') + ' · score ' + B.b.meta.score;
     }
     $('info').innerHTML = html;
   }

@@ -133,8 +133,9 @@
           <input id="sw" class="small" type="number" min="1" step="0.5" title="width along the main side (m)"><span>×</span><input id="sh" class="small" type="number" min="1" step="0.5" title="depth (m)">
           <select id="shape" title="site shape"><option value="rect">rect</option><option value="L">L-shape</option><option value="U">U-shape</option><option value="notched">notched</option><option value="random">random</option></select></div>
         <div class="g2" title="templates only"><span>Main side</span><select id="approach"><option value="S">south</option><option value="N">north</option><option value="E">east</option><option value="W">west</option><option value="mix">mixed</option></select></div>
+        <div class="g2" title="templates only: how the template sits in the world"><span>Setting</span><select id="setting"><option value="lot">its own lot</option><option value="filler">inside a filler</option><option value="bare">template only</option></select></div>
         <div class="g2" title="templates only"><span>Wrongness</span><select id="wrong"><option value="">archetype</option><option value="0">off</option><option value="0.5">some</option><option value="1">lots</option></select></div>
-        <div class="g2" title="fillers only: the openings the world's connection graph gives the site"><span>Connections</span><select id="nconn"><option value="0">none</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
+        <div class="g2" title="fillers and lots: the openings the world's connection graph gives the site"><span>Connections</span><select id="nconn"><option value="0">none</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
           <input id="connx" type="text" placeholder="or exactly: S 4 1.5; E 10 2" spellcheck="false" title="side, at (m along that side), width (m); separated by ;" style="width:190px"></div>
         <div class="g2">
           <label class="tg"><input type="checkbox" id="o-labels"> labels</label>
@@ -186,11 +187,12 @@
 <script src="src/tpl/archetypes/room.js"></script>
 <script src="src/tpl/fillers/engine.js"></script>
 <script src="src/tpl/fillers/pool.js"></script>
+<script src="src/tpl/lot.js"></script>
 <script src="src/tpl/render2d.js"></script>
 <script>
 (function () {
   'use strict';
-  const TPL = BR.TPL, TG = BR.TG, FILL = BR.FILL, $ = (id) => document.getElementById(id);
+  const TPL = BR.TPL, TG = BR.TG, FILL = BR.FILL, LOT = BR.LOT, $ = (id) => document.getElementById(id);
   // Fillers sit in the library next to the templates. They are not POIs, so they
   // stay out of TPL.archetypes; here they are entries 'filler:<id>', plus
   // 'filler:pool' for the weighted pick the world makes.
@@ -217,7 +219,7 @@
 
   // ---------------------------------------------------------------- state
   const state = {
-    mode: 'seeds', arch: 'ranch', seed: 1, count: 12, siteSize: 'archetype', sw: 24, sh: 14, shape: 'rect', approach: 'S', wrong: '', nconn: 2, connx: '',
+    mode: 'seeds', arch: 'ranch', seed: 1, count: 12, siteSize: 'archetype', sw: 24, sh: 14, shape: 'rect', approach: 'S', wrong: '', setting: 'lot', nconn: 2, connx: '',
     labels: true, dims: false, tags: false, portals: true, graph: false, blue: false, crop: true,
     q: '', engines: '', sizes: '', fav: false, bad: false, sort: 'engine', cmp: '', detail: null
   };
@@ -248,7 +250,7 @@
     const ch = state.siteSize === 'fixed' ? snap(state.sh) : snap(r.range(S.h[0], S.h[1]));
     return { rects: TPL.siteShape(cw, ch, state.shape, r, approach) };
   }
-  const settingsKey = () => [state.siteSize, state.sw, state.sh, state.shape, state.approach, state.wrong, state.nconn, state.connx].join('|');
+  const settingsKey = () => [state.siteSize, state.sw, state.sh, state.shape, state.approach, state.wrong, state.setting, state.nconn, state.connx].join('|');
   /** a filler's connections: typed exactly, or sampled along the outline */
   function connsFor(site, seed) {
     const txt = state.connx.trim();
@@ -265,12 +267,71 @@
     if (state.wrong !== '') s.wrongness = +state.wrong;
     return s;
   }
+  /**
+   * A template in its setting (LOT, src/tpl/lot.js): on its own lot (a house
+   * behind its front yard; a flush lot is the template alone, its doors on
+   * the edge) or inside a filler's site. The result wraps the building:
+   * { lot: true, site, setting (br.filler or null), settingAt (where the
+   * setting's frame sits), buildings: [{ origin, b }], main, conns }.
+   */
+  function buildLot(A, seed) {
+    const s = specFor(A, seed), r = new BR.Rng(BR.hash4(seed, TG.hashStr(A.id), 0x6c6f74, 0));
+    const t0 = performance.now(), wrap = (L, kind, main) => (!L.buildings.length
+      ? { error: L.issues[0] || 'no layout', site: { w: L.site.w, h: L.site.h, rects: L.site.rects }, meta: {} }
+      : { schema: LOT.SCHEMA, lot: true, kind, archetype: A.id, seed, site: L.site, setting: L.setting, settingAt: L.at, buildings: L.buildings, main: main || L.buildings[0].b,
+        conns: L.conns, issues: L.issues, meta: { ms: Math.round((performance.now() - t0) * 10) / 10 } });
+    if (state.setting === 'lot' && LOT.setting(A).kind === 'yard') {
+      // the house first, then its lot round what was built (LOT.yard): the
+      // lot meets the world at the end of the lane and at each door off the
+      // front, as it does on the map
+      const b = LOT.template({ archetype: A.id, seed, approach: s.approach, rects: s.site.rects, wrongness: s.wrongness });
+      if (b.error) return b;
+      const Y = LOT.yard(b, s.approach, LOT.margins(A, r, r.f())), f = s.approach, h = f === 'N' || f === 'S', line = f === 'N' || f === 'W' ? 0 : h ? Y.h : Y.w;
+      const spans = Y.yard.filter((q) => (h ? (f === 'N' ? q[1] : q[3]) : f === 'W' ? q[0] : q[2]) === line).map((q) => (h ? [q[0], q[2]] : [q[1], q[3]])).sort((p, q) => p[0] - q[0]), lane = [];
+      for (const sp of spans) { const t = lane[lane.length - 1]; if (t && t[1] === sp[0]) t[1] = sp[1]; else lane.push(sp.slice()); }
+      const connections = [], edge = {};
+      const best = lane.sort((p, q) => q[1] - q[0] - (p[1] - p[0]))[0];
+      if (best) { const wd = Math.max(1, Math.min(2, best[1] - best[0] - 1)); connections.push({ id: 'front', side: f, at: Math.round((best[0] + (best[1] - best[0] - wd) / 2) * 2) / 2, width: wd, line, route: true }); }
+      for (const d of Y.doors) {
+        const id = 'edge ' + d.portal;
+        if (d.adapter) connections.push({ id, side: d.side, at: d.s0, width: d.s1 - d.s0, line: d.c });
+        else edge[d.portal] = id;
+      }
+      return wrap(LOT.build({ seed, site: { rects: [[0, 0, Y.w, Y.h]] }, filler: 'yard', buildings: [{ id: 'b', b, origin: Y.origin, edge }], connections,
+        hint: { yard: Y.yard, adapters: Y.doors.filter((d) => d.adapter).map((d) => d.adapter) } }), 'yard', b);
+    }
+    if (state.setting === 'lot') {
+      // flush: the template alone; its doors are the lot's connections
+      const b = TPL.generate(Object.assign({}, s, { flush: true }));
+      if (b.error) return b;
+      return { schema: LOT.SCHEMA, lot: true, kind: 'flush', archetype: A.id, seed, site: b.site, setting: null, settingAt: [0, 0], buildings: [{ origin: [0, 0], b }], main: b, conns: [], issues: [], meta: { ms: b.meta.ms } };
+    }
+    // inside a filler: a few metres of filler round it on each side
+    const bb = TG.bbox(s.site.rects), p = [r.int(3, 9), r.int(3, 9), r.int(3, 9), r.int(3, 9)];
+    const site = { rects: [[0, 0, bb[2] - bb[0] + p[0] + p[2], bb[3] - bb[1] + p[1] + p[3]]] };
+    const rects = s.site.rects.map((q) => [q[0] - bb[0] + p[0], q[1] - bb[1] + p[1], q[2] - bb[0] + p[0], q[3] - bb[1] + p[1]]);
+    return wrap(LOT.build({ seed, site, connections: connsFor(site, seed), buildings: [{ id: 'b', archetype: A.id, seed, approach: s.approach, rects, wrongness: s.wrongness }] }), 'filler');
+  }
+  /** a lot's one-line description */
+  const lotLabel = (b) => (b.kind === 'yard' ? 'behind its front yard' : b.kind === 'flush' ? 'its own lot, flush' : 'inside a ' + (b.setting ? b.setting.name.toLowerCase() : 'filler'));
+  /** the building inside a lot wrapper (or the blueprint itself) */
+  const core = (b) => (b && b.lot ? b.main : b);
+  /** draw a blueprint, or a lot: every floor first, then every wall */
+  function drawAny(g, b, o) {
+    if (!b.lot) { TPL.drawBuilding(g, b, o); return; }
+    const hl = (pre) => (o.highlight && String(o.highlight).indexOf(pre) === 0 ? String(o.highlight).slice(pre.length) : null);
+    const at = (origin, layer, site, pre) => Object.assign({}, o, { ox: o.ox + origin[0] * o.scale, oy: o.oy + origin[1] * o.scale, layer, site, highlight: hl(pre) });
+    for (const layer of ['floors', 'walls']) {
+      if (b.setting) TPL.drawBuilding(g, b.setting, at(b.settingAt || [0, 0], layer, true, 's:'));
+      b.buildings.forEach((B, k) => TPL.drawBuilding(g, B.b, at(B.origin, layer, !b.setting, 'b' + k + ':')));
+    }
+  }
   const cache = new Map();
   function build(id, seed) {
     const k = id + '|' + seed + '|' + settingsKey();
     if (cache.has(k)) return cache.get(k);
     let b;
-    try { const A = entry(id); b = A.engine === 'filler' ? FILL.generate(specFor(A, seed)) : TPL.generate(specFor(A, seed)); } catch (err) { console.error(err); b = { error: String((err && err.message) || err), site: { w: 1, h: 1, rects: [] }, meta: {} }; }
+    try { const A = entry(id); b = A.engine === 'filler' ? FILL.generate(specFor(A, seed)) : state.setting === 'bare' ? TPL.generate(specFor(A, seed)) : buildLot(A, seed); } catch (err) { console.error(err); b = { error: String((err && err.message) || err), site: { w: 1, h: 1, rects: [] }, meta: {} }; }
     if (cache.size > 3000) cache.delete(cache.keys().next().value);
     cache.set(k, b);
     return b;
@@ -408,7 +469,7 @@
   // ---------------------------------------------------------------- controls
   function bind() {
     $('seed').value = state.seed; $('count').value = String(state.count); $('siteSize').value = state.siteSize; $('sw').value = state.sw; $('sh').value = state.sh;
-    $('shape').value = state.shape; $('approach').value = state.approach; $('wrong').value = state.wrong;
+    $('shape').value = state.shape; $('approach').value = state.approach; $('wrong').value = state.wrong; $('setting').value = state.setting;
     $('nconn').value = String(state.nconn); $('connx').value = state.connx;
     for (const k of VIEWOPTS) $('o-' + k).checked = state[k];
     $('sw').disabled = $('sh').disabled = state.siteSize !== 'fixed';
@@ -427,6 +488,7 @@
   on('shape', 'change', () => { state.shape = $('shape').value; refresh(); });
   on('approach', 'change', () => { state.approach = $('approach').value; refresh(); });
   on('wrong', 'change', () => { state.wrong = $('wrong').value; refresh(); });
+  on('setting', 'change', () => { state.setting = $('setting').value; refresh(); });
   on('nconn', 'change', () => { state.nconn = +$('nconn').value; refresh(); });
   on('connx', 'change', () => { state.connx = $('connx').value; refresh(); });
   for (const k of VIEWOPTS) on('o-' + k, 'change', () => { state[k] = $('o-' + k).checked; saveHash(); redrawAll(); if (detailB) drawDetail(); });
@@ -518,7 +580,7 @@
   /** what to frame: the site, or the footprint plus a margin */
   function frameOf(b) {
     const site = [0, 0, b.site.w, b.site.h];
-    if (!state.crop || !b.footprint || isFillerB(b)) return site;      // a filler's solid is part of the picture
+    if (!state.crop || !b.footprint || isFillerB(b) || b.lot) return site;      // a filler's or a lot's solid is part of the picture
     const bb = [Infinity, Infinity, -Infinity, -Infinity];
     for (const f of b.footprint) for (const r of f.rects) { bb[0] = Math.min(bb[0], r[0]); bb[1] = Math.min(bb[1], r[1]); bb[2] = Math.max(bb[2], r[2]); bb[3] = Math.max(bb[3], r[3]); }
     if (!isFinite(bb[0])) return site;
@@ -549,7 +611,7 @@
     }
     const f = fit(cv, frameOf(b), 8);
     g.fillStyle = state.blue ? '#0d2640' : '#2a2926'; g.fillRect(0, 0, f.W, f.H);
-    TPL.drawBuilding(g, b, drawOpts({ scale: f.s, ox: f.ox, oy: f.oy }));
+    drawAny(g, b, drawOpts({ scale: f.s, ox: f.ox, oy: f.oy }));
     if (isFillerB(b)) {
       const m = b.meta, bad = m.issues.length;
       l1.innerHTML = (bad ? '<span class="bad">' + bad + ' problem(s)</span>' : '<span class="good">ok</span>') + ' · ' + m.ms.toFixed(1) + ' ms';
@@ -557,23 +619,23 @@
         (bad ? '<br><span class="bad">' + esc(m.issues[0]) + '</span>' : '');
       return;
     }
-    const m = b.meta, sc = m.score, cls = sc >= 90 ? 'good' : sc >= 75 ? '' : sc >= 60 ? 'warn' : 'bad';
-    const hard = m.issues.filter((x) => x.indexOf('ERROR') === 0).length;
-    const area = b.rooms.reduce((s, r) => s + r.area, 0);
-    l1.innerHTML = '<span class="score ' + cls + '">' + sc.toFixed(0) + '</span> · ' + m.ms.toFixed(0) + ' ms';
-    l2.innerHTML = '<span class="pill">' + esc(m.plan.type || '?') + '</span>' + b.rooms.length + ' rooms · ' + area.toFixed(0) + ' m² · ' + b.portals.length + ' portals' + (b.levels.length > 1 ? ' · ' + b.levels.length + ' levels' : '') +
-      (m.mutations.length ? '<br>' + m.mutations.map((k) => '<span class="pill w">' + esc(mutLabel(b, k)) + '</span>').join('') : '') + (hard ? '<br><span class="bad">' + hard + ' error(s)</span>' : '');
+    const c = core(b), m = c.meta, sc = m.score, cls = sc >= 90 ? 'good' : sc >= 75 ? '' : sc >= 60 ? 'warn' : 'bad';
+    const hard = m.issues.filter((x) => x.indexOf('ERROR') === 0).length + (b.lot ? b.issues.length : 0);
+    const area = c.rooms.reduce((s, r) => s + r.area, 0);
+    l1.innerHTML = '<span class="score ' + cls + '">' + sc.toFixed(0) + '</span> · ' + (b.lot ? b.meta.ms : m.ms).toFixed(0) + ' ms';
+    l2.innerHTML = (b.lot ? '<span class="pill">' + esc(lotLabel(b)) + '</span>' : '') + '<span class="pill">' + esc(m.plan.type || '?') + '</span>' + c.rooms.length + ' rooms · ' + area.toFixed(0) + ' m² · ' + c.portals.length + ' portals' + (c.levels.length > 1 ? ' · ' + c.levels.length + ' levels' : '') +
+      (m.mutations.length ? '<br>' + m.mutations.map((k) => '<span class="pill w">' + esc(mutLabel(c, k)) + '</span>').join('') : '') + (hard ? '<br><span class="bad">' + hard + ' error(s)' + (b.lot && b.issues.length ? ': ' + esc(b.issues[0]) : '') + '</span>' : '');
   }
   function redrawAll() { for (const v of visible) if (v.b) drawCard(v); }
   window.addEventListener('resize', () => { clearTimeout(redrawAll._t); redrawAll._t = setTimeout(() => { redrawAll(); if (detailB) drawDetail(); }, 120); });
   function summary() {
     const bs = visible.filter((v) => v.b).map((v) => v.b), ok = bs.filter((b) => !b.error);
-    const tp = ok.filter((b) => !isFillerB(b)), fl = ok.filter(isFillerB);
+    const tp = ok.filter((b) => !isFillerB(b)).map(core), fl = ok.filter(isFillerB), lotIssues = ok.reduce((s, b) => s + (b.lot ? b.issues.length : 0), 0);
     const avg = (L, f) => (L.length ? L.reduce((s, b) => s + f(b), 0) / L.length : 0);
     const terms = {}, plans = {}, picks = {};
     for (const b of tp) { plans[b.meta.plan.type] = (plans[b.meta.plan.type] || 0) + 1; for (const k in b.meta.terms) terms[k] = (terms[k] || 0) + b.meta.terms[k] / tp.length; }
     for (const b of fl) picks[b.name] = (picks[b.name] || 0) + 1;
-    const errs = tp.reduce((s, b) => s + b.meta.issues.filter((x) => x.indexOf('ERROR') === 0).length, 0) + fl.reduce((s, b) => s + b.meta.issues.length, 0);
+    const errs = tp.reduce((s, b) => s + b.meta.issues.filter((x) => x.indexOf('ERROR') === 0).length, 0) + fl.reduce((s, b) => s + b.meta.issues.length, 0) + lotIssues;
     const busy = queue.length ? ' <span class="k">· working… ' + queue.length + ' left' + (healthLeft ? ' (health check)' : '') + '</span>' : '';
     $('summary').innerHTML = [
       '<span><b>' + bs.length + '</b>/' + visible.length + ' built' + busy + '</span>',
@@ -618,11 +680,12 @@
     cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
     const g = cv.getContext('2d');
     g.fillStyle = state.blue ? '#0d2640' : '#2a2926'; g.fillRect(0, 0, cv.width, cv.height);
-    $('dlevels').innerHTML = b && b.levels && b.levels.length > 1 ? b.levels.map((L) => '<button data-l="' + L.index + '"' + (L.index === level ? ' class="primary"' : '') + '>Level ' + L.index + '</button>').join('') : '';
+    const c = core(b);
+    $('dlevels').innerHTML = c && c.levels && c.levels.length > 1 ? c.levels.map((L) => '<button data-l="' + L.index + '"' + (L.index === level ? ' class="primary"' : '') + '>Level ' + L.index + '</button>').join('') : '';
     for (const btn of $('dlevels').children) btn.addEventListener('click', () => { level = +btn.dataset.l; drawDetail(); });
     if (!b || b.error) { g.fillStyle = '#e0705f'; g.font = (14 * dpr) + 'px sans-serif'; g.fillText(b ? b.error : '', 20 * dpr, 30 * dpr); return; }
     if (!view) { const F = [0, 0, b.site.w, b.site.h], s = Math.min((cv.width - 60 * dpr) / F[2], (cv.height - 60 * dpr) / F[3]); view = { s, ox: (cv.width - F[2] * s) / 2, oy: (cv.height - F[3] * s) / 2 }; }
-    TPL.drawBuilding(g, b, drawOpts({ scale: view.s, ox: view.ox, oy: view.oy, highlight: hoverRoom, level, dims: state.dims || view.s > 30 }));
+    drawAny(g, b, drawOpts({ scale: view.s, ox: view.ox, oy: view.oy, highlight: hoverRoom, level, dims: state.dims || view.s > 30 }));
     const bar = b.site.w < 5 ? 1 : 5;
     g.fillStyle = 'rgba(255,255,255,0.6)'; g.fillRect(16 * dpr, cv.height - 18 * dpr, bar * view.s, 3 * dpr);
     g.font = (11 * dpr) + 'px sans-serif'; g.fillText(bar + ' m', 16 * dpr, cv.height - 24 * dpr);
@@ -646,15 +709,16 @@
       if (!view || !detailB || detailB.error) return;
       const r = cv.getBoundingClientRect();
       const x = ((e.clientX - r.left) * dpr - view.ox) / view.s, y = ((e.clientY - r.top) * dpr - view.oy) / view.s;
-      let hit = null;
-      for (const rm of detailB.rooms) if ((rm.level || 0) === level) for (const q of rm.rects) if (x >= q[0] && x < q[2] && y >= q[1] && y < q[3]) hit = rm;
+      let hit = null, key = null;
+      const parts = detailB.lot ? (detailB.setting ? [['s:', detailB.setting, detailB.settingAt || [0, 0]]] : []).concat(detailB.buildings.map((B, k) => ['b' + k + ':', B.b, B.origin])) : [['', detailB, [0, 0]]];
+      for (const [pre, bp, o] of parts) for (const rm of bp.rooms) if ((rm.level || 0) === level) for (const q of rm.rects) if (x - o[0] >= q[0] && x - o[0] < q[2] && y - o[1] >= q[1] && y - o[1] < q[3]) { hit = rm; key = pre + rm.id; }
       $('dhover').innerHTML = hit ? '<b>' + esc(hit.name) + '</b> · ' + hit.area.toFixed(1) + ' m² · ceiling ' + hit.ceiling + ' m · ' + esc(hit.zone || '') + '<br><span class="k">' + esc((hit.tags || []).join(', ')) + '</span>' : '';
-      const id = hit ? hit.id : null;
-      if (id !== hoverRoom) { hoverRoom = id; drawDetail(); }
+      if (key !== hoverRoom) { hoverRoom = key; drawDetail(); }
     });
   })();
   function sidePanel() {
-    const b = detailB, body = $('dbody'), A = entry(detailId);
+    let b = detailB;
+    const body = $('dbody'), A = entry(detailId);
     $('dtitle').textContent = (A ? A.name || A.id : detailId) + ' · seed ' + detailSeed;
     if (!b || b.error) {
       const w = b ? Object.entries(b.meta.layoutFailures || {}).sort((p, q) => q[1] - p[1]) : [];
@@ -662,11 +726,23 @@
       body.innerHTML = '<div class="k">Layout rejections</div><ul>' + w.map(([k, v]) => '<li>' + esc(k) + ': ' + v + '</li>').join('') + '</ul>';
       return;
     }
+    const L = b.lot ? b : null;
+    if (L) b = L.main;
     const m = b.meta;
     if (isFillerB(b) && tab !== 'rooms' && tab !== 'portals' && tab !== 'json') { fillerPanel(b, A, body); return; }
     if (isFillerB(b)) fillerPanel(b, A, null);
-    else $('dsub').innerHTML = 'plan <b>' + esc(m.plan.type) + '</b> · site ' + b.site.w + '×' + b.site.h + ' m · main side ' + b.approach + ' · score <b>' + m.score + '</b> · ' + m.ms + ' ms<br>layout #' + m.chosen + ' · ' + m.candidates + ' layouts drawn, ' + m.resolved + ' resolved, ' + m.valid + ' valid' +
+    else $('dsub').innerHTML = (L ? '<b>' + esc(lotLabel(L)) + '</b> · ' + (L.kind === 'flush' ? 'the doors are the lot edge' : 'lot ' + L.site.w + '×' + L.site.h + ' m · ' + L.conns.length + ' edge connection(s) · ' + L.meta.ms + ' ms') + (L.issues.length ? ' · <span class="bad">' + L.issues.length + ' problem(s)</span>' : '') + '<br>' : '') +
+      'plan <b>' + esc(m.plan.type) + '</b> · site ' + b.site.w + '×' + b.site.h + ' m · main side ' + b.approach + ' · score <b>' + m.score + '</b> · ' + m.ms + ' ms<br>layout #' + m.chosen + ' · ' + m.candidates + ' layouts drawn, ' + m.resolved + ' resolved, ' + m.valid + ' valid' +
       (m.mutations.length ? '<br>' + m.mutations.map((k) => '<span class="pill w">' + esc(mutLabel(b, k)) + '</span>').join('') : '');
+    if (L && tab === 'portals' && L.setting) {
+      const f = L.setting, B = L.buildings[0], rev = {};
+      for (const k in B.conns) rev[B.conns[k]] = k;
+      body.innerHTML = '<table><tr><th>connection</th><th>onto</th><th>side</th><th class="n">width</th></tr>' +
+        f.portals.map((p) => '<tr><td>' + esc(rev[p.connection] ? 'door ' + rev[p.connection] : p.connection) + '</td><td>' + esc((f.rooms.find((r) => r.id === p.room) || {}).name || p.room) + '</td><td>' + esc(rev[p.connection] ? TG.opposite(p.side) : p.side) + '</td><td class="n">' + p.width + '</td></tr>').join('') +
+        '</table><p class="k">The lot\'s edge connections and the building\'s own doors, all honoured by the ' + esc(f.name.toLowerCase()) + ' round it. A connection that lands on solid gets a passage to the nearest floor.</p>' + (L.issues.length ? '<div class="k">Problems</div><ul>' + L.issues.map((x) => '<li class="bad">' + esc(x) + '</li>').join('') + '</ul>' : '');
+      return;
+    }
+    if (L && tab === 'json') { body.innerHTML = '<pre>' + esc(JSON.stringify(L, null, 1).slice(0, 80000)) + '</pre>'; return; }
     if (tab === 'score') {
       const rows = Object.entries(m.terms).sort((p, q) => q[1] - p[1]).map(([k, v]) => '<tr><td>' + esc(k) + '</td><td class="n">−' + v.toFixed(1) + '</td></tr>').join('');
       body.innerHTML = '<table><tr><th>penalty</th><th class="n">points</th></tr>' + (rows || '<tr><td colspan=2 class="k">none</td></tr>') + '<tr><td><b>score</b></td><td class="n"><b>' + m.score + '</b></td></tr></table>' +

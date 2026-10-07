@@ -7,8 +7,9 @@
  *   - every connection honoured: one portal, exactly where the world asked,
  *     on an exterior wall, on the right side
  *   - every room reachable through the room graph
- *   - walkable: every floor cell can be walked to from every portal, with
- *     walls, openings, partitions and columns taken into account
+ *   - walkable by a walker 1 m wide (tests/walk.js): from the connections it
+ *     reaches every floor cell, with walls, openings, partitions and columns
+ *     taken into account, so no join is narrower than 1 m
  *   - deterministic, and independent of load order and connection order
  *   - the pool picks only fillers that fit, and leans enclosed
  */
@@ -16,6 +17,7 @@ const path = require('path');
 for (const f of ['core', 'tpl/grid', 'tpl/framework', 'tpl/fillers/engine', 'tpl/fillers/pool'])
   require(path.join(__dirname, '..', 'src', f + '.js'));
 const BR = globalThis.BR, FILL = BR.FILL, TPL = BR.TPL, { Rng, hash4 } = BR;
+const { walk1m } = require('./walk');
 
 const N = +(process.argv[2] || 40);
 let failures = 0;
@@ -96,41 +98,12 @@ function contract(b, spec) {
     while (st.length) for (const v of adj.get(st.pop())) if (!seen.has(v)) { seen.add(v); st.push(v); }
     if (seen.size !== b.rooms.length) bad.push((b.rooms.length - seen.size) + ' rooms unreachable in the graph');
   } else bad.push('no rooms');
-  // walkability on the cell grid
-  const pass = new Map();                          // edge key -> 1 open / 0 blocked
-  const ek = (x0, y0, x1, y1) => (x0 < x1 || y0 < y1 ? x0 + ',' + y0 + ',' + x1 + ',' + y1 : x1 + ',' + y1 + ',' + x0 + ',' + y0);
-  const along = (a, b2, fn) => {
-    const horiz = a[1] === b2[1], c = Math.round((horiz ? a[1] : a[0]) / G);
-    const s0 = Math.round(Math.min(horiz ? a[0] : a[1], horiz ? b2[0] : b2[1]) / G), s1 = Math.round(Math.max(horiz ? a[0] : a[1], horiz ? b2[0] : b2[1]) / G);
-    for (let s = s0; s < s1; s++) fn(horiz ? ek(s, c - 1, s, c) : ek(c - 1, s, c, s));
-  };
-  for (const op of b.openings) if (op.kind === 'opening' || op.kind === 'door') along(op.a, op.b, (k) => pass.set(k, 1));
-  for (const w of b.walls) if (w.kind === 'open') along(w.a, w.b, (k) => pass.set(k, 1));
-  for (const w of b.walls) if (w.kind === 'partition') along(w.a, w.b, (k) => pass.set(k, 0));
-  const col = new Uint8Array(W * H);
-  for (const c of b.columns) for (let y = Math.round(c.rect[1] / G); y < Math.round(c.rect[3] / G); y++) for (let x = Math.round(c.rect[0] / G); x < Math.round(c.rect[2] / G); x++) col[y * W + x] = 1;
-  const can = (x0, y0, x1, y1) => {
-    const a = own(x0, y0), c = own(x1, y1);
-    if (a < 0 || c < 0 || col[y1 * W + x1]) return false;
-    const k = ek(x0, y0, x1, y1);
-    return a === c ? pass.get(k) !== 0 : pass.get(k) === 1;
-  };
-  let total = 0, start = -1;
-  for (let i = 0; i < W * H; i++) if (cell[i] >= 0 && !col[i]) { total++; if (start < 0) start = i; }
-  if (start >= 0) {
-    const seen = new Uint8Array(W * H), st = [start];
-    seen[start] = 1;
-    let n = 0;
-    while (st.length) {
-      const i = st.pop(), x = i % W, y = (i - x) / W; n++;
-      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
-        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-        const j = ny * W + nx;
-        if (!seen[j] && can(x, y, nx, ny)) { seen[j] = 1; st.push(j); }
-      }
-    }
-    if (n !== total) bad.push((total - n) + ' floor cells cannot be walked to');
-  }
+  // walkability for a walker 1 m wide: from the connections it reaches every
+  // floor cell, and every connection opens onto the same floor
+  const wk = walk1m(b);
+  if (wk.unreached) bad.push(wk.unreached + ' floor cells a 1 m walker cannot reach');
+  if (wk.stuck.length) bad.push('nowhere to stand behind ' + wk.stuck.join(', '));
+  if (wk.pieces > 1 && !FILL.fillers[b.filler].pieces) bad.push('the connections open onto ' + wk.pieces + ' separate floors');
   for (const k of ['furniture', 'materials', 'lights']) if (k in b) bad.push('has ' + k);
   return bad;
 }

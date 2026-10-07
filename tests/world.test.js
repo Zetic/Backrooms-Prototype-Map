@@ -2,7 +2,8 @@
 // built by a template, and the rules that make an infinite map work.
 // run: node tests/world.test.js [seed]
 const { BR, components, harness } = require('./helpers');
-const { check, finish } = harness(), seed = +(process.argv[2] || 31337), C = BR.WORLD_CFG.cell, TPL = BR.TPL;
+const { walk1m } = require('./walk');
+const { check, finish } = harness(), seed = +(process.argv[2] || 31337), C = BR.WORLD_CFG.cell, TPL = BR.TPL, TG = BR.TG;
 const strip = (x) => JSON.stringify(x, (k, v) => (k === 'ms' || k === '_filler' ? undefined : v));
 const planPrint = (W, i0, j0, i1, j1) => {
   const out = [];
@@ -37,27 +38,66 @@ const W = new BR.World(seed), R = [-3, -3, 2, 2];
   check('sites tile every cell exactly: no gaps, no overlaps', gaps === 0 && overlap === 0 && bad === 0, `${n} sites in 36 cells, ${gaps} gap m², ${overlap} overlap m²`);
   check('sites are whole metres, ids are unique and resolve back', offGrid === 0 && dup === 0 && lookups === 0);
   const sizes = [];
-  for (let i = R[0]; i <= R[2]; i++) for (let j = R[1]; j <= R[3]; j++) for (const s of W.cell(i, j).sites) if (!s.host) sizes.push(s.area);
+  for (let i = R[0]; i <= R[2]; i++) for (let j = R[1]; j <= R[3]; j++) for (const s of W.cell(i, j).sites) if (s.kind === 'filler') sizes.push(s.area);
   sizes.sort((a, b) => a - b);
   const odd = [...ids].map((id) => W.site(id)).filter((s) => s.rects.length > 1).length;
   check('filler sites are room-cluster sized, and some are irregular', sizes[0] >= 64 && sizes[Math.floor(sizes.length / 2)] < 400 && odd > n * 0.1,
     `median ${sizes[Math.floor(sizes.length / 2)]} m², ${odd} L / T / Z sites`);
 }
 
-// ---- 2. POIs claim their sites first
+// ---- 2. POIs claim their places first
 {
-  let outside = 0, close = 0, pois = 0, lost = 0;
+  let pois = 0, lost = 0, lots = 0, exact = 0, split = 0, badMode = 0, inside = 0, close = 0, flush = 0, doorsOff = 0, yardLots = 0, strayConn = 0;
+  const same = (p, q) => p.every((v, k) => v === q[k]);
   for (let i = R[0]; i <= R[2]; i++) for (let j = R[1]; j <= R[3]; j++) {
-    const c = W.cell(i, j);
-    const hosted = new Set(c.sites.flatMap((s) => s.pois.map((P) => P.id)));
-    for (const P of c.pois) { pois++; if (!hosted.has(P.id)) lost++; }
-    for (const s of c.sites) for (const P of s.pois) {
-      const b = P.bbox, block = s.rects.find((q) => q[0] <= b[0] && q[1] <= b[1] && q[2] >= b[2] && q[3] >= b[3]);
-      if (!block) { outside++; continue; }
-      if (b[0] - block[0] < 2 || b[1] - block[1] < 2 || block[2] - b[2] < 2 || block[3] - b[3] < 2) close++;
+    const c = W.cell(i, j), placed = new Set(c.sites.flatMap((s) => s.pois.map((P) => P.id)));
+    for (const P of c.pois) {
+      pois++;
+      if (!placed.has(P.id)) lost++;
+      const A = TPL.archetypes[P.archetype], small = Math.min(P.w, P.h) < BR.POI_CFG.flushMin;
+      const house = A.engine === 'house';
+      if (P.mode === 'yard' ? !house : P.mode === 'flush' ? small || house : P.mode === 'inside' ? !small || house : true) badMode++;
+    }
+    for (const s of c.sites) {
+      for (const L of s.lots) {
+        lots++;
+        if (s.lots.length === 1 && s.rects.length === 1 && same(s.rects[0], L.rect)) exact++;
+        if (!s.rects.some((q) => q[0] <= L.rect[0] && q[1] <= L.rect[1] && q[2] >= L.rect[2] && q[3] >= L.rect[3])) split++;
+      }
+      if (s.kind === 'lot') {
+        // a yard lot meets the world only where its front yard reaches the
+        // lot edge (the end of its lane) and at the end of each door's passage
+        yardLots++;
+        const L = s.lots[0], doorIds = new Set(Object.values(L.portalConns));
+        for (const id of s.conns) {
+          const cn = c.connById.get(id);
+          if (doorIds.has(id)) { const d = L.doors.find((x) => L.portalConns[x.portal] === id); if (d.o !== cn.o || d.c !== cn.c || d.s0 !== cn.s0 || d.s1 !== cn.s1) strayConn++; continue; }
+          let cov = 0;
+          for (const q of L.yard) if (cn.o === 'h' ? q[1] === cn.c || q[3] === cn.c : q[0] === cn.c || q[2] === cn.c) {
+            const a = cn.o === 'h' ? q[0] : q[1], b = cn.o === 'h' ? q[2] : q[3];
+            cov += Math.max(0, Math.min(b, cn.s1) - Math.max(a, cn.s0));
+          }
+          if (Math.abs(cov - (cn.s1 - cn.s0)) > 1e-9) strayConn++;
+        }
+      }
+      if (s.kind === 'flush') {
+        // the door is the edge: the site's connections are exactly its doors
+        flush++;
+        const L = s.lots[0], ids = Object.values(L.portalConns);
+        if (!ids.length || ids.length !== s.conns.length || !ids.every((id) => s.conns.indexOf(id) >= 0)) doorsOff++;
+      }
+      if (s.kind === 'filler') for (const P of s.pois) {
+        inside++;
+        const b = P.bbox, block = s.rects.find((q) => q[0] <= b[0] && q[1] <= b[1] && q[2] >= b[2] && q[3] >= b[3]);
+        if (!block || b[0] - block[0] < 2 || b[1] - block[1] < 2 || block[2] - b[2] < 2 || block[3] - b[3] < 2) close++;
+      }
     }
   }
-  check('every POI sits whole in one host site, 2 m clear of its edges', pois > 0 && lost === 0 && outside === 0 && close === 0, `${pois} POIs`);
+  check('houses get a yard lot; templates smaller than a block go inside fillers, block-sized ones get a flush lot', pois > 0 && lost === 0 && badMode === 0, `${pois} POIs`);
+  check('every lot is cut out as a site of its own', lots > 0 && split === 0 && exact >= lots * 0.95, `${exact} of ${lots} exactly`);
+  check('a flush lot is joined only through its own doors', flush > 0 && doorsOff === 0, `${flush} flush lots`);
+  check('a yard lot is joined only at the end of its lane and of its doors\' passages', yardLots > 0 && strayConn === 0, `${yardLots} yard lots, ${strayConn} stray`);
+  check('small templates sit whole inside fillers, 2 m clear of the edges', inside > 0 && close === 0, `${inside} inside fillers`);
 }
 
 // ---- 3. the connection graph
@@ -90,6 +130,19 @@ const W = new BR.World(seed), R = [-3, -3, 2, 2];
   check('each cell is one connected graph of sites', disconnected === 0);
   check('the graph is route-shaped: a tree with dead ends and a few loops', loops > 0 && loops < trees * 0.4 && deadEnds > sites * 0.1,
     `${trees} tree edges, ${loops} loops, ${deadEnds} dead ends of ${sites} sites`);
+  // a yard is entered from the front: a route connection on the lot's front side
+  let yards = 0, fronted = 0;
+  for (let i = R[0]; i <= R[2]; i++) for (let j = R[1]; j <= R[3]; j++) {
+    const c = W.cell(i, j);
+    for (const s of c.sites) {
+      const L = s.kind === 'lot' && s.lots.find((q) => q.kind === 'yard');
+      if (!L) continue;
+      yards++;
+      const f = L.approach, q = L.rect;
+      if (s.conns.some((id) => { const cn = c.connById.get(id); return cn.route && !cn.cross && (f === 'S' ? cn.o === 'h' && cn.c >= q[3] : f === 'N' ? cn.o === 'h' && cn.c <= q[1] : f === 'E' ? cn.o === 'v' && cn.c >= q[2] : cn.o === 'v' && cn.c <= q[0]); })) fronted++;
+    }
+  }
+  check('a yard is always entered from the front of its house', yards > 0 && fronted === yards, `${fronted} of ${yards} yards`);
 }
 
 // ---- 4. the same in any order
@@ -111,29 +164,64 @@ const W = new BR.World(seed), R = [-3, -3, 2, 2];
 // ---- 5. every site is built by a template, every connection honoured
 const B = [-1, -1, 1, 1];
 {
-  let n = 0, issues = [], unhonoured = 0, ms = 0, poiMs = 0, pois = 0, failedPois = 0, offSite = 0, wrongSide = 0;
+  let n = 0, issues = [], unhonoured = 0, ms = 0, poiMs = 0, pois = 0, failedPois = 0, offSite = 0, wrongSide = 0, yards = 0, open = 0, notSolid = 0, unwalked = [];
   const fillers = {}, feel = { enclosed: 0, mixed: 0, open: 0 };
   for (let i = B[0]; i <= B[2]; i++) for (let j = B[1]; j <= B[3]; j++) for (const s of W.cell(i, j).sites) {
     const r = W.build(s), f = r.filler;
     n++; ms += r.ms;
     issues.push(...r.issues.map((x) => s.id + ': ' + x));
     const want = new Set(s.conns.concat(r.buildings.flatMap((Bd) => Object.values(Bd.conns))));
-    const got = new Set(f.portals.map((p) => p.connection));
+    // a door on the site edge is a connection itself; anything else is cut by the filler or yard too
+    const got = new Set(f ? f.portals.map((p) => p.connection) : []);
+    for (const Bd of r.buildings) for (const p of Bd.b.portals) if (Bd.conns[p.id] && s.conns.indexOf(Bd.conns[p.id]) >= 0) got.add(Bd.conns[p.id]);
     for (const id of want) if (!got.has(id)) unhonoured++;
-    if (!s.host) { fillers[f.filler] = (fillers[f.filler] || 0) + 1; feel[f.feel] += s.area; }
+    // a 1 m walker gets everywhere from the connections (a yard: from its
+    // lane and its doors, each passage its own piece)
+    if (f) { const wk = walk1m(f); if (wk.unreached || wk.stuck.length || (wk.pieces > 1 && f.filler !== 'yard')) unwalked.push(s.id); }
+    if (s.kind === 'filler') { fillers[f.filler] = (fillers[f.filler] || 0) + 1; feel[f.feel] += s.area; }
     for (const Bd of r.buildings) {
       pois++;
-      const P = Bd.poi, local = P.rects.map((q) => [q[0] - P.bbox[0], q[1] - P.bbox[1], q[2] - P.bbox[0], q[3] - P.bbox[1]]);
-      const inside = (q) => { for (let x = q[0] + 0.25; x < q[2]; x += 0.5) for (let y = q[1] + 0.25; y < q[3]; y += 0.5) if (!inRects(local, x, y)) return false; return true; };
+      const P = Bd.poi, o = Bd.origin;
+      const inside = (q) => { for (let x = q[0] + 0.25; x < q[2]; x += 0.5) for (let y = q[1] + 0.25; y < q[3]; y += 0.5) if (!inRects(P.rects, x + o[0], y + o[1])) return false; return true; };
       if (!Bd.b.rooms.every((rm) => rm.rects.every(inside))) offSite++;
       const main = Bd.b.portals.find((p) => p.main);
       if (!main || main.side !== P.approach) wrongSide++;
+      if (P.mode === 'yard') {
+        // solid round the back and sides of the house; the yard only in front
+        // of it (beside it no more than 1 m back from its front, or in front
+        // of a door)
+        yards++;
+        const q = s.lots.find((L) => L.id === P.lot).rect, fa = P.approach, fp = Bd.b.footprint[0].rects.map((g) => [g[0] + o[0], g[1] + o[1], g[2] + o[0], g[3] + o[1]]), hb = TG.bbox(fp);
+        const ns = fa === 'N' || fa === 'S';
+        const back = fa === 'S' ? hb[1] - q[1] : fa === 'N' ? q[3] - hb[3] : fa === 'E' ? hb[0] - q[0] : q[2] - hb[2];
+        const sides = ns ? [hb[0] - q[0], q[2] - hb[2]] : [hb[1] - q[1], q[3] - hb[3]];
+        if (back < 1 || sides[0] < 1 || sides[1] < 1) notSolid++;
+        const depth = (x, y) => (fa === 'S' ? q[3] - y : fa === 'N' ? y - q[1] : fa === 'E' ? q[2] - x : x - q[0]), hf = fa === 'S' ? q[3] - hb[3] : fa === 'N' ? hb[1] - q[1] : fa === 'E' ? q[2] - hb[2] : hb[0] - q[0];
+        const step = { S: [0, 0.5], N: [0, -0.5], E: [0.5, 0], W: [-0.5, 0] }[fa];
+        // a door that opens onto the yard has 1 m of it in front of the door
+        const landings = Bd.b.portals.filter((p) => !p.level && Bd.conns[p.id] && s.conns.indexOf(Bd.conns[p.id]) < 0).map((p) => {
+          const op = Bd.b.openings.find((x) => x.id === p.opening), a = [Math.min(op.a[0], op.b[0]) + o[0], Math.min(op.a[1], op.b[1]) + o[1]], e = [Math.max(op.a[0], op.b[0]) + o[0], Math.max(op.a[1], op.b[1]) + o[1]];
+          return p.side === 'N' ? [a[0], a[1] - 1, e[0], a[1]] : p.side === 'S' ? [a[0], a[1], e[0], a[1] + 1] : p.side === 'W' ? [a[0] - 1, a[1], a[0], e[1]] : [a[0], a[1], a[0] + 1, e[1]];
+        });
+        let bad = false;
+        for (const rm of f.rooms) if (rm.type === 'yard') for (const g of rm.rects) for (let x = g[0] + 0.25; x < g[2] && !bad; x += 0.5) for (let y = g[1] + 0.25; y < g[3] && !bad; y += 0.5) {
+          const wx = x + r.fillerOrigin[0], wy = y + r.fillerOrigin[1], u = ns ? wx : wy;
+          if (inRects(landings, wx, wy)) continue;
+          if (u > (ns ? hb[0] : hb[1]) && u < (ns ? hb[2] : hb[3])) {
+            // in front of the house: nothing of the house between it and the front edge
+            for (let px = wx, py = wy; depth(px, py) > 0; px += step[0], py += step[1]) if (inRects(fp, px, py)) { bad = true; break; }
+          } else if (depth(wx, wy) > hf + 1) bad = true;
+        }
+        if (bad) open++;
+      }
     }
     failedPois += s.pois.length - r.buildings.length;
   }
   check('every site builds with no problems', issues.length === 0, `${n} sites; ${issues.slice(0, 3).join('; ')}`);
   check('every connection is cut on both sides, POI doors included', unhonoured === 0, `${unhonoured} missing`);
   check('every POI builds its template inside its site, facing its main side', pois > 0 && failedPois === 0 && offSite === 0 && wrongSide === 0, `${pois} POIs`);
+  check('a house has solid round its back and sides, and its yard only in front', yards > 0 && notSolid === 0 && open === 0, `${yards} yards: ${notSolid} without solid round them, ${open} with yard beside or behind`);
+  check('a 1 m walker gets to every floor cell of every site from its connections', unwalked.length === 0, unwalked.slice(0, 3).join(', '));
   check('the fill leans enclosed and every pool filler appears', feel.enclosed > (feel.mixed + feel.open) && Object.keys(fillers).length >= 7,
     Object.entries(fillers).map(([k, v]) => k + ' ' + v).join(', '));
   const avg = ms / n;
@@ -156,11 +244,11 @@ const B = [-1, -1, 1, 1];
 
 // ---- 7. builds are the same whatever was built before
 {
-  const s = W.cell(0, 0).sites.find((x) => x.host) || W.cell(0, 0).sites[0];
+  const s = W.cell(0, 0).sites.find((x) => x.kind === 'lot') || W.cell(0, 0).sites[0];
   const W2 = new BR.World(seed, { limits: { cells: 3, builds: 2 } });
   for (const t of W2.sitesIn(900, 900, 1000, 1000).slice(0, 6)) W2.build(t);
   check('a site builds the same whatever was built before', strip(W2.build(W2.site(s.id))) === strip(W.build(s)));
-  const t = W.cell(0, 0).sites.find((x) => !x.host);
+  const t = W.cell(0, 0).sites.find((x) => x.kind === 'filler' && !x.pois.length);
   check('a filler site builds the same as FILL.generate on its own spec', strip(W.build(t).filler) === strip(BR.FILL.generate({
     filler: W.fillerOf(t), seed: t.seed, site: { rects: t.rects.map((q) => [q[0] - t.bbox[0], q[1] - t.bbox[1], q[2] - t.bbox[0], q[3] - t.bbox[1]]) }, connections: W.build(t).conns
   })));
@@ -189,6 +277,7 @@ const B = [-1, -1, 1, 1];
   const W2 = new BR.World(seed + 9), t0 = Date.now();
   for (let i = 0; i < 12; i++) for (let j = 0; j < 12; j++) W2.cell(i, j);
   const per = (Date.now() - t0) / 144;
-  check('planning a cell is cheap (under 8 ms)', per < 8, `${per.toFixed(2)} ms per cell`);
+  // a house is built when its cell is planned (its lot is sized round it)
+  check('planning a cell is cheap (under 60 ms, its houses included)', per < 60, `${per.toFixed(2)} ms per cell`);
 }
 finish();

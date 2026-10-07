@@ -1,6 +1,6 @@
 # Templates: blueprints for points of interest
 
-Templates design the authored-feeling places (POIs) that sit buried inside the
+Templates design the authored-feeling places (POIs) that sit inside the
 backrooms. They range in size:
 
 * **Small:** a one-room closet, a restroom, storage units.
@@ -25,7 +25,7 @@ site (allotted shape) + seed + archetype  ─►  engine  ─►  building JSON 
                                                           └─► Unreal: kit pieces from walls / openings, furnishing from room tags
 ```
 
-Open `workbench.html` to browse, compare and debug templates (section 7).
+Open `workbench.html` to browse, compare and debug templates (section 8).
 
 ## 1. Kit grid and frames
 
@@ -45,11 +45,11 @@ Open `workbench.html` to browse, compare and debug templates (section 7).
 The world allots each POI a **site**: any rectilinear shape (a rectangle, an
 L, a U, a notched block). The template builds inside it.
 
-There is no yard or apron around a template. POIs are buried, so a house uses
-its site almost to the edge. On the map, the unbuilt part of the site (and a
-ring round it) is the floor of a host hall ([docs/world.md](world.md)).
-The only breathing room is each portal's `clear` depth: the floor the world
-must keep open in front of a door.
+A template uses its site almost to the edge. Whatever sits round it is not
+the template's job: on the map that is its lot's yard, or the filler it sits
+inside (section 4 and [docs/world.md](world.md)). The only breathing room a
+template asks for is each portal's `clear` depth: the floor the world must
+keep open in front of a door.
 
 ```js
 BR.TPL.generate({
@@ -60,7 +60,9 @@ BR.TPL.generate({
   approach: 'S',                              // the side the main entrance faces: N | E | S | W
   wrongness: 0.5,                             // optional 0..1, overrides the recipe
   mutations: ['falseDoors'],                  // optional, forces specific mutations
-  candidates: 36                              // optional: layouts tried
+  candidates: 36,                             // optional: layouts tried
+  flush: false                                // optional: the site edge is the lot edge, so the
+                                              // building fills it and its doors sit on the edge
 })
 ```
 
@@ -101,13 +103,78 @@ Guarantees, checked by `tests/templates.test.js`:
 ### How the world uses it
 
 * **Placement.** The world places the POI and builds it first. Its footprint
-  comes out of the host hall's site, and its exterior walls become the
-  boundary.
-* **Routes.** Every ground-floor portal becomes one of the host hall's
-  connections, so the hall cuts an opening in exactly that place.
+  comes out of the site round it, and its exterior walls become the boundary.
+* **Routes.** Every ground-floor portal becomes one of the connections of the
+  site round it (the yard, or a filler), so that site cuts an opening in
+  exactly that place. On a flush lot the portal is the world's connection.
 * **Clearance.** Keep each portal's `clear` box open.
 
-## 4. Entrances and exits are template-specific
+## 4. Lots: how a template meets the world (`src/tpl/lot.js`)
+
+Every template takes connections on its site edges, the way fillers do. A
+template sits in the world in one of three settings:
+
+* **yard**: its own lot, with a setting its recipe designs. Houses get a
+  front yard and nothing else: solid round the back and sides of the house,
+  a strip across its front a little wider than it (so the house stands half
+  way into it), and a lane from the strip out to the lot edge, where the lot
+  meets the rest of the backrooms. A door off the front gets a short passage
+  through the solid to the lot edge. The yard is sized by the biome.
+* **flush**: its own lot and nothing else. The door is the edge: the
+  template is built with `flush: true`, fills its site, and the world puts its
+  connection exactly on the template's door. Only templates at least one
+  block (8 m) across both ways may be flush.
+* **inside**: inside a bigger template. A template smaller than a block goes
+  in a filler's site. The filler builds round it and takes its doors as
+  connections.
+
+`LOT.setting(archetype)` is the recipe's setting: `archetype.setting` if it
+sets one, else a yard for houses and flush for the rest (which the world
+turns into inside when the template is smaller than a block).
+
+A house's lot is sized round the house once it is built:
+
+```js
+const b = BR.LOT.template({ archetype: 'ranch', seed: 99, approach: 'S', rects: [[0, 0, 24, 14]] });
+const m = BR.LOT.margins(BR.TPL.archetypes.ranch, rng, openness);   // { front, side, back, apron, reach, wrap, laneW }
+const Y = BR.LOT.yard(b, 'S', m);
+// -> { w, h, origin (the house's frame in the lot), yard: [rects], doors: [{ portal, side, o, c, s0, s1, main, adapter }], into: [portal ids] }
+```
+
+`yard` is the front yard (strip and lane). `doors` are the doors that meet
+the lot edge: each has an `adapter`, the passage from the door straight out
+to the edge, where the world puts its connection. `into` are the doors that
+open onto the yard.
+
+`LOT.build` is the connection adapter:
+
+```js
+BR.LOT.build({
+  seed: 1234,
+  site: { rects: [[0, 0, Y.w, Y.h]] },        // metres, the surrounding site
+  filler: 'yard',                             // or a pool filler; picked from the pool when left out
+  connections: [{ id: 'n1', side: 'S', at: 12, width: 2, line: Y.h }],   // the site's edge connections
+  buildings: [{ id: 0, b, origin: Y.origin, edge: {} }],   // or { id, archetype, seed, approach, rects } to build it here
+  hint: { yard: Y.yard, adapters: Y.doors.map((d) => d.adapter) }      // the yard filler's hint
+})
+// -> { schema: 'br.lot/0.1', site, setting (br.filler), at, buildings: [{ id, origin, b, conns }], conns, issues, ms }
+```
+
+1. Each building is given built (`b`, with its `origin` in the site), or is
+   built here by its own template (`LOT.template`, three seeds).
+2. Its footprint, and any courtyard it closes off, leave the surrounding site.
+3. Each ground-floor portal becomes a connection of the surrounding site
+   (`P{id}:{portalId}`), at the exact place and width of the door, unless
+   `edge` maps it to one of the site's own connections (a door on the site
+   edge).
+4. The surrounding filler honours those and the site's own edge connections.
+   Where one lands on solid, the filler carves a passage to the nearest floor.
+   It works in the frame of what the buildings leave; `at` is where that
+   frame's origin sits in the site.
+
+The workbench shows templates in their setting (section 8).
+
+## 5. Entrances and exits are template-specific
 
 Each engine and recipe decides its own portals:
 
@@ -126,7 +193,7 @@ portals: [{ role: 'both', kind: { door: 0.6, double: 0.4 }, side: 'S' },   // th
           { role: 'exit', kind: 'door', side: 'flank', p: 0.3 }]         // 'back' | 'flank' | 'any', with a chance
 ```
 
-## 5. Pipeline (`src/tpl/framework.js`)
+## 6. Pipeline (`src/tpl/framework.js`)
 
 1. **site.** The allowance becomes a canonical mask, with its largest inner
    rect.
@@ -149,7 +216,7 @@ portals: [{ role: 'both', kind: { door: 0.6, double: 0.4 }, side: 'S' },   // th
 7. **output.** Units become metres, and the building turns to face the main
    side.
 
-## 6. Engines and recipes
+## 7. Engines and recipes
 
 An **engine** is code: the architectural logic of one family. It registers
 with `BR.TPL.registerEngine({ id, name, types, mutations, program, layout,
@@ -211,7 +278,7 @@ BR.TPL.registerArchetype({
 
 Each mutation is tagged in the output (`wrong:*`), so a client can play it up.
 
-## 7. The workbench (`workbench.html`)
+## 8. The workbench (`workbench.html`)
 
 **Library (left):**
 
@@ -237,7 +304,16 @@ most common rejection. Use it after editing many recipes.
 
 **Site controls:** archetype-size or fixed W×D, a shape (rect, L, U, notched,
 random), the main side and the wrongness level (templates), and the
-connections, by count or exactly (fillers).
+connections, by count or exactly (fillers and lots).
+
+**Setting** (templates):
+
+* **its own lot**: the template in its own setting, as the world places it. A house
+  stands behind its front yard, with connections at the end of its lane and of
+  its doors' passages; a block-sized template is flush, its doors on the edge.
+* **inside a filler**: the template inside a filler from the pool, 3–9 m of site
+  round it, with the filler taking its doors as connections.
+* **template only**: the template alone, as `TPL.generate` builds it.
 
 **View options:**
 
@@ -267,7 +343,7 @@ a new template in the library, which is the fastest way to grow the catalogue.
 * `f` favourite;
 * `Esc` close.
 
-## 8. Next
+## 9. Next
 
 * **More house recipes and logic:** shotgun, duplex, courtyard, two-storey
   (with levels).
@@ -275,9 +351,12 @@ a new template in the library, which is the fastest way to grow the catalogue.
   a wing into the free arm of an L-shaped site.
 * **Composite engines** (a street of houses, a mall), then a tower engine.
 * **Entrances from connections.** Today a template picks its own doors and
-  the host hall adapts. Next, House and Rooms take their entrances from the
-  connections they are given, as fillers do.
+  the yard, the filler round it or the world's graph adapts. Next, House and
+  Rooms take their entrances from the connections they are given, as fillers
+  do.
+* **More designed settings.** Today only houses have one (the yard). A
+  restroom could sit off a corridor, storage units at the end of a passage.
 
-The world reads two optional recipe fields when it places POIs: `weight`
-(frequency within the size tier) and `poi: false` (keep the template out of
-the world). See [docs/world.md](world.md).
+The world reads three optional recipe fields when it places POIs: `weight`
+(frequency within the size tier), `poi: false` (keep the template out of
+the world) and `setting` (section 4). See [docs/world.md](world.md).

@@ -35,9 +35,9 @@
     return { summary: [arch.layout + ' layout'].concat(arch.room ? [arch.room] : []) };
   }
 
-  /** inner rect, sometimes a half metre shy of the site edge */
+  /** inner rect, sometimes a half metre shy of the site edge (never when flush: its lot edge is its walls) */
   function region(ctx, rng) {
-    const r = ctx.site.inner, m = () => (rng.f() < 0.25 ? 1 : 0);
+    const r = ctx.site.inner, m = () => (!ctx.spec.flush && rng.f() < 0.25 ? 1 : 0);
     const q = [r[0] + m(), r[1] + m(), r[2] - m(), r[3]];
     return TG.rvalid(q) ? q : r.slice();
   }

@@ -1,7 +1,7 @@
 // Shared test setup: loads the generator into globalThis.BR.
 const path = require('node:path');
 for (const f of ['core', 'tpl/grid', 'tpl/framework', 'tpl/house', 'tpl/room', 'tpl/archetypes/house', 'tpl/archetypes/room',
-  'tpl/fillers/engine', 'tpl/fillers/pool', 'poi', 'world'])
+  'tpl/fillers/engine', 'tpl/fillers/pool', 'tpl/lot', 'poi', 'world'])
   require(path.join(__dirname, '..', 'src', f + '.js'));
 const BR = globalThis.BR;
 
