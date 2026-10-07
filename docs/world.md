@@ -124,6 +124,57 @@ This is the rule from the design notes: the more specific template places the
 shared opening, and the other side adapts. Templates still choose their own
 doors; the yard, the filler or the world's graph honours them.
 
+## Seams: where blueprints meet (`src/seams.js`)
+
+Every blueprint is built on its own, so now and then two of them end up wall
+to wall: each puts an exterior wall on the same line, with floor on both
+sides. The back of a house in a neighborhood against the filler next door, a
+filler room against the one across a site edge, a small template against the
+filler built round it. Nobody planned these; a **seam** records each one,
+once:
+
+* **One wall, not two.** A seam is the shared stretch, with the room, blueprint
+  and wall stretches on each side (`a` and `b`). A client builds one wall
+  there; the map draws it once (the `b` side leaves it to the `a` side).
+* **Seam rules.** What may be cut through a seam depends on which templates
+  meet there (`BR.SEAM.RULES`, matched either way round on room kinds: the
+  template's engine and archetype, a part's for a room inside a composite, or
+  `filler` / `filler:<id>`). The one rule today, `house-backrooms`: a house,
+  alone or inside a neighborhood, against a filler gets a door with 20%
+  chance per seam (one per house and neighbour at most, in rooms from the
+  kitchen to a bedroom or a closet) or else a window with 50% chance (not in
+  closets, and not where the house already has a window). A seam opening
+  keeps clear of the seam's ends and of every opening either side already
+  has; a door needs 1 m of floor clear in front of it on both sides.
+* **Looking through.** Openings either blueprint already had on the seam are
+  listed as `through`: a house window there now looks into the room next door.
+* **Emergent, not forced.** An adapter (a house's door off the front, lot.js)
+  is forced: the template wants a way out, the world digs a passage and plans a
+  connection, and the neighbour must honour it. A seam is found after both
+  sides are built, moves nothing and digs nothing: it can only add a window or
+  an extra loop, never be anything's only way in.
+* **Order-free.** A seam reads two finished blueprints and changes neither, and
+  rolls its own dice from the world seed and its id, so it is the same
+  whatever was built first.
+
+A house on a yard lot keeps 1 m of solid round its back and sides, so it never
+meets a filler: house seams come from neighborhoods (their houses stand on
+the lot edge) and, in the workbench, from a house placed inside a filler.
+Around the nine neighborhoods on three test maps there are about 76
+house-to-backrooms seams, median 2 m long. About half already carry one of
+the house's own windows; the rules cut a few more windows and doors.
+
+```js
+W.seams(site);              // its seams: among its own blueprints, and with each neighbour
+W.seamsBetween(A, B);       // cached; A === B for one site's own
+W.neighbours(site);         // sites that share an edge with it, this cell or the next
+W.blueprints(site);         // its blueprints as seam items (filler first)
+BR.SEAM.between(X, Y, { seed, rules });   // any two lists of placed blueprints (SEAM.item)
+// -> [{ id, o, c, s0, s1, length, a, b: { key, site, poi, part, room, kind, node, walls }, rule, openings, through }]
+```
+
+Seam doors are edges of `W.graph`.
+
 Before building, every connection is checked against the site
 (`FILL.checkConnection`). A connection the site cannot honour is dropped and
 reported in `issues`. None was dropped over about 15,000 sites (5 × 5 cells
@@ -210,7 +261,8 @@ W.siteAt(x, y);  W.site('0,0:12');
 W.fillerOf(site);          // the filler the pool picks for it ('yard' for a yard lot, null for a flush lot)
 W.build(site);             // { site, origin, filler (br.filler, or null), fillerOrigin, buildings: [{ poi, origin, b (br.building), conns }], conns, issues, ms }
 W.peer(site, conn);        // the site on the other side of a connection
-W.graph(i0, j0, i1, j1);   // the room graph over those cells: { nodes, edges, dangling }
+W.graph(i0, j0, i1, j1);   // the room graph over those cells, seam doors included: { nodes, edges, dangling }
+W.seams(site);             // shared walls with its neighbours, and what the seam rules cut (above)
 W.poisIn(x0, y0, x1, y1);  W.poiAt(x, y);
 W.biomeAt(x, y);           // { openness, name }
 ```
@@ -275,5 +327,6 @@ W.biomeAt(x, y);           // { openness, name }
   cell plan already keeps POIs whole; a claim across a border needs the border
   openings to make way for it.
 * More fillers and biome families, and wrongness for fillers.
-* Shared walls drawn once. Today both sites draw the same line, which looks the
-  same but is drawn twice.
+* More seam rules: a restroom or storage units against the backrooms, a
+  window between two fillers now and then. Letting a yard lot drop its solid
+  on some sides would give ordinary houses seams too.

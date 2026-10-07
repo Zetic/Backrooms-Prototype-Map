@@ -21,6 +21,9 @@ connections:
   street in a big hall with houses, each one built by the house template.
 
 The world itself only decides where the sites are and how they connect.
+Where two blueprints happen to end up wall to wall, the shared wall is a
+**seam**: recorded once, and sometimes cut through by a seam rule (a window or
+a door from a house straight into the backrooms next door).
 
 ## The world
 
@@ -94,6 +97,7 @@ The URL hash keeps the seed, position, zoom and toggles, for example
 | `core.js` | Seeded hashing, PRNG, noise, union-find |
 | `poi.js` | POI placement per cell: tiers, density rhythm, settings (yard lots built round their house, flush lots, inside fillers), clusters, sites; `buildPOI` |
 | `world.js` | Cell plans (borders, blocks, sites, connection graph), site builds, bounded caches, queries |
+| `seams.js` | Where two blueprints end up wall to wall: each shared wall recorded once, and the seam rules that sometimes cut a window or door through it (a house against the backrooms) |
 | `render.js` | The map: tile cache, detail / plan / far views, overlays |
 | `tpl/` | The template system: kit grid, framework, House and Rooms engines, the composite pipeline (`composite.js`: templates built inside a template and merged into one blueprint) and the Neighborhood engine, archetypes, fillers, lots (`lot.js`: settings, the yard, and the adapter that builds templates inside bigger ones), blueprint renderer |
 
@@ -114,6 +118,10 @@ The runner checks:
 
 - **Templates.** Every archetype builds on many seeds, sites and main sides,
   and keeps the blueprint contract.
+- **Seams.** Every seam is one wall both blueprints share with floor on both
+  sides. Seam openings sit clear of every other opening, doors have floor in
+  front of them on both sides and join the world graph, and seams come out the
+  same whatever was built first.
 - **The neighborhood.** Every house in it is exactly what the house template
   builds alone from the spec it records. Houses line both sides of the street
   and face it, every door a house chose opens onto its front yard, and on the
