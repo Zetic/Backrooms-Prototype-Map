@@ -89,7 +89,7 @@ filler sites it fits, since most of them are only 8–12 m across.
 | `nested` | enclosed | 1 | 9 m | 70% | ring corridors one inside the other round a small core, each entered on a different side |
 | `repetition` | enclosed | 1 | 8.5 m | 84% | the same room, with the same partition or columns, copied 3–6 times in a row or grid |
 | `big_rooms` | mixed | 2 | 10 m | 52% | 2–5 big rooms joined through wide openings or no wall at all into one sprawling space |
-| `stepped` | mixed | 1 | 8 m | 99% | a mostly rectangular room whose outline climbs in square steps along one or two sides |
+| `curved` | mixed | 1 | 8 m | 99% | a mostly rectangular room with one or two sides curving: a slope easing across, the solid bowing in, the room bowing out, or a wave |
 | `gallery` | mixed | 1 | 8 m | 99% | a central room ringed by shallow bays between solid piers or wall stubs |
 
 Not in the pool: `yard` (weight 0), a house's front yard (a strip across the
@@ -160,8 +160,10 @@ renderer draws it:
 | `openings[]` | `opening` (no leaf) or `door`, on their walls |
 | `portals[]` | one per connection: `{ id, connection, opening, room, side, width, kind, tags: ['route' or 'side'] }` |
 | `columns[]` | `{ id, room, rect }` |
+| `curves[]` | only where a wall steps on a slant: `{ id, level, room, pts, line }`. `pts` is the curve drawn in place of the stair-step wall pieces in `line`, which runs from the curve's first point through the corners of the steps to its last. Both ends sit on the straight wall either side |
+| `outline` | with `curves` only: `[{ level, rings }]`, the edge of the floor with the curves in place of the steps, for drawing the floor |
 | `graph` | room graph, with `outside` for the portals |
-| `meta` | `rooms, built` (share of the site built), `openFloor` (share of floor in rooms of 80 m² or more), `partitions, columns, carved, loops, issues, ms` |
+| `meta` | `rooms, built` (share of the site built), `openFloor` (share of floor in rooms of 80 m² or more), `partitions, columns, curves, carved, loops, issues, ms` |
 
 ## Pipeline (`src/tpl/fillers/engine.js`)
 
@@ -190,10 +192,27 @@ of the site once, and the shared pipeline makes the result sound:
 6. **Furnish.** The filler's partitions and columns are each kept only if
    the 1 m walker still reaches every floor cell. They keep clear of
    openings, and partitions never cross or double up.
-7. **Output.** Metres, site frame.
+7. **Curves.** The floor is a 0.5 m raster, so a wall on a slant comes
+   out as a staircase. Where the edge between floor and solid steps three
+   or more times the same way in a row (every other run at most 1.5 m, the
+   rest at most 5 m), the steps are drawn as one smooth curve through their
+   middles, easing in from the straight wall at each end. Points where rooms
+   meet, the ends of openings and partitions, and the cells round columns
+   never move. The raster stays the truth: rooms, walls and the walker are
+   unchanged, and a curve keeps close to its stairs. Single jogs and the
+   offset rectangles of blob rooms stay square. A filler can name **soft**
+   rooms by tag (`soft: ['meander']`): there every run of 2 m or less
+   between two corners is rounded too, so small bumps and jogs go as well.
+   The meandering hall, the hall with a tail's corridor and the curved room
+   are soft. They get curves on every site, the stair-step corridor on
+   about two in five.
+
+   ![Stair-step walls before, curves after](fillers-curves.png)
+8. **Output.** Metres, site frame. The renderer draws the floor inside
+   `outline` and the curves in place of the wall pieces they replace.
 
 A new filler is a `layout` (and maybe a `furnish`), registered with
-`BR.FILL.register({ id, name, feel, weight, blurb, fits, doors, loops, layout, furnish })`.
+`BR.FILL.register({ id, name, feel, weight, blurb, fits, doors, loops, soft, layout, furnish })`.
 The pipeline's helpers are in `BR.FILL.lib`: `bsp`, `voidSome`, `notch`,
 `paintRooms`, `route`, `paintPath`; the shared layout pieces in `BR.FILL.kit`.
 A layout can ask for links in `P.require` (pairs of rooms that must share
@@ -218,6 +237,9 @@ seeds, site shapes (rect, L, U, notched, random) and 0–4 connections:
   order;
 * bad connections are refused, and tiny or odd sites still build;
 * the pool picks only fillers that fit and leans enclosed;
+* every curve starts and ends on its room's straight exterior walls,
+  replaces only that room's exterior wall pieces, never runs over an
+  opening, and keeps within 1 m of the steps it replaces;
 * the average time on 10–24 m sites stays under 5 ms (it is about 2.5 ms).
 
 ## Next
