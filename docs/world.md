@@ -218,8 +218,8 @@ POIs are decided per 128 m cell (the same grid), from `(seed, i, j)` only.
 
 | tier | per hectare at density 1 | clusters | templates |
 |---|---:|---:|---|
-| tiny | 2.0 | 55% beside a bigger POI (not one in a yard) | closet |
-| small | 1.8 | 45% | storage room, restroom, mechanical room, storage units |
+| tiny | 2.0 | 55% beside a bigger POI (not one in a yard) | closet; alone: janitor closet, utility, laundry, office, storage unit, hallway, vestibule, restroom (and, weird, a bathroom, a stall, a foyer, a pit…) |
+| small | 1.8 | 45% | storage room, restroom, mechanical room, storage units; alone: a corridor (and, weird, a kitchen, a bedroom, a garage, a street, a playground…) |
 | medium | 0.9 | | ranch, bungalow, split ranch, suburban, indoor park (on a flush lot) |
 | large | 0.04 | | neighborhood hall (about one in 25 cells), on a flush lot |
 | huge | 0.004 | | none yet |
@@ -232,8 +232,14 @@ POIs are decided per 128 m cell (the same grid), from `(seed, i, j)` only.
   be irregular: rect 50%, L 22%, notched 16%, U 12%. The extra band sits
   behind the template's rectangle, so the template never loses the room it
   asked for. A flush lot is always a rectangle.
+* **Pools.** A template's weight within its tier is scaled by its pool
+  (`POI_CFG.pools`): `expected` 1, `weird` 0.05. Weird templates (a lone
+  kitchen, a stall, a playground walled in) come to about 5% of POIs; every
+  expected one appears in a few hundred hectares, and about three quarters of
+  the weird ones do.
 * **Hooks.** `archetype.weight` sets a template's frequency within its tier,
-  and `archetype.poi = false` keeps it off the map (workbench only).
+  `archetype.pool` its pool, and `archetype.poi = false` keeps it off the map
+  (workbench only).
 
 Every number is in `BR.POI_CFG` and `BR.WORLD_CFG`.
 
@@ -309,7 +315,8 @@ W.biomeAt(x, y);           // { openness, name }
   Only openings that leave the region are left dangling.
 * A site builds the same whatever was built before, and a filler site matches
   `FILL.generate` on its own spec.
-* POI density, variety, clusters and rhythm, and the biome's range.
+* POI density, variety, clusters and rhythm, and the biome's range. Every
+  expected-pool template appears; weird ones turn up, rarely.
 * Planning a cell stays under 60 ms, its houses included.
 
 ## Next

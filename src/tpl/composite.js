@@ -302,7 +302,7 @@
       if (rm.part < 0) {
         counts[rm.type] = (counts[rm.type] || 0) + 1;
         const ty = T[rm.type] || {};
-        name = (ty.label || rm.type.replace(/_/g, ' ')) + (counts[rm.type] > 1 ? ' ' + counts[rm.type] : '');
+        name = rm.name || (ty.label || rm.type.replace(/_/g, ' ')) + (counts[rm.type] > 1 ? ' ' + counts[rm.type] : '');
       }
       return {
         id: id(i), type: rm.type, name, zone: rm.zone, level: rm.level,

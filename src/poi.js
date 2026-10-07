@@ -31,7 +31,9 @@
  * world can cut every lot out as a site of its own (world.js).
  *
  * Data hook (optional): archetype.weight, its relative frequency within its
- * tier (default 1). archetype.poi === false keeps a template off the map.
+ * tier (default 1), scaled by its pool (archetype.pool: 'expected', the
+ * default, or 'weird': CFG.pools). archetype.poi === false keeps a template
+ * off the map.
  * archetype.setting overrides its setting (LOT.setting).
  */
 (function (root) {
@@ -55,6 +57,10 @@
     density: { scale: 420, lo: 0.3, hi: 1.7, quiet: 0.12, quietK: 0.15 },
     shapes: { rect: 0.5, L: 0.22, notched: 0.16, U: 0.12 },
     shapeMin: 12,                     // metres: smaller sites stay rectangular
+    // each template's weight within its tier is scaled by its pool: what the
+    // backrooms are made of, and the out-of-place rarities (a lone kitchen,
+    // a stall, a playground)
+    pools: { expected: 1, weird: 0.05 },
     buildTries: 3                     // template seeds tried before a POI is dropped
   };
   const TIERS = ['huge', 'large', 'medium', 'small', 'tiny'];     // placement order: big first
@@ -158,7 +164,7 @@
     };
     const pickArch = (list) => {
       const w8 = {};
-      for (const a of list) w8[a.id] = a.weight || 1;
+      for (const a of list) w8[a.id] = (a.weight || 1) * (CFG.pools[a.pool || 'expected'] !== undefined ? CFG.pools[a.pool || 'expected'] : 1);
       return BR.TPL.archetypes[rng.weighted(w8)];
     };
     const add = (P) => {

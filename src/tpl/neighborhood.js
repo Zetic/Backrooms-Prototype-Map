@@ -43,12 +43,8 @@
   const SALT = { HOUSE: 0x4e48 };
   const EMPTY = -1, HOUSE = -2;
 
-  // the composite's own rooms (the houses bring theirs)
-  const T = {
-    street: { zone: 'circulation', minW: 12, label: 'street', tags: ['street', 'road', 'outdoor', 'hall'] },
-    front_yard: { zone: 'public', label: 'front yard', tags: ['yard', 'front yard', 'outdoor'] },
-    vacant_lot: { zone: 'public', label: 'empty lot', tags: ['yard', 'vacant', 'outdoor'] }
-  };
+  // the composite's own rooms (the houses bring theirs), from the catalogue
+  const T = TPL.CAT.types(['street', 'front_yard', 'vacant_lot']);
   const MUTATIONS = {
     twins: { weight: 1, label: 'every house is the same house' },
     vacant: { weight: 0.8, label: 'one lot stands empty' }

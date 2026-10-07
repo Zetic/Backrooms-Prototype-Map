@@ -59,6 +59,11 @@ no furniture.
 - **House** (ranch, bungalow, split ranch, suburban) and **Rooms & small
   POIs** (closet, storage room, restroom, mechanical room, storage units).
   [Contract, pipeline and how to add archetypes](docs/templates.md)
+- **Every room and zone alone.** Each is defined once in a shared catalogue
+  that every template draws on, and is a template of its own: a janitor
+  closet or a corridor on its own (the *expected* pool), or, rarely, a
+  kitchen, a stall or a playground walled in somewhere it doesn't belong (the
+  *weird* pool).
 - **Park**, an indoor park: a hall whose floor is tiled by zones (lawn,
   paths, plaza, playground, seating) for a later prop pass, pillars on tile
   pads, and sometimes a small building built by its own template.
@@ -102,7 +107,7 @@ The URL hash keeps the seed, position, zoom and toggles, for example
 | `world.js` | Cell plans (borders, blocks, sites, connection graph), site builds, bounded caches, queries |
 | `seams.js` | Where two blueprints end up wall to wall: each shared wall recorded once, and the seam rules that sometimes cut a window or door through it (a house against the backrooms) |
 | `render.js` | The map: tile cache, detail / plan / far views, overlays |
-| `tpl/` | The template system: kit grid, framework, House and Rooms engines, the composite pipeline (`composite.js`: templates built inside a template and merged into one blueprint) and the Neighborhood and Park engines, archetypes, fillers, lots (`lot.js`: settings, the yard, and the adapter that builds templates inside bigger ones), blueprint renderer |
+| `tpl/` | The template system: kit grid, framework, the shared catalogue of room and zone types (`catalogue.js`), House, Rooms and Zone engines, the composite pipeline (`composite.js`: templates built inside a template and merged into one blueprint) and the Neighborhood and Park engines, archetypes, fillers, lots (`lot.js`: settings, the yard, and the adapter that builds templates inside bigger ones), blueprint renderer |
 
 ```js
 const W = new BR.World(31337);
@@ -125,6 +130,10 @@ The runner checks:
   sides. Seam openings sit clear of every other opening, doors have floor in
   front of them on both sides and join the world graph, and seams come out the
   same whatever was built first.
+- **The catalogue.** Every engine's rooms and zones are the catalogue's plus
+  only its own context; every room and zone is a template of its own, alone;
+  every template is in the expected or the weird pool, and weird ones are
+  placed rarely.
 - **The park.** Its floor is tiled exactly by zones, every park has a
   playground, paths and lawn, every way in opens onto a path, pillars stand on
   tile pads and a 1 m walker gets everywhere round them, and its building is
