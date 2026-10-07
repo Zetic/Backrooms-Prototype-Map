@@ -32,6 +32,8 @@
  *
  * Biome: one slow noise field, openness, tilts the filler weights between
  * deep warrens and open stretches and sets how big the blocks get.
+ * Districts: patches of a few dozen sites where one family of fillers takes
+ * most of the sites, all in one carpet.
  *
  * Caches are bounded and only ever hold results of pure functions.
  */
@@ -50,7 +52,7 @@
     biome: { scale: 380, k: 1.7 },
     limits: { cells: 400, builds: 2500 }
   };
-  const S = { BV: 0x7701, BH: 0x7702, CELL: 0x7703, SITE: 0x7704, GRAPH: 0x7705, BIOME: 0x7706 };
+  const S = { BV: 0x7701, BH: 0x7702, CELL: 0x7703, SITE: 0x7704, GRAPH: 0x7705, BIOME: 0x7706, DISTRICT: 0x7707 };
   const G = TG.GRID, U = (m) => Math.round(m / G);
   const now = () => (typeof performance !== 'undefined' ? performance : Date).now();
   const pickW = (rng, list) => { let t = rng.f(); for (const [v, p] of list) { t -= p; if (t < 0) return v; } return list[list.length - 1][0]; };
@@ -63,6 +65,60 @@
   function fillerWeights(o) {
     const k = { enclosed: 1.3 - 0.6 * o, mixed: 0.5 + o, open: 0.15 + 2.2 * o }, w = {};
     for (const F of FILL.list()) if (F.weight > 0) w[F.id] = F.weight * (k[F.feel] || 1);
+    return w;
+  }
+
+  // ------------------------------------------------------------- districts
+  /**
+   * Districts group neighbouring sites, as the reference maps group similar
+   * spaces into named areas. Each is the Voronoi cell of a point jittered on
+   * a 96 m lattice, so it spans a few dozen sites, and a site belongs to the
+   * district its centre falls in. A district has a kind and a carpet, both
+   * from its own point (seed, lattice cell) and the biome there:
+   *   mixed      the ordinary mix
+   *   maze, corridors, suites, halls, pillars
+   *              a family of fillers takes about 70% of its sites (fitting
+   *              allowed); the rest come from the ordinary mix
+   * and one carpet for every filler room in it (mostly the yellow one).
+   */
+  const DISTRICT = {
+    size: 96, jitter: 0.8, share: 0.7,
+    families: {
+      maze: ['warren', 'cells', 'tiny_doors', 'room_maze', 'repetition', 'nested', 'sliver'],
+      corridors: ['passage', 'corridor_rooms', 'doors_nowhere', 'beads', 'comb', 'long_hall', 'stair_step', 'switchback', 'corridor_loop', 'tunnels'],
+      suites: ['enfilade', 'ring', 'big_rooms', 'curved', 'gallery'],
+      halls: ['broken', 'loop_hall', 'partitions', 'office', 'meander', 'tail', 'aisles'],
+      pillars: ['pillar_hall', 'cross_pillars', 'scattered_pillars', 'ragged_hall']
+    },
+    // kind weights by the openness at the district's point
+    kinds: (o) => ({ mixed: 3, maze: 2.2 * (1.3 - 0.6 * o), corridors: 2.2 * (1.3 - 0.6 * o), suites: 1.2, halls: 1.2 * (0.5 + o), pillars: 1.0 * (0.15 + 2.2 * o) }),
+    names: { mixed: 'mixed district', maze: 'maze district', corridors: 'corridor district', suites: 'suite district', halls: 'hall district', pillars: 'pillar district' },
+    carpets: [['yellow', 0.5], ['mustard', 0.12], ['grey', 0.1], ['wood', 0.08], ['red', 0.06], ['green', 0.05], ['blue', 0.05], ['concrete', 0.04]]
+  };
+  function districtPoint(seed, u, v) {
+    const rng = new Rng(hash4(seed, u, v, S.DISTRICT)), D = DISTRICT;
+    return [(u + 0.5 + (rng.f() - 0.5) * D.jitter) * D.size, (v + 0.5 + (rng.f() - 0.5) * D.jitter) * D.size, rng];
+  }
+  /** the district at (x, y): { id, cell: [u, v], kind, name, carpet, at: [x, y] (its point) } */
+  function districtAt(seed, x, y) {
+    const D = DISTRICT, u0 = Math.floor(x / D.size), v0 = Math.floor(y / D.size);
+    let best = null;
+    for (let u = u0 - 1; u <= u0 + 1; u++) for (let v = v0 - 1; v <= v0 + 1; v++) {
+      const p = districtPoint(seed, u, v), d = (p[0] - x) * (p[0] - x) + (p[1] - y) * (p[1] - y);
+      if (!best || d < best.d) best = { d, u, v, p };
+    }
+    const { u, v, p } = best, rng = p[2], kw = Object.entries(D.kinds(openness(seed, p[0], p[1])));
+    const tot = kw.reduce((s, e) => s + e[1], 0), kind = pickW(rng, kw.map(([k, w]) => [k, w / tot])), carpet = pickW(rng, D.carpets);
+    return { id: u + ',' + v, cell: [u, v], kind, name: D.names[kind], carpet, at: [p[0], p[1]] };
+  }
+  /** a site's filler weights: the biome's, with the district's family raised to about 70% */
+  function districtWeights(o, kind) {
+    const w = fillerWeights(o), fam = DISTRICT.families[kind];
+    if (!fam) return w;
+    let a = 0, b = 0;
+    for (const id in w) if (fam.indexOf(id) >= 0) a += w[id]; else b += w[id];
+    const k = a > 0 ? Math.max(1, Math.min(30, (DISTRICT.share / (1 - DISTRICT.share)) * (b / a))) : 1;
+    for (const id of fam) if (w[id] !== undefined) w[id] *= k;
     return w;
   }
 
@@ -409,7 +465,7 @@
       spec = { connections: conns.filter((c) => !direct.has(c.id)), buildings: [{ id: P.id, b: L.b, origin: [P.origin[0] - ox, P.origin[1] - oy], edge }],
         hint: { yard: local(L.yard, ox, oy), adapters: local(L.doors.filter((d) => d.adapter).map((d) => d.adapter), ox, oy) } };
     } else spec = { connections: conns, buildings: site.pois.map((P) => ({ id: P.id, archetype: P.archetype, seed: P.seed, approach: P.approach, rects: local(P.rects, ox, oy) })) };
-    const r = BR.LOT.build(Object.assign({ seed: site.seed, site: { rects: local(site.rects, ox, oy) }, filler: W.fillerOf(site) }, spec));
+    const r = BR.LOT.build(Object.assign({ seed: site.seed, site: { rects: local(site.rects, ox, oy) }, filler: W.fillerOf(site), carpet: W.districtOf(site).carpet }, spec));
     out.filler = r.setting;
     out.fillerOrigin = [ox + r.at[0], oy + r.at[1]];
     out.conns = r.conns;
@@ -463,7 +519,7 @@
     fillerOf(site) {
       if (site.kind === 'flush') return null;
       if (site.kind === 'lot') return 'yard';
-      if (!site._filler) site._filler = FILL.pick({ seed: site.seed, site: { rects: local(site.rects, site.bbox[0], site.bbox[1]) }, weights: fillerWeights(site.openness) });
+      if (!site._filler) site._filler = FILL.pick({ seed: site.seed, site: { rects: local(site.rects, site.bbox[0], site.bbox[1]) }, weights: districtWeights(site.openness, this.districtOf(site).kind) });
       return site._filler;
     }
     /** a site's blueprints (cached) */
@@ -486,6 +542,12 @@
       return cn || null;
     }
     biomeAt(x, y) { const o = openness(this.seed, x, y); return { openness: o, name: biomeName(o) }; }
+    /** the district at a point, and a site's (by its centre) */
+    districtAt(x, y) { return districtAt(this.seed, x, y); }
+    districtOf(site) {
+      if (!site._district) Object.defineProperty(site, '_district', { value: districtAt(this.seed, (site.bbox[0] + site.bbox[2]) / 2, (site.bbox[1] + site.bbox[3]) / 2) });
+      return site._district;
+    }
 
     /**
      * The world's room graph over the sites of cells [i0..i1] x [j0..j1]:
@@ -534,6 +596,8 @@
   BR.WORLD_CFG = CFG;
   BR.World = World;
   BR.worldFillerWeights = fillerWeights;
+  BR.DISTRICT = DISTRICT;
+  BR.districtWeights = districtWeights;
   BR.borderOpenings = borderOpenings;
   BR.openness = openness;
 })(typeof window !== 'undefined' ? window : globalThis);

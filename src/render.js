@@ -6,7 +6,8 @@
  *                         POI buildings), every floor first, then every wall, so
  *                         neighbours never paint over each other's walls
  *   plan    (0.12-1 px/m) the cell plans alone, nothing built: each site a
- *                         flat tone, lots and POIs picked out
+ *                         flat tone (tinted by its district's carpet), lots
+ *                         and POIs picked out
  *   far     (< 0.12 px/m) a raster of the biome (openness) and POI density
  *
  * Cells a filler leaves unbuilt stay the dark background: the solid mass
@@ -20,13 +21,20 @@
   const LOD = { detail: 1, plan: 0.12, labels: 7 };
   const PLAN = { site: [138, 128, 104], lot: [152, 132, 96], poi: [196, 160, 104], line: 'rgba(30,27,24,0.55)' };
   const COL = { route: '#e8913a', loop: '#3fb6bf', cross: '#e0609a', portal: '#3fbf6f', hover: 'rgba(255,255,255,0.95)', outline: 'rgba(255,255,255,0.35)' };
+  /** district overlay: a wash per kind (mixed districts only a faint one) */
+  const DCOL = { maze: [224, 96, 154], corridors: [232, 145, 58], suites: [63, 182, 191], halls: [138, 123, 224], pillars: [63, 191, 111] };
   const now = () => (typeof performance !== 'undefined' ? performance : Date).now();
   const css = (c) => 'rgb(' + c.map((v) => Math.round(v)).join(',') + ')';
 
-  /** a plan-view tone for a site: a little darker the more enclosed its biome, a touch of noise per site */
-  function planTone(s) {
+  /**
+   * a plan-view tone for a site: a little darker the more enclosed its biome,
+   * a touch of noise per site, and a filler site tinted by its carpet
+   */
+  const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  function planTone(s, carpet) {
     const base = s.kind !== 'filler' ? PLAN.lot : PLAN.site, k = 0.86 + 0.18 * s.openness + ((s.seed & 255) / 255 - 0.5) * 0.06;
-    return css(base.map((v) => Math.min(255, v * k)));
+    const C = TPL.THEMES.plan.carpet, tint = s.kind === 'filler' && carpet && C[carpet] ? hex(C[carpet]).map((v, i) => v / hex(C.yellow)[i]) : [1, 1, 1];
+    return css(base.map((v, i) => Math.min(255, v * k * tint[i])));
   }
 
   // --------------------------------------------------------------- tile painters
@@ -37,7 +45,7 @@
     g.fillStyle = BG; g.fillRect(0, 0, S * tz, S * tz);
     for (const s of sites) {
       if (W.hasBuild(s) || now() < deadline) ready.push(W.build(s));
-      else { complete = false; paintPlanSite(g, s, x0, y0, tz); }
+      else { complete = false; paintPlanSite(g, W, s, x0, y0, tz); }
     }
     // seams (seams.js): each shared wall drawn once, and what the seam rules
     // cut through it. A neighbour not built in time leaves the tile a draft
@@ -50,7 +58,7 @@
     }
     const cuts = BR.SEAM ? BR.SEAM.cuts([...seams.values()]) : new Map();
     const cutsAt = (key, origin) => (cuts.get(key) || []).map((k) => ({ o: k.o, c: k.c - (k.o === 'h' ? origin[1] : origin[0]), s0: k.s0 - (k.o === 'h' ? origin[0] : origin[1]), s1: k.s1 - (k.o === 'h' ? origin[0] : origin[1]) }));
-    const at = (origin, layer, labels, key) => ({ scale: tz, ox: (origin[0] - x0) * tz, oy: (origin[1] - y0) * tz, site: false, portals: false, labels, layer, cuts: cutsAt(key, origin) });
+    const at = (origin, layer, labels, key) => ({ scale: tz, ox: (origin[0] - x0) * tz, oy: (origin[1] - y0) * tz, site: false, portals: false, labels, layer, cuts: cutsAt(key, origin), lights: opts.lights !== false });
     const lab = opts.labels !== false && tz >= LOD.labels;
     for (const layer of ['floors', 'walls']) for (const r of ready) {
       if (r.filler) TPL.drawBuilding(g, r.filler, at(r.fillerOrigin, layer, false, r.site.id));
@@ -60,8 +68,8 @@
     return complete;
   }
 
-  function paintPlanSite(g, s, x0, y0, tz) {
-    g.fillStyle = planTone(s);
+  function paintPlanSite(g, W, s, x0, y0, tz) {
+    g.fillStyle = planTone(s, W.districtOf ? W.districtOf(s).carpet : null);
     for (const q of s.rects) g.fillRect((q[0] - x0) * tz, (q[1] - y0) * tz, (q[2] - q[0]) * tz, (q[3] - q[1]) * tz);
     if (s.pois.length) {
       g.fillStyle = css(PLAN.poi);
@@ -79,7 +87,7 @@
       if (!W.cells.has(i + ',' + j) && now() > deadline) { complete = false; continue; }
       for (const s of W.cell(i, j).sites) sites.push(s);
     }
-    for (const s of sites) paintPlanSite(g, s, x0, y0, tz);
+    for (const s of sites) paintPlanSite(g, W, s, x0, y0, tz);
     if (tz >= 0.3) {
       g.strokeStyle = PLAN.line; g.lineWidth = 1;
       g.beginPath();
@@ -127,14 +135,14 @@
 
   /**
    * view: { cx, cy, zoom (css px per metre), w, h (css px), dpr }
-   * opts: { labels, outlines, graph, hover (site id) }
+   * opts: { labels, lights, outlines, districts, graph, hover (site id) }
    * Returns { done, tiles, built, mode }.
    */
   function draw(ctx, W, view, opts, budgetMs) {
     const t0 = now(), deadline = t0 + budgetMs;
     const { cx, cy, zoom, w, h, dpr } = view;
     const { lv, tz } = levelFor(zoom, dpr), zl = tz / dpr, S = TILE / tz, mode = modeFor(zl);
-    const flags = mode + (mode === 'detail' && opts.labels !== false ? 'L' : '');
+    const flags = mode + (mode === 'detail' && opts.labels !== false ? 'L' : '') + (mode === 'detail' && opts.lights === false ? 'n' : '');
     const TC = tileCache(W);
     const hw = w / 2 / zoom, hh = h / 2 / zoom;
     const tx0 = Math.floor((cx - hw) / S), tx1 = Math.floor((cx + hw) / S), ty0 = Math.floor((cy - hh) / S), ty1 = Math.floor((cy + hh) / S);
@@ -173,7 +181,7 @@
         const L = lv - up / 2, f = Math.pow(2, up / 2), Sp = S * f;
         if (Math.abs(f - Math.round(f)) > 1e-9) continue;
         const ptx = Math.floor(t.tx / f), pty = Math.floor(t.ty / f), pm = modeFor(Math.pow(2, L) / dpr), base = L + '|' + ptx + '|' + pty + '|';
-        const pe = TC.map.get(base + pm + 'L') || TC.map.get(base + pm);
+        const pe = TC.map.get(base + pm + 'L') || TC.map.get(base + pm) || TC.map.get(base + pm + 'Ln') || TC.map.get(base + pm + 'n');
         if (!pe) continue;
         blit(pe.canvas, wx0, wy0, wx0 + S, wy0 + S, ((wx0 - ptx * Sp) / Sp) * TILE, ((wy0 - pty * Sp) / Sp) * TILE, TILE / f, TILE / f);
         break;
@@ -183,8 +191,9 @@
     // ---- per frame: overlays in world units
     ctx.setTransform(m, 0, 0, m, 0, 0);
     const ox = cx - w / 2 / zoom, oy = cy - h / 2 / zoom, P = (x) => x - ox, Q = (y) => y - oy, px = 1 / m;
-    if (zl >= 0.3 && (opts.outlines || opts.graph)) {
+    if (zl >= 0.3 && (opts.outlines || opts.graph || opts.districts)) {
       const vis = W.sitesIn(cx - hw, cy - hh, cx + hw, cy + hh);
+      if (opts.districts && W.districtOf) drawDistricts(ctx, W, vis, P, Q, px, zl >= 1);
       if (opts.outlines) {
         ctx.strokeStyle = COL.outline; ctx.lineWidth = px * 1.5;
         ctx.beginPath();
@@ -204,6 +213,25 @@
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     return { done, tiles: list.length, built, mode, level: zl };
+  }
+
+  /** districts: a wash per kind over its sites (alternating strength, so two alike side by side still part), the name at its point */
+  function drawDistricts(ctx, W, vis, P, Q, px, names) {
+    const seen = new Map();
+    for (const s of vis) {
+      const D = W.districtOf(s), c = DCOL[D.kind] || [255, 255, 255], odd = (D.cell[0] + D.cell[1]) & 1;
+      seen.set(D.id, D);
+      ctx.fillStyle = 'rgba(' + c.join(',') + ',' + (DCOL[D.kind] ? (odd ? 0.26 : 0.16) : (odd ? 0.08 : 0)) + ')';
+      for (const q of s.rects) ctx.fillRect(P(q[0]), Q(q[1]), q[2] - q[0], q[3] - q[1]);
+    }
+    if (!names) return;                              // names from 1 px/m
+    ctx.font = (12 * px) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const D of seen.values()) {
+      const t = D.name + ' · ' + D.carpet + ' carpet', x = P(D.at[0]), y = Q(D.at[1]), w = ctx.measureText(t).width;
+      ctx.fillStyle = 'rgba(20,18,16,0.75)';
+      ctx.fillRect(x - w / 2 - 4 * px, y - 9 * px, w + 8 * px, 18 * px);
+      ctx.fillStyle = '#fff'; ctx.fillText(t, x, y);
+    }
   }
 
   /** the connection graph: a dot per site, a line through each opening (orange tree, cyan loop, pink across a cell border, green into a POI) */
@@ -235,5 +263,5 @@
   }
 
   BR.draw = draw;
-  BR.RENDER = { BG, LOD, COL, modeFor, levelFor, planTone };
+  BR.RENDER = { BG, LOD, COL, DCOL, modeFor, levelFor, planTone };
 })(typeof window !== 'undefined' ? window : globalThis);

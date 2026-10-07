@@ -4,13 +4,14 @@
  * it doubles as a check that the contract carries everything a client needs.
  *
  *   BR.TPL.drawBuilding(ctx, building, { scale, ox, oy, level, theme: 'plan' | 'blueprint',
- *                       labels, dims, tags, graph, portals, highlight, site, layer, cuts })
+ *                       labels, dims, tags, graph, portals, highlight, site, layer, cuts, lights })
  *   BR.TPL.drawSeamOpenings(ctx, seams, { scale, ox, oy, theme })
  * (ox, oy) is where the site's (0, 0) lands in canvas pixels; scale is px/m.
  * layer 'floors' draws only the site and floors, 'walls' everything else, so
  * a map can draw every site's floors before any walls. cuts: [{ o, c, s0,
  * s1 }] (site frame) stretches left out of its walls: where a seam (seams.js)
- * cuts an opening, or a shared wall the other side draws.
+ * cuts an opening, or a shared wall the other side draws. lights: false
+ * leaves out a filler's ceiling lights (drawn from 3 px/m).
  */
 (function (root) {
   'use strict';
@@ -22,6 +23,8 @@
       label: 'rgba(50,42,34,0.85)', sub: 'rgba(50,42,34,0.55)', door: '#4f463c', arc: 'rgba(79,70,60,0.55)', window: '#6fb3d2',
       floor: { backrooms: '#ecd9b4', public: '#ecd9b4', private: '#e8d1ca', service: '#d8dbd0', circulation: '#ece2cc', wet: '#cfe2e6', storage: '#dcd3c3', yard: '#d9d4c7', street: '#c9c6bd', _: '#e2dccf' },
       marking: '#d6a92e',
+      carpet: { yellow: '#ecd9b4', mustard: '#e8cf8f', grey: '#dcd6c8', wood: '#d6b68c', red: '#d6a08c', green: '#cbd3ab', blue: '#c3cedb', concrete: '#cfccc5' },
+      light: { tube: '#fbf8ec', edge: 'rgba(110,96,74,0.55)', halo: 'rgba(255,251,232,0.75)', off: '#bab3a3' },
       zone: { lawn: '#b9c79a', path: '#efece4', plaza: '#e6e2d8', playground: '#e2c493', seating: '#cdbf9c', pit: '#2a2724' }
     },
     blueprint: {
@@ -29,6 +32,8 @@
       label: 'rgba(225,238,255,0.92)', sub: 'rgba(200,222,250,0.65)', door: '#eaf3ff', arc: 'rgba(220,235,255,0.5)', window: '#7fd0ff',
       floor: { backrooms: '#1b4a75', public: '#1b4a75', private: '#1b4a75', service: '#1b4a75', circulation: '#1f527f', wet: '#1d5582', storage: '#194468', yard: '#1a4670', street: '#17405f', _: '#1b4a75' },
       marking: '#ffe48a',
+      carpet: { yellow: '#1b4a75', mustard: '#21507a', grey: '#1d466c', wood: '#24486a', red: '#28466f', green: '#1b4f6e', blue: '#1a4b80', concrete: '#1f4565' },
+      light: { tube: 'rgba(230,242,255,0.9)', edge: 'rgba(200,225,255,0.6)', halo: 'rgba(180,215,255,0.2)', off: 'rgba(130,160,195,0.55)' },
       zone: { lawn: '#1d5a5f', path: '#245a86', plaza: '#22557f', playground: '#3a5f8a', seating: '#2b6182', pit: '#0b1e33' }
     }
   };
@@ -45,6 +50,11 @@
     if (t.indexOf('wet') >= 0 && t.indexOf('kitchen') < 0) return 'wet';
     if (t.indexOf('closet') >= 0 || (t.indexOf('storage') >= 0 && rm.zone !== 'public')) return 'storage';
     return rm.zone || '_';
+  }
+  /** a room's floor: its key's colour, and a filler's carpet for its Backrooms rooms */
+  function floorFill(TH, rm, b) {
+    const k = floorKey(rm);
+    return (k === 'backrooms' && b.carpet && TH.carpet && TH.carpet[b.carpet]) || TH.floor[k] || TH.floor._;
   }
 
   function drawBuilding(g, b, o) {
@@ -79,7 +89,7 @@
       }
       for (const rm of b.rooms) {
         if (!onLv(rm)) continue;
-        g.fillStyle = TH.floor[floorKey(rm)] || TH.floor._;
+        g.fillStyle = floorFill(TH, rm, b);
         g.beginPath();
         for (const r of rm.rects) g.rect(Math.round(X(r[0])), Math.round(Y(r[1])), Math.round(X(r[2])) - Math.round(X(r[0])), Math.round(Y(r[3])) - Math.round(Y(r[1])));
         g.fill();
@@ -88,7 +98,7 @@
       if (outline) {
         for (const c of curves) {
           const rm = rooms.get(c.room);
-          g.fillStyle = (rm && TH.floor[floorKey(rm)]) || TH.floor._;
+          g.fillStyle = rm ? floorFill(TH, rm, b) : TH.floor._;
           g.beginPath(); poly(c.pts.concat(c.line.slice().reverse())); g.closePath(); g.fill();
           g.strokeStyle = g.fillStyle; g.lineWidth = 1.5; g.stroke();     // no seam where it meets the room's own floor
         }
@@ -104,6 +114,7 @@
       g.fill();
     }
     if (floors) drawMarkings(g, b, lv, X, Y, S, TH);
+    if (floors && o.lights !== false) drawLights(g, b, lv, X, Y, S, TH, outline);
     if (!walls) { g.restore(); return; }
     // ---- verticals (stairs / lifts): a tread pattern in the room
     for (const v of b.verticals || []) for (const rid of v.rooms) {
@@ -317,6 +328,64 @@
     if (p.role === 'exit' || p.role === 'both') head(tip, out);
   }
 
+  /**
+   * ceiling lights (fillers): from 6 px/m each panel (or bulb) with a soft
+   * pool of light round it, a dead one grey with none; further out (from
+   * 3 px/m) a white dot per working light
+   */
+  const LIGHT = { w: 1.2, h: 0.5, bulb: 0.15, min: 3, halo: 6, glow: 1.1, bulbGlow: 0.7 };
+  function drawLights(g, b, lv, X, Y, S, TH, outline) {
+    const ls = (b.lights || []).filter((l) => (l.level || 0) === lv);
+    if (!ls.length || S < LIGHT.min || !TH.light) return;
+    const bulb = (l) => l.kind === 'bulb';
+    const half = (l) => (bulb(l) ? [LIGHT.bulb, LIGHT.bulb] : l.dir === 'v' ? [LIGHT.h / 2, LIGHT.w / 2] : [LIGHT.w / 2, LIGHT.h / 2]);
+    if (S < LIGHT.halo) {                            // zoomed out: a dot per working light
+      const d = Math.max(1.5, S * 0.5);
+      g.fillStyle = TH.light.tube;
+      for (const l of ls) if (!l.off) g.fillRect(X(l.at[0]) - d / 2, Y(l.at[1]) - d / 2, d, d);
+      return;
+    }
+    // the pool of light stays in its own room (and inside the curves)
+    const byRoom = new Map();
+    for (const l of ls) if (!l.off) { if (!byRoom.has(l.room)) byRoom.set(l.room, []); byRoom.get(l.room).push(l); }
+    const rooms = new Map(b.rooms.map((r) => [r.id, r]));
+    for (const [rid, list] of byRoom) {
+      const rm = rooms.get(rid);
+      if (!rm) continue;
+      g.save();
+      g.beginPath();
+      for (const r of rm.rects) g.rect(X(r[0]), Y(r[1]), (r[2] - r[0]) * S, (r[3] - r[1]) * S);
+      g.clip();
+      if (outline) {
+        g.beginPath();
+        for (const ring of outline.rings) { ring.forEach((p, k) => (k ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1])))); g.closePath(); }
+        g.clip('evenodd');
+      }
+      for (const l of list) {
+        const [hx, hy] = half(l), x = X(l.at[0]), y = Y(l.at[1]), gl = bulb(l) ? LIGHT.bulbGlow : LIGHT.glow, rx = (hx + gl) * S, ry = (hy + gl) * S;
+        g.save();
+        g.translate(x, y); g.scale(rx / ry, 1);
+        const gr = g.createRadialGradient(0, 0, 0, 0, 0, ry);
+        gr.addColorStop(0, TH.light.halo); gr.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = gr;
+        g.fillRect(-ry, -ry, 2 * ry, 2 * ry);
+        g.restore();
+      }
+      g.restore();
+    }
+    for (const dead of [false, true]) {
+      g.beginPath();
+      for (const l of ls) {
+        if (!!l.off !== dead) continue;
+        const [hx, hy] = half(l);
+        if (bulb(l)) { g.moveTo(X(l.at[0]) + hx * S, Y(l.at[1])); g.arc(X(l.at[0]), Y(l.at[1]), hx * S, 0, 2 * Math.PI); }
+        else g.rect(X(l.at[0] - hx), Y(l.at[1] - hy), 2 * hx * S, 2 * hy * S);
+      }
+      g.fillStyle = dead ? TH.light.off : TH.light.tube; g.fill();
+      g.strokeStyle = TH.light.edge; g.lineWidth = 1; g.stroke();
+    }
+  }
+
   /** floor paint read from room tags: a double centre line down a street */
   function drawMarkings(g, b, lv, X, Y, S, TH) {
     if (S < 1.5) return;
@@ -353,6 +422,7 @@
   TPL.drawSeamOpenings = drawSeamOpenings;
   TPL.wallRuns = wallRuns;
   TPL.floorKey = floorKey;
+  TPL.floorFill = floorFill;
   TPL.THEMES = THEMES;
   TPL.ROLE_COLORS = ROLE;
 })(typeof window !== 'undefined' ? window : globalThis);

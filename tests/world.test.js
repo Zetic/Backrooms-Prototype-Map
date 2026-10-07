@@ -267,8 +267,38 @@ const B = [-1, -1, 1, 1];
   check('a site builds the same whatever was built before', strip(W2.build(W2.site(s.id))) === strip(W.build(s)));
   const t = W.cell(0, 0).sites.find((x) => x.kind === 'filler' && !x.pois.length);
   check('a filler site builds the same as FILL.generate on its own spec', strip(W.build(t).filler) === strip(BR.FILL.generate({
-    filler: W.fillerOf(t), seed: t.seed, site: { rects: t.rects.map((q) => [q[0] - t.bbox[0], q[1] - t.bbox[1], q[2] - t.bbox[0], q[3] - t.bbox[1]]) }, connections: W.build(t).conns
+    filler: W.fillerOf(t), seed: t.seed, site: { rects: t.rects.map((q) => [q[0] - t.bbox[0], q[1] - t.bbox[1], q[2] - t.bbox[0], q[3] - t.bbox[1]]) }, connections: W.build(t).conns,
+    carpet: W.districtOf(t).carpet
   })));
+}
+
+// ---- 7b. districts: neighbouring sites share a filler family and a carpet
+{
+  require('../src/tpl/render2d.js');                 // the map themes' carpets
+  const D = BR.DISTRICT, FILL = BR.FILL, pool = FILL.list().filter((F) => F.weight > 0).map((F) => F.id), fam = {};
+  for (const k in D.families) for (const id of D.families[k]) fam[id] = (fam[id] || []).concat(k);
+  check('every pool filler is in exactly one district family, and every family member is in the pool',
+    pool.every((id) => (fam[id] || []).length === 1) && Object.keys(fam).every((id) => pool.indexOf(id) >= 0), pool.filter((id) => (fam[id] || []).length !== 1).join(', '));
+  check('district carpets are carpets the fillers and both map themes know',
+    D.carpets.every(([c]) => FILL.CARPETS.indexOf(c) >= 0) && FILL.CARPETS.every((c) => TPL.THEMES.plan.carpet[c] && TPL.THEMES.blueprint.carpet[c]));
+  const sites = [], kinds = {}, carpets = new Set(), byD = new Map();
+  for (let i = -3; i <= 2; i++) for (let j = -3; j <= 2; j++) for (const s of W.cell(i, j).sites) if (s.kind === 'filler') sites.push(s);
+  let inFam = 0, inKind = 0, same = 0;
+  for (const s of sites) {
+    const d = W.districtOf(s), F = W.fillerOf(s);
+    kinds[d.kind] = (kinds[d.kind] || 0) + 1; carpets.add(d.carpet);
+    if (D.families[d.kind]) { inKind += s.area; if (fam[F][0] === d.kind) inFam += s.area; }
+    if (!byD.has(d.id)) byD.set(d.id, 0); byD.set(d.id, byD.get(d.id) + 1);
+    const c = [(s.bbox[0] + s.bbox[2]) / 2, (s.bbox[1] + s.bbox[3]) / 2];
+    if (JSON.stringify(W.districtAt(c[0], c[1])) === JSON.stringify(d) && JSON.stringify(new BR.World(seed).districtOf(s)) === JSON.stringify(d)) same++;
+  }
+  check('a site\'s district is a pure function of the seed and where it is', same === sites.length);
+  check('every kind of district and several carpets turn up', Object.keys(kinds).length === Object.keys(D.names).length && carpets.size >= 4, JSON.stringify(kinds) + ' · ' + [...carpets].join(','));
+  check('a district\'s family fills most of it', inFam / inKind > 0.55, `${Math.round((inFam / inKind) * 100)}% of district floor`);
+  const n = [...byD.values()].sort((a, b) => a - b);
+  check('a district spans a few dozen sites', n[n.length >> 1] >= 15 && n[n.length >> 1] <= 80, `median ${n[n.length >> 1]} filler sites`);
+  const t = sites.find((s) => !s.pois.length);
+  check('a filler site carries its district\'s carpet', W.build(t).filler.carpet === W.districtOf(t).carpet);
 }
 
 // ---- 8. POI placement: density, variety, rhythm

@@ -137,11 +137,13 @@
         <div class="g2" title="templates only"><span>Wrongness</span><select id="wrong"><option value="">archetype</option><option value="0">off</option><option value="0.5">some</option><option value="1">lots</option></select></div>
         <div class="g2" title="fillers and lots: the openings the world's connection graph gives the site"><span>Connections</span><select id="nconn"><option value="0">none</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
           <input id="connx" type="text" placeholder="or exactly: S 4 1.5; E 10 2" spellcheck="false" title="side, at (m along that side), width (m); separated by ;" style="width:190px"></div>
+        <div class="g2" title="fillers and lots: the carpet the world gives a district (every Backrooms room)"><span>Carpet</span><select id="carpet"></select></div>
         <div class="g2">
           <label class="tg"><input type="checkbox" id="o-labels"> labels</label>
           <label class="tg"><input type="checkbox" id="o-dims"> sizes</label>
           <label class="tg"><input type="checkbox" id="o-tags"> tags</label>
           <label class="tg"><input type="checkbox" id="o-portals"> portals</label>
+          <label class="tg"><input type="checkbox" id="o-lights"> lights</label>
           <label class="tg"><input type="checkbox" id="o-graph"> graph</label>
           <label class="tg"><input type="checkbox" id="o-blue"> blueprint</label>
           <label class="tg"><input type="checkbox" id="o-crop"> crop</label>
@@ -223,7 +225,7 @@
   const ORIGINAL = {};
   for (const a of TPL.listArchetypes()) ORIGINAL[a.id] = JSON.parse(JSON.stringify(a));
   const SIZES = ['tiny', 'small', 'medium', 'large', 'huge'];
-  const VIEWOPTS = ['labels', 'dims', 'tags', 'portals', 'graph', 'blue', 'crop'];
+  const VIEWOPTS = ['labels', 'dims', 'tags', 'portals', 'lights', 'graph', 'blue', 'crop'];
   const store = {
     get(k, d) { try { const v = localStorage.getItem('tplwb.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem('tplwb.' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } }
@@ -232,8 +234,8 @@
 
   // ---------------------------------------------------------------- state
   const state = {
-    mode: 'seeds', arch: 'ranch', seed: 1, count: 12, siteSize: 'archetype', sw: 24, sh: 14, shape: 'rect', approach: 'S', wrong: '', setting: 'lot', nconn: 2, connx: '',
-    labels: true, dims: false, tags: false, portals: true, graph: false, blue: false, crop: true,
+    mode: 'seeds', arch: 'ranch', seed: 1, count: 12, siteSize: 'archetype', sw: 24, sh: 14, shape: 'rect', approach: 'S', wrong: '', setting: 'lot', nconn: 2, connx: '', carpet: 'yellow',
+    labels: true, dims: false, tags: false, portals: true, lights: true, graph: false, blue: false, crop: true,
     q: '', engines: '', sizes: '', fav: false, bad: false, sort: 'engine', cmp: '', detail: null
   };
   const BOOL = VIEWOPTS.concat(['fav', 'bad']);
@@ -263,7 +265,7 @@
     const ch = state.siteSize === 'fixed' ? snap(state.sh) : snap(r.range(S.h[0], S.h[1]));
     return { rects: TPL.siteShape(cw, ch, state.shape, r, approach) };
   }
-  const settingsKey = () => [state.siteSize, state.sw, state.sh, state.shape, state.approach, state.wrong, state.setting, state.nconn, state.connx].join('|');
+  const settingsKey = () => [state.siteSize, state.sw, state.sh, state.shape, state.approach, state.wrong, state.setting, state.nconn, state.connx, state.carpet].join('|');
   /** a filler's connections: typed exactly, or sampled along the outline */
   function connsFor(site, seed) {
     const txt = state.connx.trim();
@@ -274,7 +276,7 @@
     const approach = state.approach === 'mix' ? 'SENW'[seed % 4] : state.approach;
     if (arch.engine === 'filler') {
       const site = siteFor(arch, seed, approach);
-      return { filler: arch.filler || undefined, seed, site, connections: connsFor(site, seed) };
+      return { filler: arch.filler || undefined, seed, site, connections: connsFor(site, seed), carpet: state.carpet };
     }
     const s = { archetype: arch.id, seed, approach, site: siteFor(arch, seed, approach) };
     if (state.wrong !== '') s.wrongness = +state.wrong;
@@ -312,7 +314,7 @@
         if (d.adapter) connections.push({ id, side: d.side, at: d.s0, width: d.s1 - d.s0, line: d.c });
         else edge[d.portal] = id;
       }
-      return wrap(LOT.build({ seed, site: { rects: [[0, 0, Y.w, Y.h]] }, filler: 'yard', buildings: [{ id: 'b', b, origin: Y.origin, edge }], connections,
+      return wrap(LOT.build({ seed, site: { rects: [[0, 0, Y.w, Y.h]] }, filler: 'yard', carpet: state.carpet, buildings: [{ id: 'b', b, origin: Y.origin, edge }], connections,
         hint: { yard: Y.yard, adapters: Y.doors.filter((d) => d.adapter).map((d) => d.adapter) } }), 'yard', b);
     }
     if (state.setting === 'lot') {
@@ -325,7 +327,7 @@
     const bb = TG.bbox(s.site.rects), p = [r.int(3, 9), r.int(3, 9), r.int(3, 9), r.int(3, 9)];
     const site = { rects: [[0, 0, bb[2] - bb[0] + p[0] + p[2], bb[3] - bb[1] + p[1] + p[3]]] };
     const rects = s.site.rects.map((q) => [q[0] - bb[0] + p[0], q[1] - bb[1] + p[1], q[2] - bb[0] + p[0], q[3] - bb[1] + p[1]]);
-    return wrap(LOT.build({ seed, site, connections: connsFor(site, seed), buildings: [{ id: 'b', archetype: A.id, seed, approach: s.approach, rects, wrongness: s.wrongness }] }), 'filler');
+    return wrap(LOT.build({ seed, site, carpet: state.carpet, connections: connsFor(site, seed), buildings: [{ id: 'b', archetype: A.id, seed, approach: s.approach, rects, wrongness: s.wrongness }] }), 'filler');
   }
   /** a lot's one-line description */
   const lotLabel = (b) => (b.kind === 'yard' ? 'behind its front yard' : b.kind === 'flush' ? 'its own lot, flush' : 'inside a ' + (b.setting ? b.setting.name.toLowerCase() : 'filler'));
@@ -495,7 +497,7 @@
   // ---------------------------------------------------------------- controls
   function bind() {
     $('seed').value = state.seed; $('count').value = String(state.count); $('siteSize').value = state.siteSize; $('sw').value = state.sw; $('sh').value = state.sh;
-    $('shape').value = state.shape; $('approach').value = state.approach; $('wrong').value = state.wrong; $('setting').value = state.setting;
+    $('shape').value = state.shape; $('carpet').value = state.carpet; $('approach').value = state.approach; $('wrong').value = state.wrong; $('setting').value = state.setting;
     $('nconn').value = String(state.nconn); $('connx').value = state.connx;
     for (const k of VIEWOPTS) $('o-' + k).checked = state[k];
     $('sw').disabled = $('sh').disabled = state.siteSize !== 'fixed';
@@ -512,6 +514,8 @@
   on('sw', 'change', () => { state.sw = Math.max(1, +$('sw').value || 10); refresh(); });
   on('sh', 'change', () => { state.sh = Math.max(1, +$('sh').value || 10); refresh(); });
   on('shape', 'change', () => { state.shape = $('shape').value; refresh(); });
+  $('carpet').innerHTML = FILL.CARPETS.map((c) => '<option value="' + c + '">' + c + '</option>').join('');
+  on('carpet', 'change', () => { state.carpet = $('carpet').value; refresh(); });
   on('approach', 'change', () => { state.approach = $('approach').value; refresh(); });
   on('wrong', 'change', () => { state.wrong = $('wrong').value; refresh(); });
   on('setting', 'change', () => { state.setting = $('setting').value; refresh(); });
@@ -620,7 +624,7 @@
     const s = Math.min((canvas.width - 2 * pad * dpr) / fw, (canvas.height - 2 * pad * dpr) / fh);
     return { s, ox: (canvas.width - fw * s) / 2 - F[0] * s, oy: (canvas.height - fh * s) / 2 - F[1] * s, W: canvas.width, H: canvas.height, dpr };
   }
-  const drawOpts = (extra) => Object.assign({ labels: state.labels, dims: state.dims, tags: state.tags, portals: state.portals, graph: state.graph, theme: state.blue ? 'blueprint' : 'plan' }, extra || {});
+  const drawOpts = (extra) => Object.assign({ labels: state.labels, dims: state.dims, tags: state.tags, portals: state.portals, lights: state.lights, graph: state.graph, theme: state.blue ? 'blueprint' : 'plan' }, extra || {});
   function drawCard(v) {
     const { card, b } = v, cv = card.querySelector('canvas'), g = cv.getContext('2d');
     const l1 = card.querySelector('.l1 .meta'), l2 = card.querySelector('.l2');

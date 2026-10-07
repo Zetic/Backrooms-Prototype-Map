@@ -10,6 +10,7 @@
  *   - walkable by a walker 1 m wide (tests/walk.js): from the connections it
  *     reaches every floor cell, with walls, openings, partitions and columns
  *     taken into account, so no join is narrower than 1 m
+ *   - ceiling lights clear on their room's floor; nearly every room lit
  *   - deterministic, and independent of load order and connection order
  *   - the pool picks only fillers that fit, and leans enclosed
  *
@@ -108,7 +109,39 @@ function contract(b, spec) {
   if (wk.unreached) bad.push(wk.unreached + ' floor cells a 1 m walker cannot reach');
   if (wk.stuck.length) bad.push('nowhere to stand behind ' + wk.stuck.join(', '));
   if (wk.pieces > 1 && !FILL.fillers[b.filler].pieces) bad.push('the connections open onto ' + wk.pieces + ' separate floors');
-  for (const k of ['furniture', 'materials', 'lights']) if (k in b) bad.push('has ' + k);
+  for (const k of ['furniture', 'materials']) if (k in b) bad.push('has ' + k);
+  if (FILL.CARPETS.indexOf(b.carpet) < 0) bad.push('carpet ' + b.carpet);
+  // lights: each panel (1.2 x 0.5 m, 0.2 m clear round it) or bulb on its own
+  // room's floor, clear of columns and partitions, and inside the curves
+  if (!Array.isArray(b.lights)) bad.push('no lights list');
+  const rings = b.outline ? b.outline[0].rings : null;
+  const inside = (x, y) => { let c = false; for (const r of rings) for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const p = r[i], q = r[j]; if ((p[1] > y) !== (q[1] > y) && x < ((q[0] - p[0]) * (y - p[1])) / (q[1] - p[1]) + p[0]) c = !c; } return c; };
+  const segDist = (x, y, a, c) => {
+    const dx = c[0] - a[0], dy = c[1] - a[1], t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
+    return Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy);
+  };
+  for (const l of b.lights || []) {
+    if (!ids.has(l.room) || (l.kind !== 'panel' && l.kind !== 'bulb') || (l.kind === 'panel' && l.dir !== 'h' && l.dir !== 'v')) { bad.push('light ' + l.id + ' malformed'); continue; }
+    if (l.kind === 'bulb') {
+      // a bulb: 0.15 m across the middle, 0.075 m clear round it
+      const R = 0.225 - 1e-6, [x, y] = l.at, d = (q) => Math.hypot(Math.max(q[0] - x, 0, x - q[2]), Math.max(q[1] - y, 0, y - q[3]));
+      let off = false;
+      for (let cy = Math.floor((y - R) / G); cy < Math.ceil((y + R) / G); cy++) for (let cx = Math.floor((x - R) / G); cx < Math.ceil((x + R) / G); cx++) if (own(cx, cy) !== ids.get(l.room) && d([cx * G, cy * G, (cx + 1) * G, (cy + 1) * G]) < R) off = true;
+      if (off || (b.columns || []).some((c) => d(c.rect) < R)) bad.push('bulb ' + l.id + ' not clear on its room\'s floor');
+      if (b.walls.some((w) => w.kind === 'partition' && segDist(x, y, w.a, w.b) < R)) bad.push('bulb ' + l.id + ' on a partition');
+      if (rings && (!inside(x, y) || rings.some((ring) => ring.some((p, i) => segDist(x, y, ring[(i + ring.length - 1) % ring.length], p) < R)))) bad.push('bulb ' + l.id + ' outside the curves');
+      continue;
+    }
+    const hx = (l.dir === 'h' ? 0.6 : 0.25) + 0.2 - 1e-6, hy = (l.dir === 'h' ? 0.25 : 0.6) + 0.2 - 1e-6, r = [l.at[0] - hx, l.at[1] - hy, l.at[0] + hx, l.at[1] + hy];
+    let off = false;
+    for (let y = Math.floor(r[1] / G); y < Math.ceil(r[3] / G) && !off; y++) for (let x = Math.floor(r[0] / G); x < Math.ceil(r[2] / G); x++) if (own(x, y) !== ids.get(l.room)) { off = true; break; }
+    if (off) { bad.push('light ' + l.id + ' not clear on its room\'s floor'); continue; }
+    if ((b.columns || []).some((c) => c.rect[0] < r[2] && c.rect[2] > r[0] && c.rect[1] < r[3] && c.rect[3] > r[1])) bad.push('light ' + l.id + ' on a column');
+    if (b.walls.some((w) => w.kind === 'partition' && (w.a[1] === w.b[1] ? w.a[1] > r[1] && w.a[1] < r[3] && Math.min(w.a[0], w.b[0]) < r[2] && Math.max(w.a[0], w.b[0]) > r[0]
+      : w.a[0] > r[0] && w.a[0] < r[2] && Math.min(w.a[1], w.b[1]) < r[3] && Math.max(w.a[1], w.b[1]) > r[1]))) bad.push('light ' + l.id + ' across a partition');
+    if (rings && (![[r[0], r[1]], [r[2], r[1]], [r[0], r[3]], [r[2], r[3]]].every(([x, y]) => inside(x, y)) ||
+      rings.some((ring) => ring.some((p) => p[0] > r[0] && p[0] < r[2] && p[1] > r[1] && p[1] < r[3])))) bad.push('light ' + l.id + ' outside the curves');
+  }
   // curves: each replaces stair-step pieces of its room's exterior walls, no
   // opening among them, and keeps close to the steps it replaces
   if (!!b.curves !== !!b.outline) bad.push('curves without an outline, or the other way round');
@@ -134,7 +167,7 @@ function contract(b, spec) {
 }
 
 // ---------------------------------------------------------------- every filler, many sites
-const stats = {};
+const stats = {}, lit = { rooms: 0, lit: 0, n: 0, off: 0 };
 let errors = 0, total = 0;
 for (const F of FILL.list().filter((F) => !ONLY || ONLY.indexOf(F.id) >= 0)) {
   const st = stats[F.id] = { n: 0, ok: 0, ms: 0, built: 0, open: 0, skipped: 0, bad: [] };
@@ -149,12 +182,16 @@ for (const F of FILL.list().filter((F) => !ONLY || ONLY.indexOf(F.id) >= 0)) {
     const c = contract(b, spec).concat(b.meta.issues);
     if (c.length) { st.bad.push('#' + seed + ': ' + c.slice(0, 3).join('; ')); continue; }
     st.ok++; st.ms += b.meta.ms; st.built += b.meta.built; st.open += b.meta.openFloor;
+    for (const rm of b.rooms) if (rm.area >= 6 && rm.rects.some((r) => Math.min(r[2] - r[0], r[3] - r[1]) >= 2)) { lit.rooms++; if (b.lights.some((l) => l.room === rm.id)) lit.lit++; }
+    lit.n += b.lights.length; lit.off += b.lights.filter((l) => l.off).length;
   }
   console.log('     ' + F.id.padEnd(12) + (st.ok + '/' + st.n + ' ok').padEnd(10) + ' avg ' + (st.ms / Math.max(1, st.ok)).toFixed(2) + ' ms, built ' +
     Math.round((st.built / Math.max(1, st.ok)) * 100) + '%, open floor ' + Math.round((st.open / Math.max(1, st.ok)) * 100) + '%' + (st.skipped ? ', ' + st.skipped + ' sites too small' : ''));
 }
 const allBad = [].concat(...Object.keys(stats).map((k) => stats[k].bad.map((x) => k + ' ' + x)));
 check('every filler builds on any site shape and keeps the contract', allBad.length === 0, allBad.length + ' bad of ' + total + (allBad.length ? ': ' + allBad.slice(0, 4).join(' | ') : ''));
+check('nearly every room 2 m across or more has a ceiling light, and a few are dead', lit.lit >= lit.rooms * 0.97 && lit.off > lit.n * 0.02 && lit.off < lit.n * 0.15,
+  `${lit.lit} of ${lit.rooms} rooms lit, ${lit.off} of ${lit.n} lights dead`);
 check('connections that do not fit are refused, not moved', (() => {
   const b1 = FILL.generate({ filler: 'warren', seed: 1, site: { w: 20, h: 20 }, connections: [{ id: 'x', side: 'N', at: 19.5, width: 1.5 }] });
   const b2 = FILL.generate({ filler: 'warren', seed: 1, site: { rects: [[0, 0, 10, 20], [10, 10, 20, 20]] }, connections: [{ id: 'y', side: 'N', at: 12, width: 1.5, line: 0 }] });

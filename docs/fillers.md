@@ -12,8 +12,10 @@ rectilinear site, and they honour every connection they are given.
 They are Backrooms only and lean **enclosed**: clumps of irregular rooms,
 long thin corridors with rooms hung on them, mazes and chains of rooms,
 with a hall only now and then. Cells a filler leaves unbuilt are solid,
-the mass between rooms that the reference maps are full of. Every filler
-room draws in the one Backrooms carpet colour; zone colours are for POIs.
+the mass between rooms that the reference maps are full of. Every room of a
+filler draws in one Backrooms carpet; zone colours are for POIs. The world
+gives each district its own carpet (mostly the yellow one), and every filler
+has ceiling lights.
 
 ![One example of each filler](fillers-atlas.png)
 
@@ -27,8 +29,9 @@ summary bar. *Check health* builds each filler on 12 standard sites and
 shows how many came out clean.
 
 The map (`index.html`) is built from fillers: every site that is not a POI's
-lot gets one from the pool, weighted by the biome, and builds round any small
-POI inside it. A house's lot is built by the `yard` filler
+lot gets one from the pool, weighted by the biome and by its district (most
+of a district's sites come from one family of fillers), and builds round any
+small POI inside it. A house's lot is built by the `yard` filler
 ([docs/world.md](world.md)), in pieces: the front yard, and each door's
 passage to the lot edge.
 
@@ -128,7 +131,8 @@ BR.FILL.generate({
     { id: 'n2', side: 'E', at: 10, width: 2, kind: 'door', route: false }
   ],
   weights: { warren: 30 },     // optional, only used when picking
-  hint: { yard: [[2, 14, 28, 18], [10, 18, 16, 26]], adapters: [] }  // optional, metres: the yard filler's front yard and passages
+  hint: { yard: [[2, 14, 28, 18], [10, 18, 16, 26]], adapters: [] },  // optional, metres: the yard filler's front yard and passages
+  carpet: 'red'                // optional: one of BR.FILL.CARPETS, yellow when left out
 })
 ```
 
@@ -153,6 +157,7 @@ renderer draws it:
 | field | content |
 |---|---|
 | `schema, filler, name, feel, seed, grid` | identity |
+| `carpet` | the floor of every Backrooms room: one of `BR.FILL.CARPETS` (`yellow, mustard, grey, wood, red, green, blue, concrete`) |
 | `site`, `connections` | the input, as used |
 | `levels`, `footprint` | one level; the built cells |
 | `rooms[]` | `{ id, type, name, zone, level, rects, area, ceiling, tags }`. Types: `room`, `hall`, `passage`, `cell`, `alcove`, `closet`. Every room is tagged `backrooms` plus what made it (`warren`, `enfilade`, `ring`, `bridge`, `landing`…) |
@@ -160,10 +165,11 @@ renderer draws it:
 | `openings[]` | `opening` (no leaf) or `door`, on their walls |
 | `portals[]` | one per connection: `{ id, connection, opening, room, side, width, kind, tags: ['route' or 'side'] }` |
 | `columns[]` | `{ id, room, rect }` |
+| `lights[]` | ceiling lights: `{ id, level, room, kind, at: [x, y] (the centre), dir?, off? }`. `kind` is `panel` (1.2 × 0.5 m, `dir` `h` or `v` the long way) or `bulb` (0.3 m across). `off: true` is a dead one |
 | `curves[]` | only where a wall steps on a slant: `{ id, level, room, pts, line }`. `pts` is the curve drawn in place of the stair-step wall pieces in `line`, which runs from the curve's first point through the corners of the steps to its last. Both ends sit on the straight wall either side |
 | `outline` | with `curves` only: `[{ level, rings }]`, the edge of the floor with the curves in place of the steps, for drawing the floor |
 | `graph` | room graph, with `outside` for the portals |
-| `meta` | `rooms, built` (share of the site built), `openFloor` (share of floor in rooms of 80 m² or more), `partitions, columns, curves, carved, loops, issues, ms` |
+| `meta` | `rooms, built` (share of the site built), `openFloor` (share of floor in rooms of 80 m² or more), `partitions, columns, curves, lights, carved, loops, issues, ms` |
 
 ## Pipeline (`src/tpl/fillers/engine.js`)
 
@@ -208,8 +214,25 @@ of the site once, and the shared pipeline makes the result sound:
    about two in five.
 
    ![Stair-step walls before, curves after](fillers-curves.png)
-8. **Output.** Metres, site frame. The renderer draws the floor inside
-   `outline` and the curves in place of the wall pieces they replace.
+8. **Lights.** The long fluorescent ceiling panels, about every 3 m. Each
+   room gets an even lattice centred on it, in rows. Where a room is 4 m
+   across or less (a passage, a hall's arm, a corridor on a slant) the lights
+   run single file down the middle instead, so they follow the corridor round
+   its turns. A panel keeps 0.2 m clear of walls, columns, partitions and the
+   curves. In a room with columns or partitions the lattice takes the spacing
+   (3–4 m) and offset that fit the most panels between them, so the rows stay
+   straight and sit between the pillars. A lattice panel that still does not
+   fit slides 0.5 m along its row or is left out; a corridor one slides along
+   the corridor, and where no panel fits at all (a winding tail, a stair-step
+   corridor, a closet) a small round bulb takes its place. About one in
+   fourteen is dead. Lights are only drawn: nothing walks or routes by them.
+
+   ![Ceiling lights in a few fillers](fillers-lights.png)
+9. **Output.** Metres, site frame. The renderer draws the floor inside
+   `outline` and the curves in place of the wall pieces they replace, in the
+   filler's carpet, then the lights: from 6 px/m each panel with a soft pool
+   of light round it (kept to its room), a dead one grey; from 3 px/m a white
+   dot per working light.
 
 A new filler is a `layout` (and maybe a `furnish`), registered with
 `BR.FILL.register({ id, name, feel, weight, blurb, fits, doors, loops, soft, layout, furnish })`.
@@ -240,13 +263,13 @@ seeds, site shapes (rect, L, U, notched, random) and 0–4 connections:
 * every curve starts and ends on its room's straight exterior walls,
   replaces only that room's exterior wall pieces, never runs over an
   opening, and keeps within 1 m of the steps it replaces;
+* every light, with its clearance, is on its own room's floor, off columns
+  and partitions and inside the curves; nearly every room 2 m across has
+  one, and a few are dead;
 * the average time on 10–24 m sites stays under 5 ms (it is about 2.5 ms).
 
 ## Next
 
-* Zones or districts: neighbouring sites share a filler family or a carpet
-  colour, as the reference maps group similar spaces into named areas.
-* Ceiling lights drawn in rows along corridors and halls.
 * House and Rooms take their entrances from connections in the same way.
   Today they choose their own doors, and the world or the filler round them
   adapts (docs/world.md).

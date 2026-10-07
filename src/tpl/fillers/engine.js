@@ -26,7 +26,8 @@
  *               the 1 m walker still reaches every floor cell
  *   7. curves   a wall that steps on a slant is drawn as a smooth curve
  *               (drawing only: the raster stays the truth)
- *   8. output   metres, site frame (+x right, +y down)
+ *   8. lights   ceiling panels in rows, single file down narrow parts
+ *   9. output   metres, site frame (+x right, +y down)
  *
  * Cells a layout leaves unbuilt are solid: the mass between rooms that gives
  * the Backrooms its enclosed feel. All geometry is integer kit units
@@ -45,7 +46,9 @@
   const U = (m) => Math.round(m / G);
   const SIDES = ['N', 'E', 'S', 'W'];
   const PASS = { door: 1, opening: 1 };             // walkable opening kinds a filler cuts
-  const SALT = { LAYOUT: 1, JOIN: 2, OPEN: 3, FURNISH: 4, CEIL: 5, PICK: 6 };
+  const SALT = { LAYOUT: 1, JOIN: 2, OPEN: 3, FURNISH: 4, CEIL: 5, PICK: 6, LIGHT: 7 };
+  /** carpets a filler's rooms can have (spec.carpet; the world gives one per district) */
+  FILL.CARPETS = ['yellow', 'mustard', 'grey', 'wood', 'red', 'green', 'blue', 'concrete'];
   const now = () => (typeof performance !== 'undefined' ? performance : Date).now();
 
   /** Room catalogue: zone, tags and ceiling range (m). */
@@ -961,7 +964,8 @@
   /**
    * spec: { filler (id; picked from the pool when omitted), seed, site: { w, h } | { rects } (metres),
    *         connections: [{ id, side, at, width, line?, kind?, route? }], weights?,
-   *         hint? (the filler's own; lists of rects in it are metres, e.g. the yard's { yard, adapters }) }
+   *         hint? (the filler's own; lists of rects in it are metres, e.g. the yard's { yard, adapters }),
+   *         carpet? (one of FILL.CARPETS, for every Backrooms room; yellow when omitted) }
    * Returns a filler blueprint (docs/fillers.md) or { error }.
    */
   function generate(spec) {
@@ -1007,7 +1011,7 @@
     if (!F.pieces) for (let v = 1; v < P.rooms.length; v++) if (J.uf.find(v) !== J.uf.find(0)) { issues.push('room graph is not connected'); break; }
     const crng = rs(SALT.CEIL);
     for (const rm of P.rooms) { const c = (TYPES[rm.type] || TYPES.room).ceil; rm.ceiling = Math.round(crng.range(c[0], c[1]) * 10) / 10; }
-    const b = output(spec, S, P, J, F, seed);
+    const b = output(spec, S, P, J, F, seed, rs(SALT.LIGHT));
     b.meta.carved = Math.round(carved * G * G * 10) / 10;
     b.meta.loops = J.loops;
     b.meta.issues = issues;
@@ -1150,8 +1154,180 @@
     return { outline, curves: out };
   }
 
+  // ============================================================ lights
+  /**
+   * Ceiling lights: the long fluorescent panels of the Backrooms, 1.2 by
+   * 0.5 m, about every 3 m. Each room gets an even lattice centred on it, in
+   * rows; with columns or partitions in it, the spacing (3 to 4 m) and phase
+   * that fit the most panels between them. Where a room narrows to 4 m or
+   * less (a passage, a hall's arm, a corridor on a slant) the lights run
+   * single file down the middle instead, along it. A panel keeps 0.2 m clear
+   * of walls, columns and partitions (and inside the curves). A lattice
+   * panel that does not fit slides 0.5 m along its row or is left out; a
+   * corridor one slides along the corridor, and where no panel fits (a
+   * winding tail, a stair-step corridor, a closet) a small round bulb takes
+   * its place. A few are dead. Drawing and mood only: nothing walks or
+   * routes by them.
+   * Returns [{ room, at: [x, y], kind: 'panel' | 'bulb', dir: 'h' | 'v', off }], cell units.
+   */
+  const LIGHT = { pitch: 6, narrow: 8, len: 2.4, wid: 1, clear: 0.4, bulb: 0.3, bulbClear: 0.15, apart: 4, off: 0.07 };
+  function lights(P, rings, rng) {
+    const W = P.W, H = P.H, A = P.R.a, L = LIGHT, n = P.rooms.length;
+    // per cell, its room's straight run through it each way: from, to
+    const H0 = new Int32Array(W * H), H1 = new Int32Array(W * H), V0 = new Int32Array(W * H), V1 = new Int32Array(W * H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W;) {
+      const v = A[y * W + x];
+      let e = x + 1;
+      while (e < W && A[y * W + e] === v) e++;
+      for (let i = x; i < e; i++) { H0[y * W + i] = x; H1[y * W + i] = e; }
+      x = e;
+    }
+    for (let x = 0; x < W; x++) for (let y = 0; y < H;) {
+      const v = A[y * W + x];
+      let e = y + 1;
+      while (e < H && A[e * W + x] === v) e++;
+      for (let i = y; i < e; i++) { V0[i * W + x] = y; V1[i * W + x] = e; }
+      y = e;
+    }
+    const box = P.rooms.map(() => [W, H, 0, 0]);
+    for (let i = 0; i < A.length; i++) {
+      const v = A[i];
+      if (v < 0) continue;
+      const x = i % W, y = (i - x) / W, b = box[v];
+      if (x < b[0]) b[0] = x; if (y < b[1]) b[1] = y; if (x + 1 > b[2]) b[2] = x + 1; if (y + 1 > b[3]) b[3] = y + 1;
+    }
+    const inside = (x, y) => {                       // even-odd, against the smoothed outline
+      let c = false;
+      for (const r of rings) for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+        const a = r[i], b = r[j];
+        if ((a[1] > y) !== (b[1] > y) && x < ((b[0] - a[0]) * (y - a[1])) / (b[1] - a[1]) + a[0]) c = !c;
+      }
+      return c;
+    };
+    // columns and partitions by room (only a room's own can be in its way)
+    const cols = P.rooms.map(() => []), parts = P.rooms.map(() => []);
+    for (const c of P.columns) if (c.room >= 0) cols[c.room].push(c.rect);
+    for (const p of P.partitions) if (p.room >= 0) parts[p.room].push(p);
+    const fits = (v, cx, cy, dir) => {
+      const hx = (dir === 'h' ? L.len : L.wid) / 2, hy = (dir === 'h' ? L.wid : L.len) / 2;
+      const x0 = cx - hx - L.clear, y0 = cy - hy - L.clear, x1 = cx + hx + L.clear, y1 = cy + hy + L.clear;
+      if (x0 < 0 || y0 < 0 || x1 > W || y1 > H) return false;
+      for (let y = Math.floor(y0); y < Math.ceil(y1); y++) for (let x = Math.floor(x0); x < Math.ceil(x1); x++) if (A[y * W + x] !== v) return false;
+      for (const r of cols[v]) if (r[0] < x1 && r[2] > x0 && r[1] < y1 && r[3] > y0) return false;
+      for (const p of parts[v]) {
+        if (p.o === 'h' ? p.c > y0 && p.c < y1 && p.s0 < x1 && p.s1 > x0 : p.c > x0 && p.c < x1 && p.s0 < y1 && p.s1 > y0) return false;
+      }
+      if (rings) {                                   // corners inside the curves, and no curve point within
+        const e = 0.05, a0 = x0 - e, b0 = y0 - e, a1 = x1 + e, b1 = y1 + e;
+        if (!(inside(a0, b0) && inside(a1, b0) && inside(a0, b1) && inside(a1, b1))) return false;
+        for (const r of rings) for (const p of r) if (p[0] > a0 && p[0] < a1 && p[1] > b0 && p[1] < b1) return false;
+      }
+      return true;
+    };
+    // a bulb: a disc of radius bulb, bulbClear from any other cell, column, partition or curve
+    const segDist = (x, y, a, b) => {
+      const dx = b[0] - a[0], dy = b[1] - a[1], t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
+      return Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy);
+    };
+    const rectDist = (x, y, r) => Math.hypot(Math.max(r[0] - x, 0, x - r[2]), Math.max(r[1] - y, 0, y - r[3]));
+    const fitsBulb = (v, cx, cy) => {
+      const R = L.bulb + L.bulbClear;
+      if (cx - R < 0 || cy - R < 0 || cx + R > W || cy + R > H) return false;
+      for (let y = Math.floor(cy - R); y < Math.ceil(cy + R); y++) for (let x = Math.floor(cx - R); x < Math.ceil(cx + R); x++) {
+        if (A[y * W + x] !== v && rectDist(cx, cy, [x, y, x + 1, y + 1]) < R) return false;
+      }
+      for (const r of cols[v]) if (rectDist(cx, cy, r) < R) return false;
+      for (const p of parts[v]) if ((p.o === 'h' ? segDist(cx, cy, [p.s0, p.c], [p.s1, p.c]) : segDist(cx, cy, [p.c, p.s0], [p.c, p.s1])) < R) return false;
+      if (rings) {
+        if (!inside(cx, cy)) return false;
+        for (const r of rings) for (let i = 0, j = r.length - 1; i < r.length; j = i++) if (segDist(cx, cy, r[j], r[i]) < R + 0.05) return false;
+      }
+      return true;
+    };
+    const out = [];
+    const near = (v, x, y) => out.some((l) => l.room === v && Math.abs(l.at[0] - x) < L.apart && Math.abs(l.at[1] - y) < L.apart);
+    const even = (a, b, pitch) => {                  // lattice lines across [a, b], evenly spaced and centred
+      const k = Math.max(1, Math.round((b - a) / pitch)), s0 = a + (b - a - (k - 1) * pitch) / 2, r = [];
+      for (let i = 0; i < k; i++) r.push(s0 + i * pitch);
+      return r;
+    };
+    // a lattice light only slides 0.5 m along its row (the rows stay
+    // straight; one a column is in the way of is left out), a corridor light
+    // slides along the corridor
+    const SH = L.pitch / 2, HALF = L.pitch / 4;
+    const tries = { gridh: [[0, 0], [1, 0], [-1, 0]], gridv: [[0, 0], [0, 1], [0, -1]], wide: [[0, 0], [SH, 0], [-SH, 0], [0, SH], [0, -SH], [SH, SH], [-SH, -SH], [SH, -SH], [-SH, SH]],
+      h: [[0, 0], [HALF, 0], [-HALF, 0], [SH, 0], [-SH, 0]], v: [[0, 0], [0, HALF], [0, -HALF], [0, SH], [0, -SH]] };
+    const place = (v, x, y, dir, kind, bulbs) => {
+      for (const d of tries[kind]) {
+        const cx = x + d[0], cy = y + d[1];
+        if (fits(v, cx, cy, dir)) { if (!near(v, cx, cy)) out.push({ room: v, at: [cx, cy], kind: 'panel', dir, off: false }); return; }
+      }
+      if (bulbs) for (const d of tries[kind]) {
+        const cx = x + d[0], cy = y + d[1];
+        if (fitsBulb(v, cx, cy)) { if (!near(v, cx, cy)) out.push({ room: v, at: [cx, cy], kind: 'bulb', dir, off: false }); return; }
+      }
+    };
+    for (let v = 0; v < n; v++) {
+      const b = box[v];
+      if (b[2] <= b[0]) continue;
+      let xs = even(b[0], b[2], L.pitch), ys = even(b[1], b[3], L.pitch);
+      const axis = b[2] - b[0] >= b[3] - b[1] ? 'h' : 'v', n0 = out.length;
+      const narrowH = (i) => V1[i] - V0[i] <= L.narrow && H1[i] - H0[i] >= V1[i] - V0[i];  // runs along x (or on a slant)
+      const narrowV = (i) => H1[i] - H0[i] <= L.narrow && V1[i] - V0[i] > H1[i] - H0[i];   // runs along y
+      const open = (x, y) => { const i = Math.min(H - 1, Math.floor(y)) * W + Math.min(W - 1, Math.floor(x)); return A[i] === v && !narrowH(i) && !narrowV(i); };
+      // with columns or partitions in the room, the lattice takes the spacing
+      // (3 to 4 m) and phase that light the most floor between them
+      let ox = 0, oy = 0;
+      if (cols[v].length || parts[v].length) {
+        // a summed table of the room's free cells (not under a column, not
+        // beside a partition) scores each try in constant time
+        const W1 = W + 1, T = new Int32Array(W1 * (H + 1)), free = new Uint8Array(W * H);
+        for (let i = 0; i < W * H; i++) free[i] = A[i] === v ? 1 : 0;
+        for (const r of cols[v]) for (let y = r[1]; y < r[3]; y++) for (let x = r[0]; x < r[2]; x++) free[y * W + x] = 0;
+        for (const p of parts[v]) for (let t = p.s0; t < p.s1; t++) for (const c of [p.c - 1, p.c]) {
+          const x = p.o === 'h' ? t : c, y = p.o === 'h' ? c : t;
+          if (x >= 0 && y >= 0 && x < W && y < H) free[y * W + x] = 0;
+        }
+        for (let y = 0; y < H; y++) for (let x = 0, row = 0; x < W; x++) { row += free[y * W + x]; T[(y + 1) * W1 + x + 1] = T[y * W1 + x + 1] + row; }
+        const hx = (axis === 'h' ? L.len : L.wid) / 2 + L.clear, hy = (axis === 'h' ? L.wid : L.len) / 2 + L.clear;
+        const rough = (cx, cy) => {
+          const xa = Math.floor(cx - hx), xb = Math.ceil(cx + hx), ya = Math.floor(cy - hy), yb = Math.ceil(cy + hy);
+          if (xa < 0 || ya < 0 || xb > W || yb > H) return false;
+          return T[yb * W1 + xb] - T[ya * W1 + xb] - T[yb * W1 + xa] + T[ya * W1 + xa] === (xb - xa) * (yb - ya);
+        };
+        let best = -1;
+        for (let pitch = L.pitch; pitch <= L.pitch + 2; pitch++) {
+          const px = even(b[0], b[2], pitch), py = even(b[1], b[3], pitch);
+          for (let dy = 1 - pitch / 2; dy <= pitch / 2; dy++) for (let dx = 1 - pitch / 2; dx <= pitch / 2; dx++) {
+            let k = 0;
+            for (const y of py) for (const x of px) if (rough(x + dx, y + dy) && open(x + dx, y + dy)) k++;
+            if (k * pitch * pitch > best) { best = k * pitch * pitch; ox = dx; oy = dy; xs = px; ys = py; }
+          }
+        }
+      }
+      const lattice = (kind, bulbs) => {
+        for (const y of ys) for (const x of xs) if (open(x + ox, y + oy)) place(v, x + ox, y + oy, axis, kind || 'grid' + axis, bulbs);
+      };
+      // the open lattice
+      lattice(null, false);
+      // single file down the narrow parts
+      for (const x of xs) {
+        const cx = Math.min(W - 1, Math.floor(x));
+        for (let y = b[1]; y < b[3]; y++) { const i = y * W + cx; if (A[i] === v && narrowH(i)) { place(v, x, (V0[i] + V1[i]) / 2, 'h', 'h', true); y = V1[i] - 1; } }
+      }
+      for (const y of ys) {
+        const cy = Math.min(H - 1, Math.floor(y));
+        for (let x = b[0]; x < b[2]; x++) { const i = cy * W + x; if (A[i] === v && narrowV(i)) { place(v, (H0[i] + H1[i]) / 2, y, 'v', 'v', true); x = H1[i] - 1; } }
+      }
+      // a room still dark (packed with partitions or columns) looks further, and takes bulbs
+      if (out.length === n0) lattice('wide', true);
+    }
+    for (const l of out) l.off = rng.f() < L.off;
+    return out;
+  }
+
   // ============================================================ output
-  function output(spec, S, P, J, F, seed) {
+  function output(spec, S, P, J, F, seed, lrng) {
     const W = P.W, m = (v) => Math.round(v * G * 1000) / 1000, id = (v) => (v >= 0 ? 'r' + v : null);
     const pt = (o, c, s) => (o === 'h' ? [m(s), m(c)] : [m(c), m(s)]);
     // per-room rects, area
@@ -1202,17 +1378,19 @@
       outline: [{ level: 0, rings: cv.outline.map((r) => r.map(mp)) }],
       curves: cv.curves.map((c, k) => ({ id: 'c' + k, level: 0, room: id(c.room), pts: c.pts.map(mp), line: c.line.map(mp) }))
     } : {};
+    const lit = lights(P, cv.curves.length ? cv.outline : null, lrng).map((l, k) => Object.assign({ id: 'l' + k, level: 0, room: id(l.room), kind: l.kind, at: [m(l.at[0]), m(l.at[1])] }, l.kind === 'panel' ? { dir: l.dir } : {}, l.off ? { off: true } : {}));
     return Object.assign({
       schema: FILL.SCHEMA, filler: F.id, name: F.name, feel: F.feel, seed, grid: G,
+      carpet: FILL.CARPETS.indexOf(spec.carpet) >= 0 ? spec.carpet : FILL.CARPETS[0],
       site: { w: S.w, h: S.h, rects: S.rects },
       connections: J.portals.map((p) => ({ id: p.conn.id, side: p.conn.side, at: m(p.conn.s0), width: m(p.conn.s1 - p.conn.s0), line: m(p.conn.line), kind: p.conn.kind, route: p.conn.route })),
       levels: [{ index: 0, elevation: 0, height: Math.max(...rooms.map((r) => r.ceiling), 2.4) }],
       footprint: [{ level: 0, rects: TG.rectsWhere(P.R, (v) => v >= 0).map((r) => r.map(m)) }],
-      rooms, walls, openings: ops, portals, columns, verticals: [], graph,
+      rooms, walls, openings: ops, portals, columns, lights: lit, verticals: [], graph,
       meta: {
         rooms: rooms.length, built: Math.round((built / S.area) * 1000) / 1000,
         openFloor: Math.round((bigFloor / Math.max(1, built * G * G)) * 1000) / 1000,
-        partitions: P.partitions.length, columns: P.columns.length, curves: cv.curves.length
+        partitions: P.partitions.length, columns: P.columns.length, curves: cv.curves.length, lights: lit.length
       }
     }, smooth);
   }

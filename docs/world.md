@@ -95,9 +95,9 @@ Measured over 8 × 8 cells for three seeds:
 `W.build(site)` returns the site's blueprints. It is cached, and the result
 depends only on the site.
 
-* **A filler site.** The biome's weights pick a filler from the pool
-  (`FILL.pick`). The filler builds the site from the site's connections, given
-  in its own frame.
+* **A filler site.** The biome's weights, tilted by the site's district,
+  pick a filler from the pool (`FILL.pick`). The filler builds the site from
+  the site's connections, given in its own frame, in the district's carpet.
 * **A yard lot.** The house was built with the plan, and its lot sized round
   what was built (`LOT.yard`): 1 m of solid behind the house, 2–3 m beside
   it, and 4–12 m in front. The front yard is one room: a strip 2–4 m deep
@@ -202,6 +202,42 @@ region, enclosed fillers cover 64–77% of the filler area, mixed 18–25% and
 open 5–10%. Hover the map to see a place's biome: *deep warren* (under 0.3),
 *backrooms*, or *open stretch* (over 0.7).
 
+## Districts
+
+The reference maps group similar spaces into named areas: a maze here, a
+pillar hall there, each with its own carpet. Districts do the same. Each is
+the Voronoi cell of a point jittered on a 96 m lattice, and a site belongs to
+the district its centre falls in, so a district is a patch of about 35 filler
+sites (a few to about 50). A district's kind and carpet come from its own
+point (seed and lattice cell), so they never depend on what was planned or
+built first.
+
+| kind | weight at its point | family that takes about 70% of its sites |
+|---|---|---|
+| mixed | 3 | none: the biome's own mix |
+| maze | 2.2 × (1.3 − 0.6 × openness) | warren, cells, tiny doors, room maze, repetition, nested, sliver |
+| corridors | 2.2 × (1.3 − 0.6 × openness) | passage, corridor with rooms, doors to nowhere, beads, comb, long hall, stair step, switchback, corridor loop, tunnels |
+| suites | 1.2 | enfilade, ring, big rooms, curved big room, gallery |
+| halls | 1.2 × (0.5 + openness) | broken room, loop hall, partitions, office, meandering hall, hall with a tail, aisles |
+| pillars | 1.0 × (0.15 + 2.2 × openness) | pillar hall, cross-pillar hall, scattered pillars, ragged hall |
+
+The family's weights are raised until it holds about 70% of the weight
+(never lowered, at most 30 times); fillers that do not fit a site still drop
+out, so a pillar district on small sites ends nearer 55%. Every pool filler
+is in exactly one family. Over a region the mix stays where the biome puts
+it: about 69% enclosed, 20% mixed and 11% open by area. Mixed districts are
+about a quarter of the map, maze and corridor districts a fifth each, and
+suites, halls and pillars about a tenth each.
+
+Each district also has a **carpet**, the floor of every Backrooms room in it:
+yellow about half the time, then mustard (12%), grey (10%), wood (8%), red
+(6%), green (5%), blue (5%) and concrete (4%). A yard is still a yard, and a
+POI's own rooms keep their zone colours. Hover the map to see a site's
+district, or turn on *Districts* to wash each kind in its own colour, with
+each district's name and carpet at its point.
+
+![The same place with and without the Districts overlay: carpets on the left, district kinds and names on the right](world-districts.png)
+
 ## POIs (`src/poi.js`)
 
 POIs are decided per 128 m cell (the same grid), from `(seed, i, j)` only.
@@ -251,11 +287,13 @@ blits them and spends a 14 ms budget on the missing ones, nearest first.
 | zoom | view |
 |---|---|
 | 1 px/m and closer | **Detail.** Every site's blueprints: the filler or yard, then any POI buildings. All floors are drawn before any walls, so neighbours never paint over each other's walls. POI room labels appear from 7 px/m. |
-| 0.12–1 px/m | **Plan.** The cell plans alone, with nothing built. Each site is a flat tone, lots are picked out, and POIs are drawn as their sites. |
+| 0.12–1 px/m | **Plan.** The cell plans alone, with nothing built. Each site is a flat tone (a filler site tinted by its district's carpet), lots are picked out, and POIs are drawn as their sites. |
 | under 0.12 px/m | **Far.** A raster of the biome and the POI density. |
 
-The per-frame overlays are hover (the site's outline), *Site outlines* and
-*Connection graph*.
+Fillers' ceiling lights are drawn from 3 px/m, as white dots, and from 6 px/m
+as panels with a pool of light round each (docs/fillers.md); *Ceiling lights*
+turns them off. The per-frame overlays are hover (the site's outline),
+*Districts*, *Site outlines* and *Connection graph*.
 
 ## API
 
@@ -265,6 +303,8 @@ W.cell(i, j);              // { i, j, rect, density, openness, pois, lots, borde
 W.sitesIn(x0, y0, x1, y1); // sites whose bbox meets the rect
 W.siteAt(x, y);  W.site('0,0:12');
 W.fillerOf(site);          // the filler the pool picks for it ('yard' for a yard lot, null for a flush lot)
+W.districtOf(site);        // its district: { id, cell, kind, name, carpet, at (the district's point) }
+W.districtAt(x, y);        // the district round a point
 W.build(site);             // { site, origin, filler (br.filler, or null), fillerOrigin, buildings: [{ poi, origin, b (br.building), conns }], conns, issues, ms }
 W.peer(site, conn);        // the site on the other side of a connection
 W.graph(i0, j0, i1, j1);   // the room graph over those cells, seam doors included: { nodes, edges, dangling }
@@ -315,6 +355,11 @@ W.biomeAt(x, y);           // { openness, name }
   Only openings that leave the region are left dangling.
 * A site builds the same whatever was built before, and a filler site matches
   `FILL.generate` on its own spec.
+* Every pool filler is in exactly one district family, and district carpets
+  are ones the fillers and both map themes know. A site's district is a pure
+  function of the seed and its place. Every kind of district and several
+  carpets turn up, a district's family fills most of it, a district spans a
+  few dozen sites, and a filler site carries its district's carpet.
 * POI density, variety, clusters and rhythm, and the biome's range. Every
   expected-pool template appears; weird ones turn up, rarely.
 * Planning a cell stays under 60 ms, its houses included.
@@ -333,7 +378,9 @@ W.biomeAt(x, y);           // { openness, name }
 * Big POIs that claim across cells (a longer street in a hall, a mall). The
   cell plan already keeps POIs whole; a claim across a border needs the border
   openings to make way for it.
-* More fillers and biome families, and wrongness for fillers.
+* More fillers, and wrongness for fillers.
+* Districts that change more than the filler mix and the carpet: a ceiling
+  height, a light colour, flooded rooms.
 * More seam rules: a restroom or storage units against the backrooms, a
   window between two fillers now and then. Letting a yard lot drop its solid
   on some sides would give ordinary houses seams too.

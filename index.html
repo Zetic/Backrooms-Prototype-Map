@@ -60,7 +60,7 @@
   </div>
   <div class="sec">Map</div>
   <div id="legend">
-    <div><i style="background:#ecd9b4"></i>Backrooms floor</div>
+    <div><i style="background:#ecd9b4"></i>Backrooms floor (carpet varies by district)</div>
     <div><i style="background:#d9d4c7"></i>Front yard</div>
     <div><i style="background:#3b3934"></i>Solid</div>
     <div><i style="background:#c4a068"></i>POI site (far)</div>
@@ -70,6 +70,8 @@
   <div class="sec">Show</div>
   <div class="grid2">
     <label class="tg"><input type="checkbox" id="o-labels" checked> Room labels</label>
+    <label class="tg"><input type="checkbox" id="o-lights" checked> Ceiling lights</label>
+    <label class="tg"><input type="checkbox" id="o-districts"> Districts</label>
     <label class="tg"><input type="checkbox" id="o-outlines"> Site outlines</label>
     <label class="tg"><input type="checkbox" id="o-graph"> Connection graph</label>
   </div>
@@ -114,8 +116,8 @@
   const canvas = document.getElementById('c');
   const ctx = canvas.getContext('2d');
   const $ = (id) => document.getElementById(id);
-  const OPTS = ['labels', 'outlines', 'graph'];
-  const DEFAULT_ON = new Set(['labels']);                 // on unless the URL says 0
+  const OPTS = ['labels', 'lights', 'districts', 'outlines', 'graph'];
+  const DEFAULT_ON = new Set(['labels', 'lights']);                 // on unless the URL says 0
 
   // ---------- state (mirrored into the URL hash so views are shareable)
   const Q = new URLSearchParams(location.hash.slice(1));
@@ -190,6 +192,8 @@
     const what = s.kind === 'flush' ? '<b>' + esc(s.pois[0].name) + '</b> · its own lot, doors on the edge' : s.kind === 'lot' ? '<b>' + esc(s.pois[0].name) + '</b> · its own lot, in a yard' : '<b>' + esc(F.name) + '</b> · ' + F.feel + ' filler';
     let html = what + '<br>site ' + s.id + ' · ' + (b[2] - b[0]) + '×' + (b[3] - b[1]) + ' m · ' + s.area + ' m²' +
       (s.rects.length > 1 ? ' · ' + s.rects.length + ' blocks' : '') + '<br>' + s.conns.length + (s.conns.length === 1 ? ' connection · ' : ' connections · ') + bio.name + ' (openness ' + s.openness.toFixed(2) + ')';
+    const D = world.districtOf(s);
+    html += '<br>' + D.name + ' · ' + D.carpet + ' carpet';
     if (world.hasBuild(s)) {
       const r = world.build(s), f = r.filler;
       html += '<br>' + (f ? f.rooms.length + ' rooms · built ' + Math.round(f.meta.built * 100) + '% · ' : '') + r.ms.toFixed(1) + ' ms' + (r.issues.length ? '<br><span style="color:#e0503f">' + esc(r.issues[0]) + '</span>' : '');

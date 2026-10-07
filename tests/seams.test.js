@@ -6,9 +6,11 @@ const { check, finish } = harness(), SEAM = BR.SEAM, TPL = BR.TPL, LOT = BR.LOT,
 const strip = (x) => JSON.stringify(x);
 const EPS = 1e-9;
 
-// neighborhoods on a few maps: their houses stand on the lot edge, so they meet fillers
+// neighborhoods on a few maps: their houses stand on the lot edge, so they meet
+// fillers (most of those seams are short or already have the house's door,
+// so windows are rare: enough maps to see a few)
 const hoods = [];
-for (const seed of [31337, 7, 12345]) {
+for (const seed of [31337, 7, 12345, 99, 4242, 1, 2, 3]) {
   const W = new BR.World(seed);
   for (let i = -4; i < 4; i++) for (let j = -4; j < 4; j++) for (const P of W.cell(i, j).pois) if (P.archetype === 'neighborhood') hoods.push({ W, P, site: W.siteAt(P.cx, P.cy) });
 }
