@@ -17,12 +17,12 @@
     plan: {
       site: '#3b3934', siteLine: 'rgba(255,255,255,0.16)', wall: '#2c2925', thin: '#3d3934', open: 'rgba(60,50,40,0.3)',
       label: 'rgba(50,42,34,0.85)', sub: 'rgba(50,42,34,0.55)', door: '#4f463c', arc: 'rgba(79,70,60,0.55)', window: '#6fb3d2',
-      floor: { public: '#ecd9b4', private: '#e8d1ca', service: '#d8dbd0', circulation: '#ece2cc', wet: '#cfe2e6', storage: '#dcd3c3', _: '#e2dccf' }
+      floor: { public: '#ecd9b4', private: '#e8d1ca', service: '#d8dbd0', circulation: '#ece2cc', wet: '#cfe2e6', storage: '#dcd3c3', yard: '#d9d4c7', _: '#e2dccf' }
     },
     blueprint: {
       site: '#123250', siteLine: 'rgba(170,210,255,0.25)', wall: '#eaf3ff', thin: '#c9def5', open: 'rgba(200,225,255,0.35)',
       label: 'rgba(225,238,255,0.92)', sub: 'rgba(200,222,250,0.65)', door: '#eaf3ff', arc: 'rgba(220,235,255,0.5)', window: '#7fd0ff',
-      floor: { public: '#1b4a75', private: '#1b4a75', service: '#1b4a75', circulation: '#1f527f', wet: '#1d5582', storage: '#194468', _: '#1b4a75' }
+      floor: { public: '#1b4a75', private: '#1b4a75', service: '#1b4a75', circulation: '#1f527f', wet: '#1d5582', storage: '#194468', yard: '#1a4670', _: '#1b4a75' }
     }
   };
   const ROLE = { entrance: '#3fbf6f', exit: '#e8913a', both: '#3fb6bf' };
@@ -32,6 +32,7 @@
   const bigRect = (rs) => rs.reduce((p, q) => ((q[2] - q[0]) * (q[3] - q[1]) > (p[2] - p[0]) * (p[3] - p[1]) ? q : p));
   function floorKey(rm) {
     const t = rm.tags || [];
+    if (t.indexOf('yard') >= 0) return 'yard';
     if (t.indexOf('wet') >= 0 && t.indexOf('kitchen') < 0) return 'wet';
     if (t.indexOf('closet') >= 0 || (t.indexOf('storage') >= 0 && rm.zone !== 'public')) return 'storage';
     return rm.zone || '_';

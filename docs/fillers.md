@@ -2,7 +2,10 @@
 
 In the template-first world every site is built by a template from its
 connections. POIs (houses, restrooms, later malls and streets) claim their
-sites first; every other site gets a **filler**. Fillers are the bulk of the
+places first: a house gets a lot with a yard, a block-sized template a lot of
+its own, and a smaller one sits inside a filler's site. Every other site gets
+a **filler**, which also builds round any small POI inside it, taking its
+doors as connections. Fillers are the bulk of the
 map, so they are cheap (about 1 ms on a 10–24 m site), they cope with any
 rectilinear site, and they honour every connection they are given.
 
@@ -22,8 +25,9 @@ side, metres along it, width). Pool pick with 48 seeds shows the mix in the
 summary bar. *Check health* builds each filler on 12 standard sites and
 shows how many came out clean.
 
-The map (`index.html`) is built from fillers: every site no POI claims gets
-one from the pool, weighted by the biome, and every POI sits in a `host` hall
+The map (`index.html`) is built from fillers: every site that is not a POI's
+lot gets one from the pool, weighted by the biome, and builds round any small
+POI inside it. A house's lot is built by the `yard` filler
 ([docs/world.md](world.md)).
 
 ## The pool
@@ -38,7 +42,7 @@ one from the pool, weighted by the biome, and every POI sits in a `host` hall
 | `broken` | mixed | 20 | a 10–18 m room cut up by stub walls and gapped partitions, with small rooms or solid around it |
 | `ragged_hall` | open | 5 | a big room with a notched outline, a few columns, sometimes a solid block to walk around |
 | `pillar_hall` | open | 5 | an open floor on a 3.5–6 m column grid |
-| `host` | open | 0 | not in the pool: the hall the world wraps round a POI building (the POI's site comes as a `hint`), with a warren beyond it |
+| `yard` | open | 0 | not in the pool: the big room a house stands in, open floor in front of its front door and the walls on the lot edge (`src/tpl/lot.js`; the lot comes as a `hint`) |
 
 The weights add up to 70 enclosed, 20 mixed and 10 open. `BR.FILL.pick`
 chooses by weight among the fillers that fit the site (each has a `fits`
@@ -60,7 +64,7 @@ BR.FILL.generate({
     { id: 'n2', side: 'E', at: 10, width: 2, kind: 'door', route: false }
   ],
   weights: { warren: 30 },     // optional, only used when picking
-  hint: { hall: [[4, 4, 16, 12]] }  // optional, metres: where the host filler puts its hall
+  hint: { lots: [{ rect: [2, 3, 30, 26], front: 'S', kind: 'yard' }] }  // optional, metres: the yard filler's lots
 })
 ```
 
@@ -140,6 +144,8 @@ seeds, site shapes (rect, L, U, notched, random) and 0–4 connections:
 ## Next
 
 * House and Rooms take their entrances from connections in the same way.
+  Today they choose their own doors, and the world or the filler round them
+  adapts (docs/world.md).
 * More variety: a gallery (a room with a ring of bays), a stair-ish split
   level, corridor-with-rooms, and wrongness for fillers (false doors,
   dead-end loops, a ceiling at the wrong height).

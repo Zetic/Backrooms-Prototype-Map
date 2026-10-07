@@ -703,7 +703,7 @@
   /**
    * spec: { filler (id; picked from the pool when omitted), seed, site: { w, h } | { rects } (metres),
    *         connections: [{ id, side, at, width, line?, kind?, route? }], weights?,
-   *         hint? ({ hall: [rects] }, metres: where a host filler's hall goes) }
+   *         hint? ({ lots: [{ rect, front, kind }] }, metres: the yard's lots, src/tpl/lot.js) }
    * Returns a filler blueprint (docs/fillers.md) or { error }.
    */
   function generate(spec) {
@@ -728,7 +728,7 @@
     const rs = (salt) => new Rng(hash4(base, salt, 0, 0x66));
 
     const P = makePlan(S, conns, base);
-    P.hint = spec.hint && spec.hint.hall ? { hall: spec.hint.hall.map((q) => q.map(U)) } : null;
+    P.hint = spec.hint && spec.hint.lots ? { lots: spec.hint.lots.map((L) => Object.assign({}, L, { rect: L.rect.map(U) })) } : null;
     F.layout(P, rs(SALT.LAYOUT), F);
     land(P);
     clean(P);
