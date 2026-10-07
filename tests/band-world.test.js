@@ -70,7 +70,8 @@ for (const seed of [7, 99, 31337]) {
     assert.equal(components(g.nodes, g.edges).sizes.length, 1);
     const entrance = p.id + '/s:entry', arrival = p.id + '/s:arrival';
     assert(walk(g, entrance).has(arrival)); assert(walk(g, arrival).has(entrance));
-    assert.equal([...g.nodes].filter((v) => v.startsWith(p.id + '/')).length, 9, 'shared journey surfaces are emitted once');
+    assert.equal([...g.nodes].filter((v) => v.startsWith(p.id + '/')).length, w.transition(p).surfaces.length, 'shared journey surfaces are emitted once');
+    assert(w.transition(p).rooms.some((r) => r.tags.includes('vertical-infill')), 'world selects the populated atrium');
     assert(g.dangling.every((id) => /\|[vh]/.test(id)), 'only cell borders leave this region');
     const one = w.graph(p.i, p.j, p.i, p.j, [n]);
     assert(one.verticalFrontier.some((v) => v.owner === p.id && v.band === 'band:' + (n + 1)));
@@ -144,7 +145,7 @@ for (const fault of ['height', 'width', 'side', 'clearance', 'missing']) {
 }
 assert.throws(() => new BR.BandWorld(7, { band: 0.5 }), /integer/);
 assert.throws(() => new BR.BandWorld(7).exportRegion(0, 0, 8, 8, [0]), /64/);
-same(E.validate(E.generate({ seed: 7, direction: 'down', rise: 16, site: { w: 80, h: 72 } })).errors, []);
+same(E.validate(E.generate({ seed: 7, direction: 'down', rise: 16, site: { w: 56, h: 48 }, infill: true })).errors, []);
 assert.throws(() => E.generate({ rise: 16 }), /too steep/);
 console.log('ok   invalid portal matching, region sizes and slopes rejected; both-direction scaled fills remain physical');
 console.log('All band-world checks passed.');

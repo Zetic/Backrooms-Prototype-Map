@@ -13,6 +13,7 @@ run('park.test.js', [], 'park (a hall tiled by zones)');
 run('fillers.test.js', [], 'fillers');
 run('architectural.test.js', [], 'architectural curves (constant radii and radial layouts)');
 run('elevation.test.js', [], 'elevation (surfaces, vertical fills, capabilities and reservations)');
+run('atrium.test.js', [], 'compact world atriums (territory use and physical infill)');
 run('elevation-ui.test.js', [], 'elevation lab controller');
 run('band-world.test.js', [], 'elevation world (ownership, matching, topology and eviction)');
 run('band-render.test.js', [], 'elevation map tiles and floor slices');
