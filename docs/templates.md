@@ -4,7 +4,8 @@ Templates design the authored-feeling places (POIs) that sit inside the
 backrooms. They range in size:
 
 * **Small:** a one-room closet, a restroom, storage units.
-* **Medium:** a house.
+* **Medium:** a house; an indoor park (a hall laid out as lawns, paths and a
+  playground, sometimes with a small building of its own).
 * **Large:** a neighborhood: houses lined up on both sides of a street in a
   big hall, each one built by the house template (section 8: templates inside
   templates).
@@ -90,6 +91,8 @@ Lengths are in metres in the site frame. Ids are stable within a building.
 | `portals[]` | `{ id, opening, level, room, role, kind, side, width, clear, main, tags }`. Where the POI meets the backrooms. `role`: `entrance`, `exit` or `both`. `main` marks the main entrance. `clear`: metres of open floor the world must keep in front |
 | `verticals[]` | `{ id, kind, rooms: [bottom → top], dead, tags }`: stairs, lifts, ladders linking stacked rooms. `dead: true` means it leads nowhere (a mutation) |
 | `graph` | `{ nodes: [room ids, 'outside'], edges: [[a, b, kind, opening id], ...] }`. Edge kinds: the opening kinds, `open`, and vertical kinds |
+| `zones[]` | `{ id, type, name, room, level, rects, area, tags }`: marked areas of a room's floor, with no walls, for a later prop pass to read (a park's `lawn`, `path`, `plaza`, `playground`, `seating`). A room with zones is tiled by them exactly: every floor cell in one zone, each zone one connected patch. Optional; empty for templates that mark none |
+| `columns[]` | `{ id, room, level, rect }`: pillars standing in a room (the same as a filler's). Optional |
 | `parts[]` | composite templates only: `{ id, archetype, engine, name, label, approach, site: { rects }, score, mutations, rooms: [ids], doors: [opening ids], spec }`, one per template built inside it. `spec` is exactly what built it, so `TPL.generate` on that spec alone gives the same building (section 8) |
 | `meta` | `plan, score, terms, candidates, valid, chosen, mutations, program, issues, autoDoors, layoutFailures, ms`. This is debug information, not part of the building |
 
@@ -321,7 +324,8 @@ in place of `layout`. `TPL.generate` hands it to `TPL.compose`:
    carried over, renumbered.
 4. **Validate.** Rooms inside the site, no overlaps, no child door onto solid
    or back into its own building, an entrance, every room reachable from the
-   outside.
+   outside. Zones inside their room, never overlapping, a zoned room tiled
+   exactly; columns inside their room.
 5. **Score.** The children's mean penalty, plus the engine's own terms.
 6. **Output.** Metres, turned to face the main side, with `parts[]` (section
    3).
@@ -364,6 +368,37 @@ down it; fences, mailboxes and the stop sign are for a furnishing pass. A
 neighborhood is about 40–52 × 40–64 m, the `large` tier: on the map it is a
 flush lot of its own, joined to the backrooms only through its entrance and
 far door.
+
+### The park
+
+![An indoor park](park.png)
+
+`park` (`src/tpl/park.js`, `src/tpl/archetypes/park.js`), after the indoor
+park of the pitfalls reference: one hall under a 4.5–7 m ceiling, 28–44 ×
+24–38 m (the `medium` tier, a flush lot of its own on the map). Its floor is
+tiled exactly by **zones**, marked areas that drive props later:
+
+| zone | what it marks |
+|---|---|
+| `lawn` | grass, everything the other zones leave |
+| `path` | a tiled path from the entrance to the far wall, often a cross path wall to wall (70%) |
+| `plaza` | tile: a pad under each pillar, and a metre of apron round the building |
+| `playground` | one 7–11 × 6–10 m area beside a path, a metre of lawn round it |
+| `seating` | 1–4 bench spots on a path's edge |
+| `pit` | wrongness: a hole in the lawn, tagged `hazard` |
+
+Zones are painted by rank (lawn < path < seating < plaza < playground < pit),
+then each connected patch of a type is one zone; a crumb under 1 m² joins the
+zone round it. Pillars (75% of parks) stand on a loose 8–11 m grid, each on a
+tile pad, off the paths, the playground, the building and the entrances; the
+`crowded` mutation halves the spacing. The entrance is an opening at the
+bottom of the main path; by chance there are ways out at its far end (40%)
+and at each end of the cross path (35%).
+
+60% of the time the park tries for a small **building**, from the recipe's
+`building.templates` (`restroom`, `storage_room`, `bungalow` by weight): a
+real template built on its own sub-site in a block the paths leave, facing the
+main path, 2–3 m of park round it. If none fits, the park is open.
 
 ## 9. The workbench (`workbench.html`)
 
@@ -414,10 +449,11 @@ connections, by count or exactly (fillers and lots).
 
 **Detail view** (click a card):
 
-* pan and zoom; hovering a room of a composite names the part it is in;
+* pan and zoom; hovering a room names the zone under the cursor and, in a
+  composite, the part it is in;
 * level tabs;
 * tabs for score breakdown and rejections, rooms with tags (grouped by part
-  in a composite), portals, program (with the parts of a composite), issues,
+  in a composite) and zones, portals, program (with the parts of a composite), issues,
   and the JSON (copy or download).
 
 **Recipes:** *Edit recipe* changes a recipe live. *Save as new…* forks it into
@@ -439,6 +475,8 @@ a new template in the library, which is the fastest way to grow the catalogue.
   (with levels).
 * **Use the leftover arms of irregular sites.** For example, push a garage or
   a wing into the free arm of an L-shaped site.
+* **Zones for more templates:** a front yard tiled into lawn and driveway, a
+  house's rooms into furniture areas, a filler hall into aisles.
 * **More composite engines:** a mall, then a tower engine. For the
   neighborhood: alleys between houses out to the hall wall, back doors that
   open onto them, and a cul-de-sac or a crossroads; a neighborhood that

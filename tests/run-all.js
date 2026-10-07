@@ -8,8 +8,9 @@ const run = (file, args, title) => {
 };
 run('templates.test.js', [], 'templates');
 run('neighborhood.test.js', [], 'neighborhood (templates inside a template)');
+run('park.test.js', [], 'park (a hall tiled by zones)');
 run('fillers.test.js', [], 'fillers');
 run('seams.test.js', [], 'seams (shared walls between blueprints)');
 for (const seed of ['31337', '7', '12345', '99', '4242']) run('world.test.js', [seed], 'world: seed ' + seed);
 run('ui-smoke.test.js', [], 'map page');
-console.log('\nAll template, neighborhood, filler, seam, world (5 seeds) and map page checks passed.');
+console.log('\nAll template, neighborhood, park, filler, seam, world (5 seeds) and map page checks passed.');

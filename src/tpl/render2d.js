@@ -21,13 +21,15 @@
       site: '#3b3934', siteLine: 'rgba(255,255,255,0.16)', wall: '#2c2925', thin: '#3d3934', open: 'rgba(60,50,40,0.3)',
       label: 'rgba(50,42,34,0.85)', sub: 'rgba(50,42,34,0.55)', door: '#4f463c', arc: 'rgba(79,70,60,0.55)', window: '#6fb3d2',
       floor: { backrooms: '#ecd9b4', public: '#ecd9b4', private: '#e8d1ca', service: '#d8dbd0', circulation: '#ece2cc', wet: '#cfe2e6', storage: '#dcd3c3', yard: '#d9d4c7', street: '#c9c6bd', _: '#e2dccf' },
-      marking: '#d6a92e'
+      marking: '#d6a92e',
+      zone: { lawn: '#b9c79a', path: '#efece4', plaza: '#e6e2d8', playground: '#e2c493', seating: '#cdbf9c', pit: '#2a2724' }
     },
     blueprint: {
       site: '#123250', siteLine: 'rgba(170,210,255,0.25)', wall: '#eaf3ff', thin: '#c9def5', open: 'rgba(200,225,255,0.35)',
       label: 'rgba(225,238,255,0.92)', sub: 'rgba(200,222,250,0.65)', door: '#eaf3ff', arc: 'rgba(220,235,255,0.5)', window: '#7fd0ff',
       floor: { backrooms: '#1b4a75', public: '#1b4a75', private: '#1b4a75', service: '#1b4a75', circulation: '#1f527f', wet: '#1d5582', storage: '#194468', yard: '#1a4670', street: '#17405f', _: '#1b4a75' },
-      marking: '#ffe48a'
+      marking: '#ffe48a',
+      zone: { lawn: '#1d5a5f', path: '#245a86', plaza: '#22557f', playground: '#3a5f8a', seating: '#2b6182', pit: '#0b1e33' }
     }
   };
   const ROLE = { entrance: '#3fbf6f', exit: '#e8913a', both: '#3fb6bf' };
@@ -71,6 +73,14 @@
       for (const r of rm.rects) g.rect(Math.round(X(r[0])), Math.round(Y(r[1])), Math.round(X(r[2])) - Math.round(X(r[0])), Math.round(Y(r[3])) - Math.round(Y(r[1])));
       g.fill();
       if (o.highlight === rm.id) { g.fillStyle = o.theme === 'blueprint' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.4)'; g.fill(); }
+    }
+    // ---- zones: marked areas of a room's floor (a park's lawns, paths, playground)
+    if (floors) for (const z of b.zones || []) {
+      if ((z.level || 0) !== lv || !TH.zone || !TH.zone[z.type]) continue;
+      g.fillStyle = TH.zone[z.type];
+      g.beginPath();
+      for (const r of z.rects) g.rect(Math.round(X(r[0])), Math.round(Y(r[1])), Math.round(X(r[2])) - Math.round(X(r[0])), Math.round(Y(r[3])) - Math.round(Y(r[1])));
+      g.fill();
     }
     if (floors) drawMarkings(g, b, lv, X, Y, S, TH);
     if (!walls) { g.restore(); return; }
@@ -152,6 +162,15 @@
         g.font = (fs * 0.82) + 'px ui-sans-serif, system-ui, sans-serif';
         g.fillStyle = TH.sub;
         fit.forEach((t, k) => { if (g.measureText(t).width <= w - 3) g.fillText(t, cx, y0 + fs * 1.1 * (k + 1)); });
+      }
+      // the zones worth naming on a plan
+      for (const z of b.zones || []) {
+        if ((z.level || 0) !== lv || ['playground', 'pit'].indexOf(z.type) < 0) continue;
+        const r = bigRect(z.rects), w = (r[2] - r[0]) * S, fs = Math.max(8, Math.min(12, S * 0.38));
+        g.font = 'italic ' + fs + 'px ui-sans-serif, system-ui, sans-serif';
+        if (g.measureText(z.type).width > w - 6 || (r[3] - r[1]) * S < fs * 1.4) continue;
+        g.fillStyle = z.type === 'pit' ? WRONG : TH.sub;
+        g.fillText(z.type, X((r[0] + r[2]) / 2), Y((r[1] + r[3]) / 2));
       }
     }
     g.restore();

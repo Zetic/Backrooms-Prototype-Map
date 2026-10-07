@@ -24,6 +24,10 @@
  *                    portals: [{ room, o, c, s0, s1 (units, on the room's
  *                                exterior wall), kind, role, main, clear, tags }],
  *                    open: true | [[i, j]] (own room pairs with no wall),
+ *                    zones: [{ type, room, rects (units), tags }]: marked
+ *                      areas of its own rooms; a room with zones is tiled by
+ *                      them exactly (every floor cell in one zone),
+ *                    columns: [{ room, rect (units) }]: pillars standing in its rooms,
  *                    terms: { penalty: points }, meta, summary }
  *   4. merge     one raster of every room (own + children). Walls come from
  *                it: a child's own walls keep their kind, a child's outer
@@ -255,6 +259,25 @@
     while (st.length) { const u = st.pop(); for (const v of adj[u]) if (!seen[v]) { seen[v] = 1; st.push(v); } }
     const lost = res.rooms.map((_, i) => i).filter((i) => !seen[i]);
     if (lost.length) hard('unreachable: ' + lost.map((i) => res.rooms[i].type).join(', '));
+    // ---- zones: inside their room, never overlapping, and a zoned room tiled exactly
+    res.zones = (plan.zones || []).map((z) => Object.assign({ level: 0, tags: [] }, z));
+    if (res.zones.length) {
+      const Z = new TG.Raster(W, H, -1), zoned = new Set();
+      res.zones.forEach((z, k) => {
+        zoned.add(z.room);
+        for (const q of z.rects) for (let y = q[1]; y < q[3]; y++) for (let x = q[0]; x < q[2]; x++) {
+          if (res.R[z.level].get(x, y) !== z.room) { hard('zone ' + z.type + ' outside its room'); return; }
+          if (Z.get(x, y) >= 0) { hard('zones ' + res.zones[Z.get(x, y)].type + ' and ' + z.type + ' overlap'); return; }
+          Z.set(x, y, k);
+        }
+      });
+      let bare = 0;
+      for (const i of zoned) { const R = res.R[res.rooms[i].level]; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (R.get(x, y) === i && Z.get(x, y) < 0) bare++; }
+      if (bare) hard(bare + ' cells of a zoned room in no zone');
+    }
+    // ---- columns stand inside their room
+    res.columns = (plan.columns || []).map((c) => Object.assign({ level: 0 }, c));
+    for (const c of res.columns) if (!res.R[c.level].all(c.rect, c.room)) hard('a column outside its room');
     return res;
   }
 
@@ -312,6 +335,12 @@
       side: O.side(p.side), width: m(res.openings[p.opening].s1 - res.openings[p.opening].s0), clear: p.clear, main: p.main, tags: p.tags
     }));
     const verticals = res.verticals.map((v, i) => ({ id: 'v' + i, kind: v.kind, rooms: v.rooms.map(id), dead: !!v.dead, tags: v.tags }));
+    const zones = res.zones.map((z, i) => {
+      counts['zone:' + z.type] = (counts['zone:' + z.type] || 0) + 1;
+      const label = ((T[z.type] && T[z.type].label) || z.type.replace(/_/g, ' ')) + (counts['zone:' + z.type] > 1 ? ' ' + counts['zone:' + z.type] : '');
+      return { id: 'z' + i, type: z.type, name: label, room: id(z.room), level: z.level, rects: z.rects.map(Rm), area: Math.round(TG.rectsArea(z.rects) * G * G * 100) / 100, tags: z.tags };
+    });
+    const columns = res.columns.map((c, i) => ({ id: 'c' + i, room: id(c.room), level: c.level, rect: Rm(c.rect) }));
     const footprint = [];
     for (let lv = 0; lv < res.L; lv++) footprint.push({ level: lv, rects: TG.rectsWhere(res.R[lv], (v) => v >= 0).map(Rm) });
     const graph = { nodes: rooms.map((r) => r.id).concat('outside'), edges: [] };
@@ -334,6 +363,7 @@
       seed: spec.seed >>> 0, approach: spec.approach, grid: G,
       site: { w: S.real.w, h: S.real.h, rects: S.realRects },
       levels, footprint, rooms, walls, openings, portals, verticals, graph, parts,
+      zones, columns,
       meta
     };
   }
