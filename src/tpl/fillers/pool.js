@@ -13,6 +13,9 @@
  *   mixed     broken room                                     (weight 20)
  *   open      ragged hall, pillar hall                        (weight 10)
  *
+ * Each filler's `site` ranges are a typical site for it (tools use them; the
+ * world sizes sites itself). `fits` is the hard limit.
+ *
  * Ideas from the old fill (src/areas.js, src/zones.js): its Backrooms zones
  * (open, split, warren, ring, gallery, corridorRooms...) and its knobs
  * (room scale, pillars, pOpen, pLoop, pWide), here retuned for less open
@@ -30,6 +33,7 @@
     blurb: 'A clump of 3-10 m rooms with jagged outlines and off-centre openings; solid gaps between them.',
     doors: { opening: 0.8, door: 0.12, wide: 0.08 }, loops: 0.2,
     fits: (S) => S.area >= 120 && Math.min(...dims(S)) >= 8,
+    site: { w: [12, 30], h: [10, 26] },
     layout(P, rng) {
       const rects = bsp([0, 0, P.W, P.H], rng, 6, 20, 0.3);
       const ids = paintRooms(P, rects, 'room', ['warren']);
@@ -56,6 +60,7 @@
     blurb: 'A 1-2 m corridor that kinks between the connections, with alcoves and the odd dead-end stub.',
     doors: { opening: 1 }, loops: 0,
     fits: () => true,
+    site: { w: [8, 26], h: [8, 24] },
     layout(P, rng) {
       const b = rng.f() < 0.55 ? 2 : rng.f() < 0.7 ? 3 : 4;
       const v = P.add('passage', ['winding']);
@@ -131,6 +136,7 @@
     blurb: 'A chain of rooms in a row, each through an off-centre opening; sometimes it turns a corner.',
     doors: { opening: 0.85, door: 0.15 }, loops: 0,
     fits: (S) => Math.max(...dims(S)) >= 16 && Math.min(...dims(S)) >= 6,
+    site: { w: [16, 32], h: [8, 20] },
     layout(P, rng) {
       const I = P.inner, alongX = TG.rw(I) >= TG.rh(I);
       const A0 = alongX ? I[0] : I[1], A1 = alongX ? I[2] : I[3], C0 = alongX ? I[1] : I[0], C1 = alongX ? I[3] : I[2];
@@ -183,6 +189,7 @@
     blurb: 'Tiny 2-4 m rooms and closets packed together; mostly a tree, so it reads like a maze.',
     doors: { opening: 0.55, door: 0.45 }, loops: 0.06,
     fits: (S) => S.area >= 64 && Math.min(...dims(S)) >= 6,
+    site: { w: [8, 18], h: [8, 16] },
     layout(P, rng) {
       paintRooms(P, bsp([0, 0, P.W, P.H], rng, 4, 8, 0.25), 'cell', ['cells']);
       voidSome(P, rng, rng.range(0.06, 0.16));
@@ -195,6 +202,7 @@
     blurb: 'Rooms around a solid core (sometimes a closet), joined in a loop; a warren or solid around it.',
     doors: { opening: 0.85, door: 0.15 }, loops: 0.1,
     fits: (S) => Math.min(...dims(S)) >= 22,
+    site: { w: [14, 30], h: [14, 28] },
     layout(P, rng) {
       // the ring is 14-26 m across, somewhere in the site; the rest is warren or solid
       const I = P.inner, ow = Math.min(TG.rw(I), rng.int(28, 52)), oh = Math.min(TG.rh(I), rng.int(28, 52));
@@ -230,6 +238,7 @@
     blurb: 'A mid-size room cut up by stub walls and partial partitions, with small rooms or solid around it.',
     doors: { opening: 0.8, door: 0.1, wide: 0.1 }, loops: 0.15,
     fits: (S) => Math.min(...dims(S)) >= 14,
+    site: { w: [16, 30], h: [16, 28] },
     layout(P, rng) {
       // a 10-18 m hall somewhere in the site; a warren or solid around it
       const I = P.inner, hw = Math.min(TG.rw(I), rng.int(20, 36)), hh = Math.min(TG.rh(I), rng.int(20, 36));
@@ -301,6 +310,7 @@
     blurb: 'A big room with a notched, uneven outline, a few columns and sometimes a solid block in the middle.',
     doors: { opening: 0.7, wide: 0.3 }, loops: 0.3,
     fits: (S) => Math.min(...dims(S)) >= 24,
+    site: { w: [16, 36], h: [16, 32] },
     layout(P, rng) {
       const v = P.add('hall', ['ragged']);
       P.paint([0, 0, P.W, P.H], v);
@@ -336,6 +346,7 @@
     blurb: 'An open floor on a grid of columns; the rare big space between the enclosed stretches.',
     doors: { opening: 0.6, wide: 0.4 }, loops: 0.3,
     fits: (S) => Math.min(...dims(S)) >= 24,
+    site: { w: [16, 36], h: [16, 32] },
     layout(P, rng) {
       const v = P.add('hall', ['pillars']);
       P.paint([0, 0, P.W, P.H], v);

@@ -13,10 +13,14 @@ that the reference map is full of.
 
 ![One example of each filler](fillers-atlas.png)
 
-Open `fillers.html` to try them: pick a filler (or let the pool pick), page
-through seeds, change the site size and shape, and set the connections by
-count or exactly (`S 4 1.5; E 10 2`). *Pool check* builds 300 sites and
-shows the mix.
+Try them in `workbench.html` (`fillers.html` now redirects there). They are
+the *Fillers (Backrooms)* group in the library: one entry per filler, plus
+*Pool pick*, where each seed picks a filler by weight. Page through seeds,
+compare fillers with each other or with templates, change the site size and
+shape, and set the connections by count or exactly (`S 4 1.5; E 10 2`:
+side, metres along it, width). Pool pick with 48 seeds shows the mix in the
+summary bar. *Check health* builds each filler on 12 standard sites and
+shows how many came out clean.
 
 Fillers are separate from the old prototype map and do not touch it.
 
@@ -136,4 +140,3 @@ seeds, site shapes (rect, L, U, notched, random) and 0–4 connections:
 * More variety: a gallery (a room with a ring of bays), a stair-ish split
   level, corridor-with-rooms, and wrongness for fillers (false doors,
   dead-end loops, a ceiling at the wrong height).
-* Fillers in the workbench, next to the templates.

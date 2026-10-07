@@ -76,6 +76,9 @@
       }
       g.stroke();
     }
+    // ---- columns (fillers): solid, drawn like walls
+    g.fillStyle = TH.wall;
+    for (const c of b.columns || []) if (onLv(c)) g.fillRect(X(c.rect[0]), Y(c.rect[1]), (c.rect[2] - c.rect[0]) * S, (c.rect[3] - c.rect[1]) * S);
     // ---- open boundaries (no wall; floor change only)
     g.setLineDash([Math.max(1, S * 0.12), Math.max(2, S * 0.2)]);
     g.strokeStyle = TH.open; g.lineWidth = Math.max(0.6, S * 0.03);
