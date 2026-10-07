@@ -240,6 +240,23 @@ const B = [-1, -1, 1, 1];
     if (!inside) cross.add(cn.id);
   }
   check('only openings that leave the region are left dangling', g.dangling.length === cross.size && g.dangling.every((id) => cross.has(id)), `${g.dangling.length} lead out`);
+  // a house may reach some rooms only through a door other than its front
+  // one (a garage wing behind the garage door): the site across that door
+  // must still have a way into the world of its own
+  const WALK = new Set(['door', 'double', 'opening', 'slider', 'vehicle', 'open', 'stair']);
+  let split = null;
+  for (let i = R[0]; i <= R[2] && !split; i++) for (let j = R[1]; j <= R[3] && !split; j++) for (const L of W.cell(i, j).lots) {
+    if (L.kind !== 'yard' || !L.doors.length) continue;
+    const b = L.b, adj = new Map(b.rooms.map((r) => [r.id, []])), edge = new Set(L.doors.map((d) => d.portal));
+    for (const [a, c, k] of b.graph.edges) if (WALK.has(k) && adj.has(a) && adj.has(c)) { adj.get(a).push(c); adj.get(c).push(a); }
+    const st = b.portals.filter((p) => !edge.has(p.id)).map((p) => p.room), seen = new Set(st);
+    while (st.length) for (const v of adj.get(st.pop())) if (!seen.has(v)) { seen.add(v); st.push(v); }
+    if (L.doors.some((d) => !seen.has(b.portals.find((p) => p.id === d.portal).room))) { split = [i, j]; break; }
+  }
+  if (split) {
+    const g2 = W.graph(split[0] - 1, split[1] - 1, split[0] + 1, split[1] + 1), c2 = components(g2.nodes, g2.edges);
+    check('round a house with a wing behind another door, every room is still reachable', c2.sizes.length === 1, `cell ${split}: ${c2.sizes.length} piece(s)`);
+  } else check('round a house with a wing behind another door, every room is still reachable', true, 'none in this region');
 }
 
 // ---- 7. builds are the same whatever was built before

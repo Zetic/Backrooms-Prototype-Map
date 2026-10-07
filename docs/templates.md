@@ -5,8 +5,10 @@ backrooms. They range in size:
 
 * **Small:** a one-room closet, a restroom, storage units.
 * **Medium:** a house.
-* **Planned, not built yet:** a mall, a street of houses, a skyscraper or an
-  amusement park.
+* **Large:** a neighborhood: houses lined up on both sides of a street in a
+  big hall, each one built by the house template (section 8: templates inside
+  templates).
+* **Planned, not built yet:** a mall, a skyscraper or an amusement park.
 
 A template outputs **architecture only**:
 
@@ -25,7 +27,7 @@ site (allotted shape) + seed + archetype  ─►  engine  ─►  building JSON 
                                                           └─► Unreal: kit pieces from walls / openings, furnishing from room tags
 ```
 
-Open `workbench.html` to browse, compare and debug templates (section 8).
+Open `workbench.html` to browse, compare and debug templates (section 9).
 
 ## 1. Kit grid and frames
 
@@ -82,12 +84,13 @@ Lengths are in metres in the site frame. Ids are stable within a building.
 | `site` | `{ w, h, rects }`: the allowance |
 | `levels[]` | `{ index, elevation, height }`; there is at least one |
 | `footprint[]` | `{ level, rects }`: built cells per level |
-| `rooms[]` | `{ id, type, name, zone, level, rects, area, ceiling, tags, parent }`. `zone`: public, private, service or circulation. `tags` describe what the room is for (`kitchen`, `wet`, `sleeping`, `storage`, `vehicle`…, plus `wrong:*` for mutations). `parent`: the owning room of closets, ensuites and stalls |
-| `walls[]` | `{ id, level, kind, a, b, rooms [idA, idB], thickness }`. `kind`: `exterior` (one side is the backrooms; that room id is `null`), `interior`, `open` (a boundary with no wall) |
-| `openings[]` | `{ id, level, wall, kind, a, b, width, rooms, swingInto, hinge, height \| sill+head, portal }`. `kind`: `door`, `double`, `opening` (cased, no leaf), `slider`, `vehicle` (garage/roller door), `window`, `false` (a door on a wall that leads nowhere) |
+| `rooms[]` | `{ id, type, name, zone, level, rects, area, ceiling, tags, parent, part? }`. `zone`: public, private, service or circulation. `tags` describe what the room is for (`kitchen`, `wet`, `sleeping`, `storage`, `vehicle`…, plus `wrong:*` for mutations). `parent`: the owning room of closets, ensuites and stalls. `part`: in a composite template, the part (`parts[]`) the room belongs to, `null` for the composite's own rooms |
+| `walls[]` | `{ id, level, kind, a, b, rooms [idA, idB], thickness }`. `kind`: `exterior` (one side is the backrooms; that room id is `null`), `interior`, `open` (a boundary with no wall), `facade` (in a composite template: a part's outer wall against the composite's own rooms, such as a house front onto its yard; both room ids are set, thickness as exterior) |
+| `openings[]` | `{ id, level, wall, kind, a, b, width, rooms, swingInto, hinge, height \| sill+head, portal, part?, tags? }`. `kind`: `door`, `double`, `opening` (cased, no leaf), `slider`, `vehicle` (garage/roller door), `window`, `false` (a door on a wall that leads nowhere). In a composite, `part` names the part it came from, and a part's former portal keeps its tags (`front door`, `garage door`) |
 | `portals[]` | `{ id, opening, level, room, role, kind, side, width, clear, main, tags }`. Where the POI meets the backrooms. `role`: `entrance`, `exit` or `both`. `main` marks the main entrance. `clear`: metres of open floor the world must keep in front |
 | `verticals[]` | `{ id, kind, rooms: [bottom → top], dead, tags }`: stairs, lifts, ladders linking stacked rooms. `dead: true` means it leads nowhere (a mutation) |
 | `graph` | `{ nodes: [room ids, 'outside'], edges: [[a, b, kind, opening id], ...] }`. Edge kinds: the opening kinds, `open`, and vertical kinds |
+| `parts[]` | composite templates only: `{ id, archetype, engine, name, label, approach, site: { rects }, score, mutations, rooms: [ids], doors: [opening ids], spec }`, one per template built inside it. `spec` is exactly what built it, so `TPL.generate` on that spec alone gives the same building (section 8) |
 | `meta` | `plan, score, terms, candidates, valid, chosen, mutations, program, issues, autoDoors, layoutFailures, ms`. This is debug information, not part of the building |
 
 Guarantees, checked by `tests/templates.test.js`:
@@ -172,7 +175,7 @@ BR.LOT.build({
    It works in the frame of what the buildings leave; `at` is where that
    frame's origin sits in the site.
 
-The workbench shows templates in their setting (section 8).
+The workbench shows templates in their setting (section 9).
 
 ## 5. Entrances and exits are template-specific
 
@@ -235,6 +238,9 @@ Current engines:
     plus reach-in closets carved beside bedroom doors.
   * A garage comes with a service room behind it.
   * Portals as above.
+* **`neighborhood`** (`src/tpl/neighborhood.js`), the first composite
+  engine (section 8): a street down a hall with houses along both sides,
+  every house built by the `house` engine.
 * **`room`** (`src/tpl/room.js`), the small end of the range. Layouts:
   * `single` (closet, storage room);
   * `stalls` (restroom: vestibule, washroom, stall row, janitor closet);
@@ -266,8 +272,9 @@ BR.TPL.registerArchetype({
 
 * a skyscraper is several `levels` with stacked stair and lift `verticals`
   (the tests build one with a test engine);
-* a street of houses or a mall will be a composite engine that runs child
-  templates inside sub-sites and merges them.
+* a street of houses is a composite engine that runs child templates inside
+  sub-sites and merges them (the neighborhood, section 8); a mall will be
+  another.
 
 ### Wrongness
 
@@ -275,10 +282,87 @@ BR.TPL.registerArchetype({
 |---|---|
 | house | `twin` (a room repeats), `giant` (one room far too big), `endless` (the hallway keeps going), `windowless`, `stairs` (a staircase into the ceiling), `falseDoors` (doors onto walls), `ceiling` (a ceiling at the wrong height) |
 | room | `falseDoors`, `ceiling` |
+| neighborhood | `twins` (every house is the same house), `vacant` (one lot stands empty); each house also draws its own |
 
 Each mutation is tagged in the output (`wrong:*`), so a client can play it up.
 
-## 8. The workbench (`workbench.html`)
+## 8. Templates inside templates (`src/tpl/composite.js`)
+
+![A neighborhood: six houses, each built by the house template](neighborhood.png)
+
+A **composite** engine builds nothing itself. It cuts its site into
+sub-sites, has other templates build them, places what comes back and adds
+its own rooms round them. The shared pipeline then merges all of it into one
+ordinary `br.building/0.2`, so the world, the map and the workbench use it
+like any other template.
+
+An engine is composite when it registers with `composite: true` and a `plan`
+in place of `layout`. `TPL.generate` hands it to `TPL.compose`:
+
+1. **Site, program, mutations** as for any template.
+2. **Plan.** `engine.plan(program, ctx, rng, kit)` builds its children with
+   `kit.child({ archetype, override, seed, rect, approach, wrongness })`: a real
+   `TPL.generate` of that template on that sub-site (in the composite's
+   canonical frame), tried on three seeds and cached within the call.
+   `override` is laid over the child's recipe, so a template is reused as it
+   is with only what the setting needs changed. The plan returns its own rooms
+   (units), the parts (`{ b, at }`: each child and where its site frame
+   sits), its own portals, and which of its own boundaries are open. A few
+   candidates are tried; the first valid one is kept.
+3. **Merge.** One raster of every room gives the walls. A child's own walls
+   keep their kind; a child's outer wall against the composite's rooms is a
+   `facade`; anything against the solid is `exterior`. Every child opening
+   goes back on its wall, windows included. A child's portals (the doors it
+   chose onto "the backrooms") become doors onto whatever room the composite
+   put in front of them, and keep their tags. The child's room graph is
+   carried over, renumbered.
+4. **Validate.** Rooms inside the site, no overlaps, no child door onto solid
+   or back into its own building, an entrance, every room reachable from the
+   outside.
+5. **Score.** The children's mean penalty, plus the engine's own terms.
+6. **Output.** Metres, turned to face the main side, with `parts[]` (section
+   3).
+
+The guarantee, checked by `tests/neighborhood.test.js`: every part is
+exactly what its template builds alone from `parts[k].spec`.
+
+### The neighborhood
+
+`neighborhood` (`src/tpl/archetypes/neighborhood.js`), after the reference of
+a suburban street indoors: a street 8–14 m wide runs from the entrance on the
+main side to the far end, under a 9–14 m hall ceiling. Along each side, lots
+are packed from the far end; each lot's house template is drawn from the
+recipe's `houses` weights and its frontage from that template's own site
+range. Each house is built with the recipe's `child` overrides (no back or
+side doors, so every door it chooses is on its front), faces the street, and
+is pushed back against the hall wall, leaving a front yard of 2–6 m. The yard
+runs from the street up to the house, into any recess, and alongside it up to
+its front, so every door the house chose opens onto it; the rest of the row is
+solid. The entrance is a wide opening or double doors on the main side, and
+half the time there is a door out at the far end.
+
+A house that will not build on its lot is tried on more seeds, then as the
+recipe's smallest house; if nothing fits, the lot stands empty. The
+neighborhood needs at least one house on each side.
+
+| recipe field | what it sets |
+|---|---|
+| `houses` | house recipes that line the street, by weight |
+| `child` | fields laid over each house recipe (`backDoor: 0, sideDoor: 0`, a little `wrongness`) |
+| `street`, `row`, `rowMin` | street width; the depth of each row of lots the street is sized round; the shallowest row worth trying (m) |
+| `apron`, `yardMax` | the least front yard, and the most once the house is pushed back (m) |
+| `gap`, `perSide` | between neighbouring lots (m); the most houses on a side |
+| `mouth`, `farEnd` | clear stretch at the entrance and at the far end (m) |
+| `gate`, `gateKind`, `farExit`, `farWidth`, `farKind` | the entrance, and the chance, width and kind of a way out at the far end |
+| `ceiling` | the hall's ceiling over the street and yards (m) |
+
+The street is tagged `street`, so the renderer paints a double centre line
+down it; fences, mailboxes and the stop sign are for a furnishing pass. A
+neighborhood is about 40–52 × 40–64 m, the `large` tier: on the map it is a
+flush lot of its own, joined to the backrooms only through its entrance and
+far door.
+
+## 9. The workbench (`workbench.html`)
 
 **Library (left):**
 
@@ -325,10 +409,11 @@ connections, by count or exactly (fillers and lots).
 
 **Detail view** (click a card):
 
-* pan and zoom;
+* pan and zoom; hovering a room of a composite names the part it is in;
 * level tabs;
-* tabs for score breakdown and rejections, rooms with tags, portals,
-  program, issues, and the JSON (copy or download).
+* tabs for score breakdown and rejections, rooms with tags (grouped by part
+  in a composite), portals, program (with the parts of a composite), issues,
+  and the JSON (copy or download).
 
 **Recipes:** *Edit recipe* changes a recipe live. *Save as new…* forks it into
 a new template in the library, which is the fastest way to grow the catalogue.
@@ -343,13 +428,16 @@ a new template in the library, which is the fastest way to grow the catalogue.
 * `f` favourite;
 * `Esc` close.
 
-## 9. Next
+## 10. Next
 
 * **More house recipes and logic:** shotgun, duplex, courtyard, two-storey
   (with levels).
 * **Use the leftover arms of irregular sites.** For example, push a garage or
   a wing into the free arm of an L-shaped site.
-* **Composite engines** (a street of houses, a mall), then a tower engine.
+* **More composite engines:** a mall, then a tower engine. For the
+  neighborhood: alleys between houses out to the hall wall, back doors that
+  open onto them, and a cul-de-sac or a crossroads; a neighborhood that
+  claims across cells (`huge`).
 * **Entrances from connections.** Today a template picks its own doors and
   the yard, the filler round it or the world's graph adapts. Next, House and
   Rooms take their entrances from the connections they are given, as fillers

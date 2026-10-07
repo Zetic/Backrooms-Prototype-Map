@@ -183,8 +183,11 @@
 <script src="src/tpl/framework.js"></script>
 <script src="src/tpl/house.js"></script>
 <script src="src/tpl/room.js"></script>
+<script src="src/tpl/composite.js"></script>
+<script src="src/tpl/neighborhood.js"></script>
 <script src="src/tpl/archetypes/house.js"></script>
 <script src="src/tpl/archetypes/room.js"></script>
+<script src="src/tpl/archetypes/neighborhood.js"></script>
 <script src="src/tpl/fillers/engine.js"></script>
 <script src="src/tpl/fillers/kit.js"></script>
 <script src="src/tpl/fillers/pool.js"></script>
@@ -713,10 +716,12 @@
       if (!view || !detailB || detailB.error) return;
       const r = cv.getBoundingClientRect();
       const x = ((e.clientX - r.left) * dpr - view.ox) / view.s, y = ((e.clientY - r.top) * dpr - view.oy) / view.s;
-      let hit = null, key = null;
+      let hit = null, key = null, of = null;
       const parts = detailB.lot ? (detailB.setting ? [['s:', detailB.setting, detailB.settingAt || [0, 0]]] : []).concat(detailB.buildings.map((B, k) => ['b' + k + ':', B.b, B.origin])) : [['', detailB, [0, 0]]];
-      for (const [pre, bp, o] of parts) for (const rm of bp.rooms) if ((rm.level || 0) === level) for (const q of rm.rects) if (x - o[0] >= q[0] && x - o[0] < q[2] && y - o[1] >= q[1] && y - o[1] < q[3]) { hit = rm; key = pre + rm.id; }
-      $('dhover').innerHTML = hit ? '<b>' + esc(hit.name) + '</b> · ' + hit.area.toFixed(1) + ' m² · ceiling ' + hit.ceiling + ' m · ' + esc(hit.zone || '') + '<br><span class="k">' + esc((hit.tags || []).join(', ')) + '</span>' : '';
+      for (const [pre, bp, o] of parts) for (const rm of bp.rooms) if ((rm.level || 0) === level) for (const q of rm.rects) if (x - o[0] >= q[0] && x - o[0] < q[2] && y - o[1] >= q[1] && y - o[1] < q[3]) { hit = rm; key = pre + rm.id; of = bp; }
+      // a room of a template inside a template: name the part it belongs to
+      const part = hit && hit.part && of.parts ? of.parts.find((p) => p.id === hit.part) : null;
+      $('dhover').innerHTML = hit ? '<b>' + esc(hit.name) + '</b>' + (part ? ' <span class="k">in ' + esc(part.label) + '</span>' : '') + ' · ' + hit.area.toFixed(1) + ' m² · ceiling ' + hit.ceiling + ' m · ' + esc(hit.zone || '') + '<br><span class="k">' + esc((hit.tags || []).join(', ')) + '</span>' : '';
       if (key !== hoverRoom) { hoverRoom = key; drawDetail(); }
     });
   })();
@@ -754,8 +759,14 @@
         '<div class="k">Layout rejections</div>' + (Object.keys(m.layoutFailures || {}).length ? '<ul>' + Object.entries(m.layoutFailures).sort((p, q) => q[1] - p[1]).map(([k, v]) => '<li>' + esc(k) + ': ' + v + '</li>').join('') + '</ul>' : '<p class="k">none</p>');
     } else if (tab === 'rooms') {
       const op = {}; for (const o of b.openings) op[o.kind] = (op[o.kind] || 0) + 1;
-      body.innerHTML = '<table><tr><th>room</th><th class="n">m²</th><th class="n">ceil</th><th>tags</th></tr>' +
-        b.rooms.map((r) => '<tr><td>' + esc(r.name) + (b.levels.length > 1 ? ' <span class="k">L' + r.level + '</span>' : '') + (r.parent ? ' <span class="k">(' + esc(r.parent) + ')</span>' : '') + '</td><td class="n">' + r.area.toFixed(1) + '</td><td class="n">' + r.ceiling + '</td><td class="k">' + esc(r.tags.join(', ')) + '</td></tr>').join('') + '</table>' +
+      const partOf = new Map((b.parts || []).map((p) => [p.id, p]));
+      let lastPart;
+      body.innerHTML = (b.parts ? '<p class="k">' + b.parts.length + ' templates inside this one; their rooms are listed under each.</p>' : '') + '<table><tr><th>room</th><th class="n">m²</th><th class="n">ceil</th><th>tags</th></tr>' +
+        b.rooms.map((r) => {
+          const p = r.part ? partOf.get(r.part) : null, head = p && p.id !== lastPart ? '<tr><td colspan=4><b>' + esc(p.label) + '</b> <span class="k">' + esc(p.archetype) + ' · score ' + p.score + ' · seed ' + (p.spec ? p.spec.seed : '?') + '</span></td></tr>' : '';
+          lastPart = r.part;
+          return head + '<tr><td>' + esc(r.name) + (b.levels.length > 1 ? ' <span class="k">L' + r.level + '</span>' : '') + (r.parent ? ' <span class="k">(' + esc(r.parent) + ')</span>' : '') + '</td><td class="n">' + r.area.toFixed(1) + '</td><td class="n">' + r.ceiling + '</td><td class="k">' + esc(r.tags.join(', ')) + '</td></tr>';
+        }).join('') + '</table>' +
         '<p><span class="k">openings</span> ' + Object.entries(op).map(([k, v]) => esc(k) + ' ' + v).join(' · ') + '</p>' +
         ((b.verticals || []).length ? '<p><span class="k">verticals</span> ' + b.verticals.map((v) => esc(v.kind) + (v.dead ? ' (leads nowhere)' : '') + ': ' + v.rooms.join(' → ')).join('; ') + '</p>' : '');
     } else if (tab === 'portals' && isFillerB(b)) {
@@ -767,7 +778,10 @@
         b.portals.map((p) => '<tr><td>' + esc(p.id) + ' <span class="k">' + esc((b.rooms.find((r) => r.id === p.room) || {}).name || p.room) + '</span>' + (p.main ? ' <b>main</b>' : '') + '</td><td><span style="color:' + (TPL.ROLE_COLORS[p.role] || '#ccc') + '">' + esc(p.role) + '</span></td><td>' + esc(p.kind) + '</td><td>' + esc(p.side) + '</td><td class="n">' + p.width + '</td><td class="n">' + p.clear + '</td></tr>').join('') +
         '</table><p class="k">Portals are where the template meets the surrounding backrooms. Arrows point in for entrances and out for exits; the faint box is the clearance the world must keep free in front of it.</p>';
     } else if (tab === 'program') {
-      body.innerHTML = '<div class="k">Program drawn from the recipe</div><ul>' + (m.program || []).map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>';
+      body.innerHTML = '<div class="k">Program drawn from the recipe</div><ul>' + (m.program || []).map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>' +
+        (b.parts ? '<div class="k">Templates inside it</div><table><tr><th>part</th><th>template</th><th class="n">score</th><th>doors</th></tr>' +
+          b.parts.map((p) => '<tr><td>' + esc(p.label) + '</td><td>' + esc(p.archetype) + ' <span class="k">seed ' + (p.spec ? p.spec.seed : '?') + ', faces ' + p.approach + '</span>' + (p.mutations.length ? ' <span class="pill w">' + p.mutations.map(esc).join(', ') + '</span>' : '') + '</td><td class="n">' + p.score + '</td><td>' + p.doors.length + '</td></tr>').join('') +
+          '</table><p class="k">Each part was built by its own template on its own sub-site (spec in the JSON), then placed; its doors onto the backrooms now open onto the room in front of them.</p>' : '');
     } else if (tab === 'issues') {
       const L = (title, arr) => '<div class="k">' + title + '</div>' + (arr && arr.length ? '<ul>' + arr.map((x) => '<li' + (x.indexOf('ERROR') === 0 ? ' class="bad"' : '') + '>' + esc(x) + '</li>').join('') + '</ul>' : '<p class="k">none</p>');
       body.innerHTML = L('Validation', m.issues) + L('Doors added to keep every room reachable', m.autoDoors);

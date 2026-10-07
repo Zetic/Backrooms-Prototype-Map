@@ -473,6 +473,8 @@
     if (!arch) throw new Error('unknown archetype ' + spec.archetype);
     const engine = TPL.engines[arch.engine];
     if (!engine) throw new Error('unknown engine ' + arch.engine);
+    // a composite engine builds other templates and merges them (tpl/composite.js)
+    if (engine.composite) return TPL.compose(spec, arch, engine);
     const seed = spec.seed >>> 0, ah = TG.hashStr(arch.id);
     const approach = spec.approach || 'S';
     const site = makeSite(spec, arch, seed, ah, approach);

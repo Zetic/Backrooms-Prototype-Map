@@ -9,7 +9,7 @@ and each one sits in the world in one of three ways (`src/tpl/lot.js`):
 | setting | what | who |
 |---|---|---|
 | **yard** | its own lot: solid round the back and sides of the house, and only a front yard: a strip across the front of the house, a little wider than it, and a lane from the strip out to the lot edge, where it meets the rest of the backrooms | houses |
-| **flush** | its own lot and nothing else. The door is the edge: the world puts its connection exactly on the template's door | templates at least one block (8 m) across both ways |
+| **flush** | its own lot and nothing else. The door is the edge: the world puts its connection exactly on the template's door | templates at least one block (8 m) across both ways, a neighborhood included |
 | **inside** | inside a filler's site. The filler builds round it and takes its doors as connections | templates smaller than a block |
 
 So a house stands half way into a room of its own with the dark close behind
@@ -66,6 +66,13 @@ the map comes out the same in any order.
      from the ends of the shared run;
    * a **flush lot** is joined only through its own doors, each one an exact
      connection on the door, joined to whichever site is on the other side.
+
+   A lot's door counts towards the spanning tree only if the building links
+   that door to its front without leaving it (the main door, or any door onto
+   the front yard, `frontJoined`). A house can reach some rooms only through
+   another door, such as a garage wing behind the garage door; the site
+   across such a door still gets a way in of its own, so the room graph
+   stays one piece.
 
    The border openings join each cell to its neighbours, so the whole plane is
    one connected graph. It is route-shaped: mostly chains, with branches, dead
@@ -163,7 +170,8 @@ POIs are decided per 128 m cell (the same grid), from `(seed, i, j)` only.
 | tiny | 2.0 | 55% beside a bigger POI (not one in a yard) | closet |
 | small | 1.8 | 45% | storage room, restroom, mechanical room, storage units |
 | medium | 0.9 | | ranch, bungalow, split ranch, suburban |
-| large, huge | 0.04, 0.004 | | none yet |
+| large | 0.04 | | neighborhood hall (about one in 25 cells), on a flush lot |
+| huge | 0.004 | | none yet |
 
 * **Rhythm.** A slow field (420 m) sets each cell's density between 0.3 and
   1.7, and 12% of cells are quiet (at 0.15 of that). This gives about 3–4 POIs
@@ -245,7 +253,8 @@ W.biomeAt(x, y);           // { openness, name }
   front (beside it, no more than 1 m back from its front, or in front of a
   door). The fill leans enclosed, and sites build in under 5 ms on average.
 * Every room in 3 × 3 cells, POI rooms included, is reachable from every
-  other. Only openings that leave the region are left dangling.
+  other, also round a house whose wing is reached only through another door.
+  Only openings that leave the region are left dangling.
 * A site builds the same whatever was built before, and a filler site matches
   `FILL.generate` on its own spec.
 * POI density, variety, clusters and rhythm, and the biome's range.
@@ -262,9 +271,9 @@ W.biomeAt(x, y);           // { openness, name }
   however far that is; a shorter way round the house would read better.
 * Dressing for the front yard (a lawn, hedges, a painted sky on the far
   wall).
-* Big POIs that claim across cells (a street in a hall, a mall). The cell plan
-  already keeps POIs whole; a claim across a border needs the border openings
-  to make way for it.
+* Big POIs that claim across cells (a longer street in a hall, a mall). The
+  cell plan already keeps POIs whole; a claim across a border needs the border
+  openings to make way for it.
 * More fillers and biome families, and wrongness for fillers.
 * Shared walls drawn once. Today both sites draw the same line, which looks the
   same but is drawn twice.
