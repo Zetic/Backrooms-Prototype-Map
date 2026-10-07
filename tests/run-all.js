@@ -13,6 +13,7 @@ run('park.test.js', [], 'park (a hall tiled by zones)');
 run('fillers.test.js', [], 'fillers');
 run('architectural.test.js', [], 'architectural curves (constant radii and radial layouts)');
 run('elevation.test.js', [], 'elevation (surfaces, vertical fills, capabilities and reservations)');
+run('connections.test.js', [], 'connection zones (ladders, stairs, ramps, slope reservations)');
 run('cutaway.test.js', [], 'cutaway visibility and full-width connection footprints');
 run('elevation-ui.test.js', [], 'elevation lab controller');
 run('band-world.test.js', [], 'elevation world (ownership, matching, topology and eviction)');
@@ -20,4 +21,4 @@ run('band-render.test.js', [], 'elevation map tiles, height and selection caches
 run('seams.test.js', [], 'seams (shared walls between blueprints)');
 for (const seed of ['31337', '7', '12345', '99', '4242']) run('world.test.js', [seed], 'world: seed ' + seed);
 run('ui-smoke.test.js', [], 'map page');
-console.log('\nAll template, catalogue, neighborhood, park, filler, architectural geometry, elevation, band-world, tile renderer, seam, world (5 seeds) and page checks passed.');
+console.log('\nAll template, catalogue, neighborhood, park, filler, architectural geometry, elevation, connection zone, band-world, tile renderer, seam, world (5 seeds) and page checks passed.');

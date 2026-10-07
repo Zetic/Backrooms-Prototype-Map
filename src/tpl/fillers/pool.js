@@ -308,7 +308,7 @@
 
   // ------------------------------------------------------------ pillar hall
   FILL.register({
-    id: 'pillar_hall', name: 'Pillar hall', feel: 'open', weight: 2,
+    id: 'pillar_hall', vertical: { prefer: ['ramp', 'stair', 'ladder'] }, name: 'Pillar hall', feel: 'open', weight: 2,
     blurb: 'An open floor on a grid of columns; the rare big space between the enclosed stretches.',
     doors: { opening: 0.6, wide: 0.4 }, loops: 0.3,
     fits: (S) => Math.min(...dims(S)) >= 24,

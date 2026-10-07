@@ -78,7 +78,7 @@ const selectedKey = window.__cutaway.selected.key;
 elements.get('o-ghost').checked = true; elements.get('o-ghost').dispatch('change'); flush();
 check('ghosting targets the selected template only', last.opts.ghost && last.opts.focus === selectedKey);
 elements.get('export-template').click(); flush();
-check('selected template export has world height and exact XY origin', exported?.blueprint?.schema === 'br.elevation/0.1' && exported.origin.length === 2 && download.name.startsWith('template-'));
+check('selected template export has world height and exact XY origin', exported?.blueprint?.schema === BR.ELEV.SCHEMA && exported.origin.length === 2 && download.name.startsWith('template-'));
 elements.get('floor').value = '0'; elements.get('floor').dispatch('change'); flush();
 check('local floor selection moves the cut to its real elevation', last.opts.cutZ === 0);
 elements.get('clear-selection').click(); flush();

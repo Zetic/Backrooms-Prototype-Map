@@ -47,7 +47,7 @@
 
   const common = { feel: 'mixed', weight: 1, doors: { opening: 0.75, door: 0.25 }, loops: 0.1 };
   FILL.register(Object.assign({}, common, {
-    id: 'circular_hall', name: 'Circular hall and wing',
+    id: 'circular_hall', vertical: { prefer: ['ramp', 'stair', 'ladder'] }, name: 'Circular hall and wing',
     blurb: 'A constant-radius circular hall opening into a straight rectangular wing, with small rooms beside the wing.',
     fits: (S) => Math.min(...dims(S)) >= 16 && Math.max(...dims(S)) >= 24,
     site: { w: [12, 34], h: [8, 26] },
@@ -65,7 +65,7 @@
   }));
 
   FILL.register(Object.assign({}, common, {
-    id: 'twin_domes', name: 'Paired semicircular halls',
+    id: 'twin_domes', vertical: { prefer: ['ramp', 'stair', 'ladder'] }, name: 'Paired semicircular halls',
     blurb: 'Two matching semicircular halls on straight rectangular bases, joined by a short straight gallery.',
     fits: (S) => Math.min(...dims(S)) >= 16 && Math.max(...dims(S)) >= 28,
     site: { w: [14, 34], h: [8, 20] },
@@ -83,7 +83,7 @@
   }));
 
   FILL.register(Object.assign({}, common, {
-    id: 'sector', name: 'Circular sector room',
+    id: 'sector', vertical: { prefer: ['stair', 'ladder'] }, name: 'Circular sector room',
     blurb: 'A quarter-circle or 120-degree pie-slice room: one circular arc and two straight radial sides, with a squared entrance at the tip.',
     fits: (S) => Math.min(...dims(S)) >= 16,
     site: { w: [8, 28], h: [8, 26] },
@@ -99,7 +99,7 @@
   }));
 
   FILL.register(Object.assign({}, common, {
-    id: 'radial_suite', name: 'Radial room suite',
+    id: 'radial_suite', vertical: { prefer: ['stair', 'ladder'] }, name: 'Radial room suite',
     blurb: 'Concentric semicircular circulation and pie-slice rooms with straight radial sides, separated by solid wall bands.',
     fits: (S) => Math.min(...dims(S)) >= 24 && Math.max(...dims(S)) >= 36,
     site: { w: [18, 36], h: [12, 26] },

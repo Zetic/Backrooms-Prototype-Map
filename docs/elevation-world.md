@@ -3,8 +3,9 @@
 `BR.BandWorld` wraps the deterministic template world with independently seeded
 horizontal reference bands above and below ground zero. The atrium and its
 placement/reservation policy have been removed. **There are currently no
-world-generated connections between bands.** Optional local ladder variants
-remain in the lab and every template retains up/down potential.
+world-generated connections between bands.** Every template keeps up/down
+potential: exported layouts list their connection zones (ladder, stair, ramp),
+unselected, and the lab builds connected variants of any of them.
 
 ## Inspect the map
 
@@ -32,7 +33,7 @@ The standalone [elevation lab](../elevation.html) offers both continuous cutaway
 and exact local floor inspection. Ramp/stair footprints use their width and XYZ
 path; no extra floor entries are created by sloped paths or tall ceilings.
 Connections show landing heights, continuation above the cut and the destination
-outline. Clicking the footprint reveals its other landing.
+outline in both directions. Clicking the footprint reveals its other landing.
 
 ## Current planning and reservations
 
@@ -55,9 +56,13 @@ another owner. Child POIs identify their containing site's `reservationOwner`.
 An ordinary blueprint exceeding its envelope is rejected rather than shortened.
 
 Map painting reads original blueprints with their band offset. It does not run
-spatial adaptation or optional ladder candidate searches. `world.spatial(site)`
-caches explicit-Z adaptation when navigation/export needs it. Exports materialize
-up/down candidates and exclude wall-clock timing diagnostics.
+spatial adaptation or connection-zone searches. `world.spatial(site)` caches
+explicit-Z adaptation when navigation/export needs it. Exports materialize
+up/down capabilities and `connectionZones[]` (no cutouts or edges) and exclude
+wall-clock timing diagnostics. Placing a blueprint in a band shifts every
+connector reservation prism and every zone's entry, exit, heights and path with
+it; a blueprint's `ground` band maps to its home band and any other to its
+destination band, which must differ.
 
 Band, cell, build and tile caches are bounded. Cutaway geometry plans are cached
 by actual floor intervals, at most eight per blueprint; sliding between floors
@@ -106,6 +111,6 @@ caches. Actual map/lab controllers run with DOM/canvas adapters. The rendering
 preview was produced and pixel-checked with a native canvas; it is not browser
 layout QA.
 
-The [implementation plan](elevation.md) sets the next milestone: simple
-connection areas and slope-following reservations, followed by authored floors
-and world journeys composed from different templates.
+Connection zones and slope-following reservations (milestone 2) are in place.
+The [implementation plan](elevation.md) sets the next milestones: authored
+template floors, then world journeys composed from different templates' zones.

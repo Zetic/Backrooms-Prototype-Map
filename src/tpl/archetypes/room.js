@@ -13,6 +13,7 @@
     layout: 'single', room: 'closet',
     site: { w: [1.5, 3], h: [1, 2.5] },
     portals: [{ role: 'both', kind: 'door', side: 'S', w: 1 }],
+    vertical: { prefer: ['ladder'] },
     windows: 0, wrongness: 0.2
   });
 
