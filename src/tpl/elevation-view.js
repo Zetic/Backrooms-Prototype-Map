@@ -8,21 +8,21 @@
   function draw(g, b, o) {
     o = o || {};
     const level = o.level === undefined ? b.rooms.find((r) => r.floorZ === b.bands[0].elevation).level : o.level;
-    const floor = b.levels.find((l) => l.index === level).elevation;
+    const floor = o.floorZ === undefined ? b.levels.find((l) => l.index === level).elevation : o.floorZ;
     const S = o.scale || 20, X = (x) => (o.ox || 0) + x * S, Y = (y) => (o.oy || 0) + y * S;
     g.save();
     if (o.ghost !== false) for (const l of b.levels) {
       if (l.index === level) continue;
       g.globalAlpha = 0.10;
-      BR.TPL.drawBuilding(g, b, { scale: S, ox: o.ox, oy: o.oy, level: l.index, site: false, labels: false, portals: false });
+      BR.TPL.drawBuilding(g, b, { scale: S, ox: o.ox, oy: o.oy, level: l.index, site: false, labels: false, portals: false, layer: o.layer });
     }
     g.globalAlpha = 1;
-    BR.TPL.drawBuilding(g, b, { scale: S, ox: o.ox, oy: o.oy, level, site: false, labels: o.labels !== false, portals: true, highlight: o.highlight });
+    BR.TPL.drawBuilding(g, b, { scale: S, ox: o.ox, oy: o.oy, level, site: false, labels: o.labels !== false, portals: true, highlight: o.highlight, layer: o.layer });
     for (const v of b.voids || []) {
       if (floor < v.z0 || floor > v.z1) continue;
       g.fillStyle = 'rgba(170,180,195,0.08)'; g.strokeStyle = '#8a8780'; g.lineWidth = 1;
       g.setLineDash([5, 5]);
-      for (const r of v.rects) { g.fillRect(X(r[0]), Y(r[1]), (r[2] - r[0]) * S, (r[3] - r[1]) * S); g.strokeRect(X(r[0]), Y(r[1]), (r[2] - r[0]) * S, (r[3] - r[1]) * S); }
+      for (const r of v.rects) { if (o.layer !== 'walls') g.fillRect(X(r[0]), Y(r[1]), (r[2] - r[0]) * S, (r[3] - r[1]) * S); g.strokeRect(X(r[0]), Y(r[1]), (r[2] - r[0]) * S, (r[3] - r[1]) * S); }
       g.setLineDash([]);
       const r = bigRect(v.rects);
       g.fillStyle = '#a39d92'; g.font = '12px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -33,7 +33,7 @@
       const active = floor >= lo && floor <= hi;
       if (!active && o.ghost === false) continue;
       g.globalAlpha = active ? 1 : 0.12;
-      if (c.kind === 'ramp') {
+      if (c.kind === 'ramp' && o.layer !== 'walls') {
         g.fillStyle = '#c8b69a';
         for (const r of c.reservation.rects) g.fillRect(X(r[0]), Y(r[1]), (r[2] - r[0]) * S, (r[3] - r[1]) * S);
       }

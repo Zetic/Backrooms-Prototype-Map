@@ -42,7 +42,7 @@
     // seams (seams.js): each shared wall drawn once, and what the seam rules
     // cut through it. A neighbour not built in time leaves the tile a draft
     const seams = new Map();
-    if (BR.SEAM && W.seamsBetween) for (const r of ready) {
+    if (BR.SEAM && W.seamsBetween && !opts.floor) for (const r of ready) {
       for (const n of [r.site].concat(W.neighbours(r.site))) {
         if (n !== r.site && !W.hasBuild(n) && now() > deadline) { complete = false; continue; }
         for (const S of W.seamsBetween(r.site, n)) seams.set(S.id, S);
@@ -52,16 +52,27 @@
     const cutsAt = (key, origin) => (cuts.get(key) || []).map((k) => ({ o: k.o, c: k.c - (k.o === 'h' ? origin[1] : origin[0]), s0: k.s0 - (k.o === 'h' ? origin[0] : origin[1]), s1: k.s1 - (k.o === 'h' ? origin[0] : origin[1]) }));
     const at = (origin, layer, labels, key) => ({ scale: tz, ox: (origin[0] - x0) * tz, oy: (origin[1] - y0) * tz, site: false, portals: false, labels, layer, cuts: cutsAt(key, origin) });
     const lab = opts.labels !== false && tz >= LOD.labels;
+    const blueprint = (b, origin, layer, labels, key) => {
+      const o = at(origin, layer, labels, key);
+      if (W.floorZ !== undefined) {
+        const floorZ = W.floorZ + (opts.floor || 0), base = b.schema === BR.ELEV.SCHEMA ? 0 : W.floorZ;
+        const level = b.levels.find((l) => Math.abs(base + l.elevation - floorZ) < 1e-7);
+        o.level = level ? level.index : -1;
+        if (b.kind === 'exploration-fill') { BR.ELEV.draw(g, b, { ...o, floorZ, ghost: !!opts.ghost }); return; }
+        if (!level) return;
+      }
+      TPL.drawBuilding(g, b, o);
+    };
     for (const layer of ['floors', 'walls']) for (const r of ready) {
-      if (r.filler) TPL.drawBuilding(g, r.filler, at(r.fillerOrigin, layer, false, r.site.id));
-      for (const B of r.buildings) TPL.drawBuilding(g, B.b, at(B.origin, layer, lab, r.site.id + '/' + B.poi.id));
+      if (r.filler) blueprint(r.filler, r.fillerOrigin, layer, r.site.kind === 'transition' && lab, r.site.id);
+      for (const B of r.buildings) blueprint(B.b, B.origin, layer, lab, r.site.id + '/' + B.poi.id);
     }
     if (seams.size) TPL.drawSeamOpenings(g, [...seams.values()], { scale: tz, ox: -x0 * tz, oy: -y0 * tz });
     return complete;
   }
 
   function paintPlanSite(g, s, x0, y0, tz) {
-    g.fillStyle = planTone(s);
+    g.fillStyle = s.kind === 'transition' ? '#b194be' : planTone(s);
     for (const q of s.rects) g.fillRect((q[0] - x0) * tz, (q[1] - y0) * tz, (q[2] - q[0]) * tz, (q[3] - q[1]) * tz);
     if (s.pois.length) {
       g.fillStyle = css(PLAN.poi);
@@ -134,7 +145,8 @@
     const t0 = now(), deadline = t0 + budgetMs;
     const { cx, cy, zoom, w, h, dpr } = view;
     const { lv, tz } = levelFor(zoom, dpr), zl = tz / dpr, S = TILE / tz, mode = modeFor(zl);
-    const flags = mode + (mode === 'detail' && opts.labels !== false ? 'L' : '');
+    const slice = W.floorZ === undefined ? '' : '|b' + W.band + '|f' + (opts.floor || 0) + '|g' + !!opts.ghost;
+    const flags = mode + (mode === 'detail' && opts.labels !== false ? 'L' : '') + slice;
     const TC = tileCache(W);
     const hw = w / 2 / zoom, hh = h / 2 / zoom;
     const tx0 = Math.floor((cx - hw) / S), tx1 = Math.floor((cx + hw) / S), ty0 = Math.floor((cy - hh) / S), ty1 = Math.floor((cy + hh) / S);
@@ -173,7 +185,7 @@
         const L = lv - up / 2, f = Math.pow(2, up / 2), Sp = S * f;
         if (Math.abs(f - Math.round(f)) > 1e-9) continue;
         const ptx = Math.floor(t.tx / f), pty = Math.floor(t.ty / f), pm = modeFor(Math.pow(2, L) / dpr), base = L + '|' + ptx + '|' + pty + '|';
-        const pe = TC.map.get(base + pm + 'L') || TC.map.get(base + pm);
+        const pe = TC.map.get(base + pm + 'L' + slice) || TC.map.get(base + pm + slice);
         if (!pe) continue;
         blit(pe.canvas, wx0, wy0, wx0 + S, wy0 + S, ((wx0 - ptx * Sp) / Sp) * TILE, ((wy0 - pty * Sp) / Sp) * TILE, TILE / f, TILE / f);
         break;
@@ -183,7 +195,7 @@
     // ---- per frame: overlays in world units
     ctx.setTransform(m, 0, 0, m, 0, 0);
     const ox = cx - w / 2 / zoom, oy = cy - h / 2 / zoom, P = (x) => x - ox, Q = (y) => y - oy, px = 1 / m;
-    if (zl >= 0.3 && (opts.outlines || opts.graph)) {
+    if (zl >= 0.3 && (opts.outlines || opts.graph || W.floorZ !== undefined)) {
       const vis = W.sitesIn(cx - hw, cy - hh, cx + hw, cy + hh);
       if (opts.outlines) {
         ctx.strokeStyle = COL.outline; ctx.lineWidth = px * 1.5;
@@ -192,6 +204,11 @@
         ctx.stroke();
       }
       if (opts.graph) drawGraph(ctx, W, vis, P, Q, px);
+      if (W.floorZ !== undefined) for (const s of vis.filter((v) => v.kind === 'transition')) {
+        const p = s.transition, x = (p.rect[0] + p.rect[2]) / 2, y = (p.rect[1] + p.rect[3]) / 2;
+        ctx.fillStyle = '#dec1eb'; ctx.font = (12 * px) + 'px system-ui'; ctx.textAlign = 'center';
+        ctx.fillText('↕ ' + (s.band === p.lower ? '+' : '−') + BR.BAND_CFG.spacing + ' m', P(x), Q(y));
+      }
     }
     if (opts.hover && zl >= 0.3) {
       const s = W.site(opts.hover);

@@ -95,6 +95,7 @@
    */
   function planCell(W, i, j) {
     const seed = W.seed, C = CFG.cell, x0 = i * C, y0 = j * C, x1 = x0 + C, y1 = y0 + C;
+    const prefix = W.band === undefined ? '' : 'b' + W.band + '|';
     const rng = new Rng(hash4(seed, i, j, S.CELL));
     const borders = { W: borderOpenings(seed, 'v', i, j), E: borderOpenings(seed, 'v', i + 1, j), N: borderOpenings(seed, 'h', i, j), S: borderOpenings(seed, 'h', i, j + 1) };
     const pc = BR.buildPOICell(W, i, j);
@@ -102,7 +103,7 @@
     // ---- flush lots are built now: the door is the edge, so the world puts
     // its connections exactly on the template's doors
     const lots = [], dropped = new Set();
-    for (const L of pc.lots) {
+    for (const L of pc.lots.concat(W.plannedLots ? W.plannedLots(i, j) : [])) {
       if (L.kind === 'flush') {
         const P = L.pois[0], b = BR.buildPOI(W, P);
         if (b.error) { dropped.add(P.id); continue; }
@@ -174,7 +175,14 @@
       }
       blocks.push({ r, lots: lotsIn, pois: inIn });
     };
-    split([x0, y0, x1, y1], lots.slice(), inside.slice());
+    const claim = lots.find((L) => L.kind === 'reserved');
+    if (claim) {
+      const q = claim.rect, rs = claim.transition.split === 'h'
+        ? [[x0, y0, x1, q[1]], [x0, q[3], x1, y1], [x0, q[1], q[0], q[3]], [q[2], q[1], x1, q[3]]]
+        : [[x0, y0, q[0], y1], [q[2], y0, x1, y1], [q[0], y0, q[2], q[1]], [q[0], q[3], q[2], y1]];
+      blocks.push({ r: q.slice(), lots: [claim], pois: [] });
+      for (const r of rs) split(r, lots.filter((L) => L !== claim && TG.roverlap(L.rect, r)), inside.filter((P) => TG.roverlap(P.bbox, r)));
+    } else split([x0, y0, x1, y1], lots.slice(), inside.slice());
 
     // ---- shared edges between blocks (a west / north of b)
     const n = blocks.length, adj = [];
@@ -214,7 +222,9 @@
       const ls = g.ks.flatMap((b) => blocks[b].lots), ins = g.ks.flatMap((b) => blocks[b].pois);
       const exact = ls.length === 1 && rects.length === 1 && rects[0].every((v, t) => v === ls[0].rect[t]);
       return {
-        id: i + ',' + j + ':' + k, i, j, k, kind: !ls.length ? 'filler' : exact && ls[0].kind === 'flush' ? 'flush' : 'lot',
+        id: prefix + i + ',' + j + ':' + k, i, j, k, kind: !ls.length ? 'filler' : exact && ls[0].kind === 'reserved' ? 'transition' : exact && ls[0].kind === 'flush' ? 'flush' : 'lot',
+        ...(W.band === undefined ? {} : { band: W.band, floorZ: W.floorZ }),
+        ...(exact && ls[0].kind === 'reserved' ? { transition: ls[0].transition, owner: ls[0].transition.id } : {}),
         rects, bbox: g.bbox, area: rects.reduce((s, q) => s + TG.rarea(q), 0),
         lots: ls, pois: ls.flatMap((L) => L.pois).concat(ins), seed: hash4(seed, i, j, (k << 8) ^ S.SITE),
         openness: openness(seed, (g.bbox[0] + g.bbox[2]) / 2, (g.bbox[1] + g.bbox[3]) / 2), conns: []
@@ -224,7 +234,7 @@
     // a lot the cuts could not free as a site of its own (rare) is left out:
     // its doors would open onto the site round it
     for (const s of sites) {
-      if (!s.lots.length || s.kind === 'flush') continue;
+      if (!s.lots.length || s.kind === 'flush' || s.kind === 'transition') continue;
       const L0 = s.lots[0];
       if (s.lots.length === 1 && s.rects.length === 1 && s.rects[0].every((v, t) => v === L0.rect[t])) continue;
       for (const L of s.lots) { dropped.add(L.pois[0].id); lots.splice(lots.indexOf(L), 1); }
@@ -246,7 +256,7 @@
     };
     for (const e of adj) {
       const A = siteOf[e.a], Bk = siteOf[e.b];
-      if (A === Bk || sites[A].kind === 'flush' || sites[Bk].kind === 'flush') continue;
+      if (A === Bk || ['flush', 'transition'].includes(sites[A].kind) || ['flush', 'transition'].includes(sites[Bk].kind)) continue;
       const key = A < Bk ? A + '|' + Bk : Bk + '|' + A;
       let spans = [[e.s0, e.s1]];
       for (const k of [A, Bk]) if (sites[k].kind === 'lot') {
@@ -297,14 +307,14 @@
     const pLoop = CFG.loops[0] + (CFG.loops[1] - CFG.loops[0]) * cellOpen;
     const at = (x, y) => sites.findIndex((s) => s.rects.some((q) => x >= q[0] && x < q[2] && y >= q[1] && y < q[3]));
     for (const s of sites) {
-      if (s.kind !== 'flush' && s.kind !== 'lot') continue;
+      if (!['flush', 'lot', 'transition'].includes(s.kind)) continue;
       const L = s.lots[0], joined = frontJoined(L);
       L.portalConns = {};
       for (const d of L.doors) {
         const m = (d.s0 + d.s1) / 2, inner = d.o === 'h' ? (d.c === L.rect[1] ? 1 : -1) : (d.c === L.rect[0] ? 1 : -1);
         const other = d.o === 'h' ? at(m, d.c - inner * 0.5) : at(d.c - inner * 0.5, m);
         if (other < 0) continue;
-        const lowIsLot = inner === 1 ? false : true, id = i + ',' + j + ':e' + conns.length;
+        const lowIsLot = inner === 1 ? false : true, id = prefix + i + ',' + j + ':e' + conns.length;
         conns.push({ id, o: d.o, c: d.c, s0: d.s0, s1: d.s1, a: sites[lowIsLot ? s.k : other].id, b: sites[lowIsLot ? other : s.k].id, route: d.main, cross: false });
         L.portalConns[d.portal] = id;
         // a door only joins the lot to the site across it if the building
@@ -323,7 +333,7 @@
       for (const q of fit) { t -= q.s1 - q.s0; if (t < 0) { s = q; break; } }
       const lo = s.s0 + e.end, hi = s.s1 - e.end - w;
       const p = Math.round((lo + grng.f() * (hi - lo)) * 2) / 2;
-      conns.push({ id: i + ',' + j + ':e' + conns.length, o: s.o, c: s.c, s0: p, s1: p + w, a: sites[s.lo].id, b: sites[s.hi].id, route, cross: false });
+      conns.push({ id: prefix + i + ',' + j + ':e' + conns.length, o: s.o, c: s.c, s0: p, s1: p + w, a: sites[s.lo].id, b: sites[s.hi].id, route, cross: false });
     };
     // the tree, and a yard's front even when one of its doors joined it already
     for (const e of E) { const [a, b] = e.key.split('|').map(Number); if (tree.union(a, b) || e.force) { e.tree = true; place(e, true); } }
@@ -340,7 +350,7 @@
         if (on) owner = t;
       });
       const mine = sites[siteOf[owner]].id, low = side === 'W' || side === 'N';
-      conns.push({ id: bid + ':' + k, o: vert ? 'v' : 'h', c, s0, s1, a: low ? null : mine, b: low ? mine : null, route: true, cross: true,
+      conns.push({ id: prefix + bid + ':' + k, o: vert ? 'v' : 'h', c, s0, s1, a: low ? null : mine, b: low ? mine : null, route: true, cross: true,
         peerCell: side === 'W' ? [i - 1, j] : side === 'E' ? [i + 1, j] : side === 'N' ? [i, j - 1] : [i, j + 1] });
     });
     const byId = new Map(sites.map((s) => [s.id, s]));
@@ -358,6 +368,7 @@
    */
   const WALK = { door: 1, double: 1, opening: 1, slider: 1, vehicle: 1, open: 1, stair: 1, elevator: 1, ladder: 1 };
   function frontJoined(L) {
+    if (L.kind === 'reserved') return new Set(L.doors.map((d) => d.portal));
     const b = L.b, adj = new Map(b.rooms.map((r) => [r.id, []]));
     for (const [a, c, k] of b.graph.edges) if (WALK[k] && adj.has(a) && adj.has(c)) { adj.get(a).push(c); adj.get(c).push(a); }
     const onEdge = new Set(L.doors.map((d) => d.portal));
@@ -389,6 +400,7 @@
    * the site and their doors become connections it honours (LOT.build).
    */
   function buildSite(W, site) {
+    if (site.kind === 'transition') return W.buildTransition(site);
     const t0 = now(), ox = site.bbox[0], oy = site.bbox[1];
     const cell = W.cell(site.i, site.j);
     const conns = site.conns.map((id) => connFor(site, cell.connById.get(id)));
@@ -423,6 +435,9 @@
   class World {
     constructor(seed, opts) {
       this.seed = seed >>> 0;
+      if (opts && opts.band !== undefined) { this.band = opts.band; this.floorZ = opts.floorZ; }
+      if (opts && opts.plannedLots) this.plannedLots = opts.plannedLots;
+      if (opts && opts.buildTransition) this.buildTransition = opts.buildTransition;
       this.limits = Object.assign({}, CFG.limits, opts && opts.limits);
       this.cells = new Map();
       this.builds = new Map();
@@ -440,7 +455,7 @@
     cell(i, j) { return World.lru(this.cells, i + ',' + j, this.limits.cells, () => { this.stats.cellsPlanned++; return planCell(this, i, j); }); }
     cellAt(x, y) { const C = CFG.cell; return this.cell(Math.floor(x / C), Math.floor(y / C)); }
     /** a site by id ('i,j:k') */
-    site(id) { const c = id.indexOf(':'), ij = id.slice(0, c).split(','); return this.cell(+ij[0], +ij[1]).byId.get(id) || null; }
+    site(id) { const raw = id.split('|').pop(), c = raw.indexOf(':'), ij = raw.slice(0, c).split(','); return this.cell(+ij[0], +ij[1]).byId.get(id) || null; }
     siteAt(x, y) {
       for (const s of this.cellAt(x, y).sites) for (const q of s.rects) if (x >= q[0] && x < q[2] && y >= q[1] && y < q[3]) return s;
       return null;
@@ -461,6 +476,7 @@
     poisIn(x0, y0, x1, y1) { return this.sitesIn(x0, y0, x1, y1).flatMap((s) => s.pois.filter((P) => P.bbox[0] < x1 && P.bbox[2] > x0 && P.bbox[1] < y1 && P.bbox[3] > y0)); }
     /** the filler that builds a site: the pool's pick with the biome's weights, the yard for a lot, none for a flush lot */
     fillerOf(site) {
+      if (site.kind === 'transition') return 'terraced_atrium';
       if (site.kind === 'flush') return null;
       if (site.kind === 'lot') return 'yard';
       if (!site._filler) site._filler = FILL.pick({ seed: site.seed, site: { rects: local(site.rects, site.bbox[0], site.bbox[1]) }, weights: fillerWeights(site.openness) });
