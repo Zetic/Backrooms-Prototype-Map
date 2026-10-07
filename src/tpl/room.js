@@ -10,6 +10,8 @@
  *            (storage units, cells, cubicles), an exit at the far end
  *
  * Portals come from the archetype: portals: [{ role, kind, side, w, p }].
+ * roomTags: tags every room of the layout gets (a lone room is tagged 'lone');
+ * tight: the room fills its site, no half metre left at its edges.
  * side 'S' is the main side; 'any' takes any exterior wall.
  */
 (function (root) {
@@ -18,26 +20,20 @@
   const U = (m) => Math.round(m / TG.GRID);
   const why = (ctx, k) => { if (ctx.why) ctx.why[k] = (ctx.why[k] || 0) + 1; return null; };
 
-  const T = {
-    closet: { zone: 'service', minW: 2, maxAsp: 4, privacy: 6, ceil: [2.2, 2.4], tags: ['storage', 'closet'] },
-    storage: { zone: 'service', minW: 4, maxAsp: 3, privacy: 4, ceil: [2.4, 3.2], tags: ['storage'], label: 'storage room' },
-    restroom: { zone: 'public', minW: 3, maxAsp: 4, privacy: 4, ceil: [2.4, 2.7], tags: ['bathroom', 'wet', 'public'] },
-    stall: { zone: 'private', minW: 2, maxAsp: 3, privacy: 8, ceil: [2.4, 2.7], tags: ['bathroom', 'wet', 'stall'] },
-    vestibule: { zone: 'circulation', minW: 2, maxAsp: 4, privacy: 1, ceil: [2.4, 2.7], tags: ['entry', 'circulation'] },
-    janitor: { zone: 'service', minW: 2, maxAsp: 3, privacy: 7, ceil: [2.4, 2.5], tags: ['storage', 'wet', 'utility'], label: 'janitor closet' },
-    mechanical: { zone: 'service', minW: 3, maxAsp: 5, privacy: 5, ceil: [2.6, 3.6], tags: ['mechanical', 'utility'], label: 'mechanical room' },
-    corridor: { zone: 'circulation', minW: 2, maxAsp: 99, privacy: 0, ceil: [2.4, 2.7], tags: ['circulation'] },
-    unit: { zone: 'private', minW: 3, maxAsp: 3.5, privacy: 5, ceil: [2.4, 3], tags: ['storage', 'unit'], label: 'unit' },
-    cell: { zone: 'private', minW: 3, maxAsp: 3, privacy: 6, ceil: [2.4, 2.6], tags: ['sleeping', 'cell'] }
-  };
+  // Room types come from the shared catalogue (tpl/catalogue.js): every
+  // catalogued room, so any of them can be built on its own. Here only how
+  // private each is in this engine's small buildings (doors swing into the
+  // more private room); a room with none here sits in the middle (5).
+  const PRIVACY = { closet: 6, storage: 4, restroom: 4, stall: 8, vestibule: 1, janitor: 7, mechanical: 5, corridor: 0, unit: 5, cell: 6 };
+  const T = TPL.CAT.types(true, Object.fromEntries(Object.keys(TPL.CAT.ROOMS).map((t) => [t, { privacy: PRIVACY[t] !== undefined ? PRIVACY[t] : 5 }])));
 
   function program(arch, rng) {
     return { summary: [arch.layout + ' layout'].concat(arch.room ? [arch.room] : []) };
   }
 
-  /** inner rect, sometimes a half metre shy of the site edge (never when flush: its lot edge is its walls) */
+  /** inner rect, sometimes a half metre shy of the site edge (never when flush: its lot edge is its walls, nor for a tight recipe: a lone room fills its site) */
   function region(ctx, rng) {
-    const r = ctx.site.inner, m = () => (!ctx.spec.flush && rng.f() < 0.25 ? 1 : 0);
+    const r = ctx.site.inner, m = () => (!ctx.spec.flush && !ctx.arch.tight && rng.f() < 0.25 ? 1 : 0);
     const q = [r[0] + m(), r[1] + m(), r[2] - m(), r[3]];
     return TG.rvalid(q) ? q : r.slice();
   }
@@ -79,7 +75,7 @@
     single(arch, ctx, rng) {
       const r = region(ctx, rng), B = make(ctx);
       if (TG.rshort(r) < T[arch.room].minW) return why(ctx, 'single:small');
-      const i = B.add(arch.room, [r]);
+      const i = B.add(arch.room, [r], arch.roomTags ? { tags: arch.roomTags.slice() } : undefined);
       portals(B, arch, rng, i, 'S');
       return finish(B, ctx, rng, { type: 'single' });
     },

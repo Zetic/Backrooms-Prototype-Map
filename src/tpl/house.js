@@ -33,29 +33,32 @@
   const why = (ctx, k) => { if (ctx.why) ctx.why[k] = (ctx.why[k] || 0) + 1; return null; };
 
   // ------------------------------------------------------------ room types
-  // minW / maxAsp in units of the largest rect; win: window rule (units);
-  // privacy: doors swing into the more private room.
-  const T = {
-    foyer: { zone: 'public', minW: 3, maxAsp: 3, privacy: 1, area: [4, 7], ceil: [2.5, 2.9], tags: ['entry'] },
-    living: { zone: 'public', minW: 7, maxAsp: 2.2, privacy: 1, area: [16, 26], win: { w: [3, 5], every: 9, max: 3, need: 1 }, ceil: [2.5, 2.9], tags: ['living', 'social'] },
-    family: { zone: 'public', minW: 7, maxAsp: 2.2, privacy: 1, area: [14, 20], win: { w: [3, 4], every: 9, max: 2, need: 1 }, ceil: [2.4, 2.7], tags: ['living', 'social'], label: 'family room' },
-    dining: { zone: 'public', minW: 6, maxAsp: 2, privacy: 1, area: [9, 13], win: { w: [2, 4], every: 8, max: 2 }, ceil: [2.4, 2.7], tags: ['dining', 'social'] },
-    kitchen: { zone: 'public', minW: 5, maxAsp: 2.6, privacy: 2, area: [9, 14], win: { w: [2, 3], every: 10, max: 1, sill: 1.05 }, ceil: [2.4, 2.6], tags: ['kitchen', 'wet', 'cooking'] },
-    office: { zone: 'private', minW: 5, maxAsp: 2, privacy: 4, area: [7, 10], win: { w: [2, 3], every: 8, max: 1, need: 1 }, ceil: [2.4, 2.6], tags: ['work'] },
-    bedroom: { zone: 'private', minW: 6, maxAsp: 2, privacy: 5, area: [9, 13], win: { w: [2, 3], every: 8, max: 2, need: 2 }, ceil: [2.4, 2.6], tags: ['sleeping', 'private'] },
-    master: { zone: 'private', minW: 7, maxAsp: 2, privacy: 5, area: [13, 18], win: { w: [2, 4], every: 8, max: 2, need: 2 }, ceil: [2.4, 2.8], tags: ['sleeping', 'private', 'primary'], label: 'master bedroom' },
-    bath: { zone: 'private', minW: 3, maxAsp: 3, privacy: 6, area: [4, 6], win: { w: [1, 2], every: 12, max: 1, sill: 1.5 }, ceil: [2.3, 2.5], tags: ['bathroom', 'wet', 'private'], label: 'bathroom' },
-    ensuite: { zone: 'private', minW: 3, maxAsp: 3, privacy: 7, area: [4, 6], win: { w: [1, 2], every: 12, max: 1, sill: 1.5 }, ceil: [2.3, 2.5], tags: ['bathroom', 'wet', 'private', 'ensuite'] },
-    closet: { zone: 'private', minW: 2, maxAsp: 8, privacy: 8, ceil: [2.3, 2.4], tags: ['storage', 'closet'] },
-    wic: { zone: 'private', minW: 3, maxAsp: 4, privacy: 8, area: [3, 5], ceil: [2.3, 2.4], tags: ['storage', 'closet', 'walk-in'], label: 'walk-in closet' },
-    linen: { zone: 'private', minW: 2, maxAsp: 8, privacy: 8, area: [1, 2], ceil: [2.3, 2.4], tags: ['storage', 'closet'], label: 'linen closet' },
-    hall: { zone: 'circulation', minW: 2, maxAsp: 99, privacy: 0, win: { w: [2, 2], every: 99, max: 1 }, ceil: [2.4, 2.5], tags: ['circulation'], label: 'hallway' },
-    laundry: { zone: 'service', minW: 4, maxAsp: 3, privacy: 3, area: [3.5, 6], win: { w: [1, 2], every: 12, max: 1, sill: 1.2 }, ceil: [2.4, 2.5], tags: ['laundry', 'wet', 'utility'] },
-    mudroom: { zone: 'service', minW: 3, maxAsp: 3.5, privacy: 2, area: [3, 5], ceil: [2.4, 2.5], tags: ['entry', 'storage'] },
-    pantry: { zone: 'service', minW: 2, maxAsp: 4, privacy: 6, area: [1.5, 3], ceil: [2.4, 2.5], tags: ['storage', 'food'] },
-    utility: { zone: 'service', minW: 3, maxAsp: 4.5, privacy: 4, area: [3, 6], ceil: [2.4, 2.5], tags: ['storage', 'mechanical'], label: 'storage' },
-    garage: { zone: 'service', minW: 7, maxAsp: 2.6, privacy: 2, win: { w: [2, 2], every: 16, max: 1, sill: 1.2 }, ceil: [2.6, 2.8], tags: ['vehicle', 'storage', 'unfinished'] }
-  };
+  // What each room is comes from the shared catalogue (tpl/catalogue.js);
+  // what follows is only how rooms behave in a house: privacy (doors swing
+  // into the more private room), the window each wants to the outside, and
+  // that a closet in a house is a private, narrow, slightly taller one.
+  // minW / maxAsp in units of the largest rect; win: window rule (units).
+  const T = TPL.CAT.types(['foyer', 'living', 'family', 'dining', 'kitchen', 'office', 'bedroom', 'master', 'bath', 'ensuite', 'closet', 'wic', 'linen', 'hall', 'laundry', 'mudroom', 'pantry', 'utility', 'garage'], {
+    foyer: { privacy: 1 },
+    living: { privacy: 1, win: { w: [3, 5], every: 9, max: 3, need: 1 } },
+    family: { privacy: 1, win: { w: [3, 4], every: 9, max: 2, need: 1 } },
+    dining: { privacy: 1, win: { w: [2, 4], every: 8, max: 2 } },
+    kitchen: { privacy: 2, win: { w: [2, 3], every: 10, max: 1, sill: 1.05 } },
+    office: { privacy: 4, win: { w: [2, 3], every: 8, max: 1, need: 1 } },
+    bedroom: { privacy: 5, win: { w: [2, 3], every: 8, max: 2, need: 2 } },
+    master: { privacy: 5, win: { w: [2, 4], every: 8, max: 2, need: 2 } },
+    bath: { privacy: 6, win: { w: [1, 2], every: 12, max: 1, sill: 1.5 } },
+    ensuite: { privacy: 7, win: { w: [1, 2], every: 12, max: 1, sill: 1.5 } },
+    closet: { privacy: 8, zone: 'private', maxAsp: 8, ceil: [2.3, 2.4] },
+    wic: { privacy: 8 },
+    linen: { privacy: 8 },
+    hall: { privacy: 0, win: { w: [2, 2], every: 99, max: 1 } },
+    laundry: { privacy: 3, win: { w: [1, 2], every: 12, max: 1, sill: 1.2 } },
+    mudroom: { privacy: 2 },
+    pantry: { privacy: 6 },
+    utility: { privacy: 4 },
+    garage: { privacy: 2, win: { w: [2, 2], every: 16, max: 1, sill: 1.2 } }
+  });
   const ORDER = ['foyer', 'living', 'family', 'dining', 'kitchen', 'pantry', 'laundry', 'mudroom', 'office', 'master', 'bedroom', 'bath', 'linen'];
   // slicing keys: toward the street / toward the service (garage) side
   const FRONT = { foyer: 3, living: 2, office: 1.2, dining: 1, family: 0.8, kitchen: 0.3, mudroom: 0.2, pantry: 0, laundry: -0.5, utility: -1 };

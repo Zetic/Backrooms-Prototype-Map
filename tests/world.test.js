@@ -277,8 +277,13 @@ const B = [-1, -1, 1, 1];
   const tiers = BR.POI_TIERS.filter((t) => cat[t].length);
   check('POI density is dense but not crowded', st.perHa > 2 && st.perHa < 7, st.perHa.toFixed(2) + ' POIs/ha');
   check('every tier with templates is placed', tiers.every((t) => st.byTier[t] > 0), JSON.stringify(st.byTier));
+  // the expected pool is what the backrooms are made of: every one appears; the
+  // weird pool (a lone kitchen, a stall, a playground) is rare by design
   const used = new Set(ps.map((P) => P.archetype)), all = tiers.flatMap((t) => cat[t].map((a) => a.id));
-  check('every template in the catalogue appears', all.every((id) => used.has(id)), `${used.size}/${all.length}`);
+  const pool = (id) => TPL.archetypes[id].pool || 'expected', exp = all.filter((id) => pool(id) === 'expected'), weird = all.filter((id) => pool(id) === 'weird');
+  check('every template in the expected pool appears', exp.every((id) => used.has(id)), `${exp.filter((id) => used.has(id)).length}/${exp.length}`);
+  const wShare = ps.filter((P) => pool(P.archetype) === 'weird').length / ps.length, wSeen = weird.filter((id) => used.has(id)).length;
+  check('weird-pool templates turn up, rarely', weird.length === 0 || (wShare > 0.01 && wShare < 0.15 && wSeen >= weird.length / 2), `${(wShare * 100).toFixed(1)}% of POIs, ${wSeen}/${weird.length} templates seen`);
   const shapes = new Set(ps.map((P) => P.shape)), sides = new Set(ps.map((P) => P.approach));
   check('POI sites come in irregular shapes and face every side', shapes.size >= 3 && sides.size === 4, [...shapes].join(','));
   check('small POIs cluster beside bigger ones', ps.filter((P) => P.cluster).length > ps.length * 0.15);

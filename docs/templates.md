@@ -11,6 +11,10 @@ backrooms. They range in size:
   templates).
 * **Planned, not built yet:** a mall, a skyscraper or an amusement park.
 
+Every room and every zone is defined once, in a shared catalogue, and is also
+a template of its own: a kitchen alone, a stall alone, a playground walled in
+(section 7: the catalogue).
+
 A template outputs **architecture only**:
 
 * rooms, each with a type and tags;
@@ -253,6 +257,47 @@ Current engines:
   * `L` (an L-shaped plant room);
   * `units` (a corridor with rooms either side and an exit at the far end).
 
+### The catalogue (`src/tpl/catalogue.js`)
+
+What every room and zone **is** lives in one place, `TPL.CAT`: a room's tags
+(what a prop pass reads), default zone, smallest width, longest proportion,
+default floor area, ceiling range and label; a zone's tags and label. A
+kitchen is a kitchen wherever it turns up.
+
+How a room behaves in a particular template is that template's business.
+Each engine takes the catalogue and lays only its own context over it
+(`CAT.types(list, context)`): the House engine adds privacy (which way doors
+swing) and the window each room wants to the outside, and makes a closet in a
+house a private, narrower one; the Room engine adds privacy for its small
+buildings. The neighborhood's street and yards, the park's room and its zone
+types come from the catalogue too. Moving the engines onto the catalogue
+changed no building: every template built byte for byte the same.
+
+**Every room and zone is a template of its own** (`src/tpl/archetypes/lone.js`,
+generated from the catalogue): `lone_<room>` is that room alone, built by the
+Room engine (`single` layout, filling its site): the room as the catalogue
+says it is, a door of its own, and nothing a house would put round it (no
+dining room beside a kitchen, no window). `lone_zone_<zone>` is a zone alone,
+built by the Zone engine (`src/tpl/zone.js`, a composite with no parts): a
+room whose whole floor is that zone. A catalogue entry that already has a
+template (the closet, the storage room, the mechanical room, the park) gets no
+second one. Lone rooms are tagged `lone`.
+
+**Pools.** Every template is in a pool, `archetype.pool`:
+
+* `expected` (the default): what the backrooms are made of. Houses, closets,
+  storage, restrooms, and alone: a janitor closet, a utility or laundry room,
+  an office, a storage unit, a hallway, a corridor, a vestibule;
+* `weird`: out of place, and rare. Alone: a kitchen, a bedroom, a bathroom, a
+  garage, a stall, a foyer, a street, a front yard, a playground, a pit, and
+  the rest of a house's rooms. Their rooms are also tagged `wrong:lone`, so a
+  client can play them up (the plan view names them in red).
+
+The world scales a template's weight within its size tier by its pool
+(`BR.POI_CFG.pools`: expected 1, weird 0.05): weird templates come to about
+5% of POIs. The catalogue's `lone` field sets each room's pool and weight and
+anything its lone template needs (site, door kind, a way out at the back).
+
 A **recipe** (archetype) is pure data in `src/tpl/archetypes/`:
 
 * the `site` ranges;
@@ -261,7 +306,8 @@ A **recipe** (archetype) is pure data in `src/tpl/archetypes/`:
 * portal chances;
 * `windows`;
 * `wrongness`;
-* `category`, `blurb` and `rarity`, which the workbench uses.
+* `category`, `blurb` and `rarity`, which the workbench uses;
+* `pool`: `expected` (default) or `weird`.
 
 A new house type is a new recipe:
 
@@ -404,7 +450,8 @@ main path, 2–3 m of park round it. If none fits, the park is open.
 
 **Library (left):**
 
-* search across name, engine, category and text;
+* search across name, engine, category, pool and text (`alone` lists every
+  lone template, `weird pool` the rare ones, badged in the list);
 * filter chips by engine and size class (tiny / small / medium / large /
   huge), plus favourites and "needs work";
 * sorting by engine, name, health or size.

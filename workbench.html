@@ -181,15 +181,18 @@
 <script src="src/core.js"></script>
 <script src="src/tpl/grid.js"></script>
 <script src="src/tpl/framework.js"></script>
+<script src="src/tpl/catalogue.js"></script>
 <script src="src/tpl/house.js"></script>
 <script src="src/tpl/room.js"></script>
 <script src="src/tpl/composite.js"></script>
 <script src="src/tpl/neighborhood.js"></script>
 <script src="src/tpl/park.js"></script>
+<script src="src/tpl/zone.js"></script>
 <script src="src/tpl/archetypes/house.js"></script>
 <script src="src/tpl/archetypes/room.js"></script>
 <script src="src/tpl/archetypes/neighborhood.js"></script>
 <script src="src/tpl/archetypes/park.js"></script>
+<script src="src/tpl/archetypes/lone.js"></script>
 <script src="src/tpl/fillers/engine.js"></script>
 <script src="src/tpl/fillers/kit.js"></script>
 <script src="src/tpl/fillers/pool.js"></script>
@@ -413,7 +416,7 @@
       if (state.fav && !favs.has(a.id)) return false;
       if (state.bad) { const h = healthOf(a.id); if (!h || h.cls === 'g') return false; }
       if (!q) return true;
-      const hay = [a.id, a.name, a.engine, a.category, a.blurb, a.layout, a.room, a.feel, TPL.sizeClass(a)].join(' ').toLowerCase();
+      const hay = [a.id, a.name, a.engine, a.category, a.blurb, a.layout, a.room, a.feel, TPL.sizeClass(a), a.engine === 'filler' ? '' : (a.pool || 'expected') + ' pool'].join(' ').toLowerCase();
       return q.split(/\s+/).every((w) => hay.indexOf(w) >= 0);
     });
     const by = state.sort;
@@ -455,7 +458,7 @@
     return '<input type="checkbox" class="cmp" title="add to Compare (c)"' + (C.has(a.id) ? ' checked' : '') + '>' +
       '<span class="star' + (favs.has(a.id) ? ' on' : '') + '" title="favourite (f)">' + (favs.has(a.id) ? '★' : '☆') + '</span>' +
       '<span class="nm" title="' + esc(a.id) + '">' + esc(a.name || a.id) + (a.id.indexOf('custom:') === 0 ? ' <span class="k">(edited)</span>' : '') + '</span>' +
-      '<span class="sz">' + (a.engine === 'filler' ? esc(a.feel) : TPL.sizeClass(a)) + '</span><span class="st">' + st + '</span>';
+      '<span class="sz"' + (a.pool === 'weird' ? ' style="color:#f0a092;border-color:#7a3d33" title="weird pool: out of place, placed rarely"' : '') + '>' + (a.engine === 'filler' ? esc(a.feel) : TPL.sizeClass(a) + (a.pool === 'weird' ? ' · weird' : '')) + '</span><span class="st">' + st + '</span>';
   }
   function renderLib() {
     const L = filtered(), lib = $('lib');

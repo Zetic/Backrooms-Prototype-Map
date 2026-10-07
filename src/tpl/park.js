@@ -35,16 +35,8 @@
   const why = (ctx, k) => { ctx.why[k] = (ctx.why[k] || 0) + 1; return null; };
   const SALT = { BUILDING: 0x7061 };
 
-  const T = {
-    park: { zone: 'public', minW: 16, label: 'park', tags: ['park', 'outdoor', 'hall'] },
-    // zone types (not rooms): what a prop pass reads
-    lawn: { label: 'lawn', tags: ['grass', 'soft'] },
-    path: { label: 'path', tags: ['tile', 'walkway'] },
-    plaza: { label: 'plaza', tags: ['tile'] },
-    playground: { label: 'playground', tags: ['play', 'equipment'] },
-    seating: { label: 'seating', tags: ['bench'] },
-    pit: { label: 'pit', tags: ['hazard', 'drop', 'wrong:pit'] }
-  };
+  // its room and its zones, from the catalogue (zone types are not rooms: what a prop pass reads)
+  const T = Object.assign(TPL.CAT.types(['park']), TPL.CAT.zones(['lawn', 'path', 'plaza', 'playground', 'seating', 'pit']));
   // when two zones claim a cell, the higher one keeps it
   const RANK = { lawn: 0, path: 1, seating: 2, plaza: 3, playground: 4, pit: 5 };
   const TYPES = Object.keys(RANK);
