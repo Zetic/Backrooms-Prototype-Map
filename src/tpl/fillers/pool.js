@@ -1,65 +1,56 @@
 /*
- * tpl/fillers/pool.js - the Backrooms filler pool.
+ * tpl/fillers/pool.js - the Backrooms filler pool: the first fillers, and
+ * the pool as a whole.
  *
  * Each filler is a layout that paints rooms onto the site raster; the engine
  * (engine.js) lands the connections, cleans up, cuts the openings and checks
  * walkability. Units are kit cells (0.5 m). Cells left unpainted stay solid.
+ * Shared layout and furnishing pieces are in kit.js.
  *
- * The pool leans enclosed, like the hand-drawn reference map: clumps of
- * small irregular rooms, long thin passages and chains of rooms, with an
- * open hall only now and then.
+ * The pool leans enclosed, like the hand-drawn reference maps: clumps of
+ * irregular rooms, long thin passages and chains of rooms, with an open hall
+ * only now and then. Weights add up to 70 enclosed, 20 mixed, 10 open:
  *
- *   enclosed  warren, passage, enfilade, cells, ring          (weight 70)
- *   mixed     broken room                                     (weight 20)
- *   open      ragged hall, pillar hall                        (weight 10)
+ *   pool.js       warren, passage, enfilade, cells, ring (enclosed);
+ *                 broken (mixed); ragged hall, pillar hall (open)
+ *   corridors.js  corridor-led fillers (corridor with rooms, beads, comb...)
+ *   halls.js      hall-led fillers (loop hall, partition field, aisles...)
+ *   rooms.js      room-led fillers (big rooms, tiny entrances, nested...)
  *
  * Not in the pool (weight 0): `yard`, the room a house stands in, which
  * lives with the lots in src/tpl/lot.js.
  *
- * Each filler's `site` ranges are a typical site for it (tools use them; the
- * world sizes sites itself). `fits` is the hard limit.
- *
- * Ideas from the old world-first fill (since removed): its Backrooms zones
- * (open, split, warren, ring, gallery, corridorRooms...) and its knobs
- * (room scale, pillars, pOpen, pLoop, pWide), here retuned for less open
- * floor and more solid between rooms.
+ * Each filler's `site` ranges are a typical site for it in metres (tools use
+ * them; the world sizes sites itself). `fits` is the hard limit, in cells.
  */
 (function (root) {
   'use strict';
   const BR = root.BR, TG = BR.TG, FILL = BR.FILL;
-  const { VOID, bsp, voidSome, notch, paintRooms, paintPath, route, noiseField } = FILL.lib;
+  const { VOID, bsp, voidSome, notch, paintPath, route, noiseField } = FILL.lib;
+  const { onEdge, blob, paintBlobs, row, slice, stub, alcove, stubWall, gappedWall, freeWall, column } = FILL.kit;
   const dims = (S) => [TG.rw(S.inner), TG.rh(S.inner)];
 
   // ------------------------------------------------------------ warren
   FILL.register({
-    id: 'warren', name: 'Warren', feel: 'enclosed', weight: 26,
-    blurb: 'A clump of 3-10 m rooms with jagged outlines and off-centre openings; solid gaps between them.',
+    id: 'warren', name: 'Warren', feel: 'enclosed', weight: 18,
+    blurb: 'A clump of 3-10 m rooms, most made of 2-3 overlapping rectangles, with off-centre openings and solid pockets between them.',
     doors: { opening: 0.8, door: 0.12, wide: 0.08 }, loops: 0.2,
     fits: (S) => S.area >= 120 && Math.min(...dims(S)) >= 8,
     site: { w: [12, 30], h: [10, 26] },
     layout(P, rng) {
-      const rects = bsp([0, 0, P.W, P.H], rng, 6, 20, 0.3);
-      const ids = paintRooms(P, rects, 'room', ['warren']);
+      const rooms = [];
+      for (const r of bsp([0, 0, P.W, P.H], rng, 6, 20, 0.3)) { const v = P.add('room', ['warren']); if (blob(P, r, v, rng, { plain: 0.3 })) rooms.push({ v, r }); }
       // a ragged clump: rooms on the edge go solid or get notched more often than inner ones
-      const edge = new Set(ids.filter((v) => onEdge(P, v)));
+      const edge = new Set(rooms.filter((q) => onEdge(P, q.v)).map((q) => q.v));
       voidSome(P, rng, rng.range(0.2, 0.4), (v) => edge.has(v));
       voidSome(P, rng, rng.range(0.05, 0.15), (v) => !edge.has(v));
-      ids.forEach((v, k) => { if (rng.f() < (edge.has(v) ? 0.6 : 0.25)) notch(P, v, rects[k], rng, 6, 5); });
+      for (const q of rooms) if (rng.f() < (edge.has(q.v) ? 0.35 : 0.1)) notch(P, q.v, q.r, rng, 6, 5);
     }
   });
 
-  /** does room v touch the site outline? */
-  function onEdge(P, v) {
-    for (const i of P.cells(v)) {
-      const x = i % P.W, y = (i - x) / P.W;
-      if (!P.inSite(x - 1, y) || !P.inSite(x + 1, y) || !P.inSite(x, y - 1) || !P.inSite(x, y + 1)) return true;
-    }
-    return false;
-  }
-
   // ------------------------------------------------------------ passage
   FILL.register({
-    id: 'passage', name: 'Winding passage', feel: 'enclosed', weight: 16,
+    id: 'passage', name: 'Winding passage', feel: 'enclosed', weight: 8,
     blurb: 'A 1-2 m corridor that kinks between the connections, with alcoves and the odd dead-end stub.',
     doors: { opening: 1 }, loops: 0,
     fits: () => true,
@@ -95,47 +86,9 @@
     }
   });
 
-  /** a straight dead end from a random cell of room v, b wide, up to len long */
-  function stub(P, v, rng, b, len) {
-    const cells = P.cells(v);
-    if (!cells.length) return;
-    const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    for (let tries = 0; tries < 8; tries++) {
-      const i = cells[rng.int(0, cells.length - 1)], x = i % P.W, y = (i - x) / P.W, d = DIRS[rng.int(0, 3)];
-      const path = [];
-      for (let t = 1; t <= len; t++) {
-        const nx = x + d[0] * t, ny = y + d[1] * t;
-        if (!P.inSite(nx, ny)) break;
-        const j = ny * P.W + nx;
-        if (P.R.a[j] >= 0 && P.R.a[j] !== v) break;
-        // keep a cell of solid to either side so it reads as a stub, not a widening
-        const sx = d[1], sy = d[0];
-        if (P.own(nx + sx * b, ny + sy * b) >= 0 || P.own(nx - sx, ny - sy) >= 0) { if (t > 2) break; }
-        path.push(j);
-      }
-      if (path.length >= 4) { paintPath(P, path, b, v); return; }
-    }
-  }
-
-  /** a small room on solid ground beside room v */
-  function alcove(P, v, rng, type) {
-    const cells = P.cells(v);
-    for (let tries = 0; tries < 12 && cells.length; tries++) {
-      const i = cells[rng.int(0, cells.length - 1)], x = i % P.W, y = (i - x) / P.W;
-      const w = rng.int(4, 8), h = rng.int(4, 7), side = rng.int(0, 3);
-      const off = rng.int(-(w - 2), 0);
-      const q = side === 0 ? [x + off, y - h, x + off + w, y] : side === 1 ? [x + off, y + 1, x + off + w, y + 1 + h]
-        : side === 2 ? [x - h, y + off, x, y + off + w] : [x + 1, y + off, x + 1 + h, y + off + w];
-      if (!P.allVoid(q)) continue;
-      P.paint(q, P.add(type, ['dead-end']));
-      return true;
-    }
-    return false;
-  }
-
   // ------------------------------------------------------------ enfilade
   FILL.register({
-    id: 'enfilade', name: 'Enfilade', feel: 'enclosed', weight: 14,
+    id: 'enfilade', name: 'Enfilade', feel: 'enclosed', weight: 6,
     blurb: 'A chain of rooms in a row, each through an off-centre opening; sometimes it turns a corner.',
     doors: { opening: 0.85, door: 0.15 }, loops: 0,
     fits: (S) => Math.max(...dims(S)) >= 16 && Math.min(...dims(S)) >= 6,
@@ -166,42 +119,92 @@
     }
   });
 
-  /** rooms 3-8 m long from a0 to a1 (reversed: from a1 back), chained in order */
-  function slice(P, rng, a0, a1, mk, reverse) {
-    const out = [];
-    let t = a0;
-    const cuts = [];
-    while (t < a1) {
-      let len = rng.int(6, 16);
-      if (a1 - t - len < 6) len = a1 - t;
-      cuts.push([t, t + len]); t += len;
-    }
-    if (reverse) cuts.reverse();
-    for (const [p, q] of cuts) {
-      const r = mk(p, q), v = P.add('room', ['enfilade']);
-      if (!P.paint(r, v, true)) continue;
-      if (out.length) P.require.push([out[out.length - 1].v, v]);
-      out.push({ v, r });
-    }
-    return out;
-  }
-
   // ------------------------------------------------------------ cells
   FILL.register({
-    id: 'cells', name: 'Cell cluster', feel: 'enclosed', weight: 8,
-    blurb: 'Tiny 2-4 m rooms and closets packed together; mostly a tree, so it reads like a maze.',
+    id: 'cells', name: 'Cell cluster', feel: 'enclosed', weight: 4,
+    blurb: 'A pocket of 2-4 m rooms and closets among ordinary rooms: a cluster in one end, closets off a short corridor, or small rooms round a middle one.',
     doors: { opening: 0.55, door: 0.45 }, loops: 0.06,
-    fits: (S) => S.area >= 64 && Math.min(...dims(S)) >= 6,
+    fits: (S) => S.area >= 144 && S.area <= 1000 && Math.min(...dims(S)) >= 10,
     site: { w: [8, 18], h: [8, 16] },
     layout(P, rng) {
-      paintRooms(P, bsp([0, 0, P.W, P.H], rng, 4, 8, 0.25), 'cell', ['cells']);
-      voidSome(P, rng, rng.range(0.06, 0.16));
+      // the pocket takes 30-60% of the site from one end (all of a small site);
+      // ordinary 4-8 m rooms fill the rest
+      const all = [0, 0, P.W, P.H], alongX = P.W >= P.H, len = alongX ? P.W : P.H;
+      const take = P.site.area < 480 ? len : Math.max(12, Math.round(len * rng.range(0.3, 0.6))), first = rng.f() < 0.5;
+      const pocket = alongX ? (first ? [0, 0, take, P.H] : [P.W - take, 0, P.W, P.H]) : (first ? [0, 0, P.W, take] : [0, P.H - take, P.W, P.H]);
+      if (take < len) {
+        const rest = [];
+        for (const r of TG.rsub(all, pocket)) for (const q of bsp(r, rng, 8, 16, 0.35)) { const v = P.add('room', ['warren']); if (blob(P, q, v, rng, { plain: 0.4 })) rest.push(v); }
+        voidSome(P, rng, rng.range(0.1, 0.25), (v) => rest.indexOf(v) >= 0);
+      }
+      const style = rng.weighted({ cluster: 0.45, corridor: 0.35, round: 0.2 });
+      const cells = style === 'corridor' ? closetRow(P, rng, pocket) : style === 'round' ? roundRoom(P, rng, pocket) : cluster(P, rng, pocket);
+      voidSome(P, rng, rng.range(0.04, 0.12), (v) => cells.indexOf(v) >= 0);
     }
   });
 
+  /** cells: 2-4 m rooms and closets packed in rect q, some neighbours merged into L and T shapes */
+  function cluster(P, rng, q) {
+    const ids = [];
+    for (const r of bsp(q, rng, 4, 8, 0.25)) {
+      const v = P.add(TG.rlong(r) <= 6 && rng.f() < 0.4 ? 'closet' : 'cell', ['cells']);
+      if (P.paint(r, v, true)) ids.push(v);
+    }
+    // merge about a quarter into a neighbour, never twice into the same one
+    const grown = new Set(), gone = new Set();
+    for (const v of ids) {
+      if (rng.f() >= 0.25 || grown.has(v)) continue;
+      const nb = new Map();
+      for (const i of P.cells(v)) {
+        const x = i % P.W, y = (i - x) / P.W;
+        for (const u of [P.own(x - 1, y), P.own(x + 1, y), P.own(x, y - 1), P.own(x, y + 1)]) if (u >= 0 && u !== v && ids.indexOf(u) >= 0 && !gone.has(u) && !grown.has(u)) nb.set(u, (nb.get(u) || 0) + 1);
+      }
+      let to = -1, best = 3;
+      for (const [u, n] of nb) if (n > best || (n === best && u < to)) { to = u; best = n; }
+      if (to < 0) continue;
+      for (const i of P.cells(v)) P.R.a[i] = to;
+      if (P.rooms[to].type === 'closet') P.rooms[to].type = 'cell';
+      grown.add(to); gone.add(v);
+    }
+    return ids.filter((v) => !gone.has(v));
+  }
+
+  /** cells: a short 1-1.5 m corridor down rect q with closets and small rooms off both sides */
+  function closetRow(P, rng, q) {
+    const alongX = TG.rw(q) >= TG.rh(q), cw = rng.int(2, 3), C0 = alongX ? q[1] : q[0], C1 = alongX ? q[3] : q[2];
+    const mid = C0 + Math.floor((C1 - C0 - cw) / 2) + rng.int(-2, 2), c0 = Math.max(C0, Math.min(C1 - cw, mid));
+    const hall = P.add('passage', ['cells']), ids = [hall];
+    P.paint(alongX ? [q[0], c0, q[2], c0 + cw] : [c0, q[1], c0 + cw, q[3]], hall);
+    const d0 = Math.min(c0 - C0, rng.int(4, 8)), d1 = Math.min(C1 - c0 - cw, rng.int(4, 8));
+    const sides = [];
+    if (d0 >= 4) sides.push(alongX ? [q[0], c0 - d0, q[2], c0] : [c0 - d0, q[1], c0, q[3]]);
+    if (d1 >= 4) sides.push(alongX ? [q[0], c0 + cw, q[2], c0 + cw + d1] : [c0 + cw, q[1], c0 + cw + d1, q[3]]);
+    for (const s of sides) for (const { v } of row(P, rng, s, alongX, 4, 8, 'cell', ['cells'])) {
+      if (rng.f() < 0.35) P.rooms[v].type = 'closet';
+      P.require.push([hall, v]); ids.push(v);
+    }
+    return ids;
+  }
+
+  /** cells: a 4-6 m room in the middle of rect q with a band of small rooms round it */
+  function roundRoom(P, rng, q) {
+    const d = rng.int(4, 6), mw = Math.min(TG.rw(q) - 2 * d, rng.int(8, 12)), mh = Math.min(TG.rh(q) - 2 * d, rng.int(8, 12));
+    if (mw < 6 || mh < 6) return cluster(P, rng, q);
+    const mx = q[0] + d + rng.int(0, TG.rw(q) - 2 * d - mw), my = q[1] + d + rng.int(0, TG.rh(q) - 2 * d - mh);
+    const mid = P.add('room', ['cells', 'middle']), ids = [mid];
+    P.paint([mx, my, mx + mw, my + mh], mid);
+    const o = [mx - d, my - d, mx + mw + d, my + mh + d];
+    const bands = [[[o[0], o[1], o[2], my], true], [[o[0], my + mh, o[2], o[3]], true], [[o[0], my, mx, my + mh], false], [[mx + mw, my, o[2], my + mh], false]];
+    for (const [s, ax] of bands) for (const { v, r } of row(P, rng, s, ax, 4, 8, 'cell', ['cells'])) {
+      ids.push(v);
+      if (TG.rinter([r[0] - 1, r[1] - 1, r[2] + 1, r[3] + 1], [mx, my, mx + mw, my + mh]) && rng.f() < 0.6) P.require.push([mid, v]);
+    }
+    return ids;
+  }
+
   // ------------------------------------------------------------ ring
   FILL.register({
-    id: 'ring', name: 'Ring', feel: 'enclosed', weight: 6,
+    id: 'ring', name: 'Ring', feel: 'enclosed', weight: 3,
     blurb: 'Rooms around a solid core (sometimes a closet), joined in a loop; a warren or solid around it.',
     doors: { opening: 0.85, door: 0.15 }, loops: 0.1,
     fits: (S) => Math.min(...dims(S)) >= 22,
@@ -216,7 +219,7 @@
       if (rng.f() < 0.7) {
         const around = [];
         for (const r of bsp([0, 0, P.W, P.H], rng, 6, 14, 0.3)) for (const q of TG.rsub(r, o)) if (TG.rshort(q) >= 4) around.push(q);
-        paintRooms(P, around, 'room', ['warren']);
+        paintBlobs(P, around, 'room', ['warren'], rng, { plain: 0.4 });
       }
       const pieces = [];
       const split = (a0, a1, mk) => {
@@ -237,7 +240,7 @@
 
   // ------------------------------------------------------------ broken room
   FILL.register({
-    id: 'broken', name: 'Broken room', feel: 'mixed', weight: 20,
+    id: 'broken', name: 'Broken room', feel: 'mixed', weight: 4,
     blurb: 'A mid-size room cut up by stub walls and partial partitions, with small rooms or solid around it.',
     doors: { opening: 0.8, door: 0.1, wide: 0.1 }, loops: 0.15,
     fits: (S) => Math.min(...dims(S)) >= 14,
@@ -247,7 +250,7 @@
       const I = P.inner, hw = Math.min(TG.rw(I), rng.int(20, 36)), hh = Math.min(TG.rh(I), rng.int(20, 36));
       const hx = I[0] + rng.int(0, TG.rw(I) - hw), hy = I[1] + rng.int(0, TG.rh(I) - hh);
       const hall = [hx, hy, hx + hw, hy + hh];
-      if (rng.f() < 0.75) paintRooms(P, bsp([0, 0, P.W, P.H], rng, 5, 12, 0.3).flatMap((r) => TG.rsub(r, hall)).filter((q) => TG.rshort(q) >= 4), 'room', ['warren']);
+      if (rng.f() < 0.75) paintBlobs(P, bsp([0, 0, P.W, P.H], rng, 5, 12, 0.3).flatMap((r) => TG.rsub(r, hall)).filter((q) => TG.rshort(q) >= 4), 'room', ['warren'], rng, { plain: 0.4 });
       const v = P.add('hall', ['broken']);
       P.paint(hall, v);
       for (let k = rng.int(0, 2); k > 0; k--) notch(P, v, hall, rng, 8, 10);
@@ -267,49 +270,9 @@
     }
   });
 
-  /** a partition from one wall of rect r into the room, frac of the way across */
-  function stubWall(walk, r, rng, frac) {
-    const side = rng.int(0, 3), w = TG.rw(r), h = TG.rh(r);
-    if (side === 0 || side === 2) {                         // from N / S: vertical wall at x = c
-      if (w < 8) return false;
-      const c = rng.int(r[0] + 3, r[2] - 3), len = Math.max(2, Math.round(h * frac));
-      return side === 0 ? walk.partition('v', c, r[1], r[1] + len) : walk.partition('v', c, r[3] - len, r[3]);
-    }
-    if (h < 8) return false;
-    const c = rng.int(r[1] + 3, r[3] - 3), len = Math.max(2, Math.round(w * frac));
-    return side === 3 ? walk.partition('h', c, r[0], r[0] + len) : walk.partition('h', c, r[2] - len, r[2]);
-  }
-  /** a wall right across rect r with one or two 1-2 m gaps */
-  function gappedWall(walk, r, rng) {
-    const horiz = rng.f() < 0.5, a0 = horiz ? r[0] : r[1], a1 = horiz ? r[2] : r[3], c0 = horiz ? r[1] : r[0], c1 = horiz ? r[3] : r[2];
-    if (c1 - c0 < 12 || a1 - a0 < 10) return false;
-    const c = rng.int(c0 + Math.round((c1 - c0) * 0.3), c1 - Math.round((c1 - c0) * 0.3)), o = horiz ? 'h' : 'v';
-    const g = rng.int(2, 4), at = rng.int(a0 + 2, a1 - 2 - g);
-    let ok = false;
-    if (rng.f() < 0.35 && a1 - a0 >= 20) {                   // two gaps: three pieces
-      const g2 = rng.int(2, 4), at2 = rng.int(Math.min(at + g + 3, a1 - 2 - g2), a1 - 2 - g2);
-      ok = walk.partition(o, c, a0, at) | walk.partition(o, c, at + g, at2) | walk.partition(o, c, at2 + g2, a1);
-    } else ok = walk.partition(o, c, a0, at) | walk.partition(o, c, at + g, a1);
-    return ok;
-  }
-  /** a free-standing partition inside rect r */
-  function freeWall(walk, r, rng) {
-    const horiz = rng.f() < 0.5, len = rng.int(4, 10);
-    const along = horiz ? [r[0] + 3, r[2] - 3] : [r[1] + 3, r[3] - 3], across = horiz ? [r[1] + 3, r[3] - 3] : [r[0] + 3, r[2] - 3];
-    if (along[1] - along[0] < len || across[1] <= across[0]) return false;
-    const s = rng.int(along[0], along[1] - len), c = rng.int(across[0], across[1]);
-    return walk.partition(horiz ? 'h' : 'v', c, s, s + len);
-  }
-  function column(walk, r, rng) {
-    const s = rng.f() < 0.6 ? 1 : 2;
-    if (TG.rw(r) < s + 6 || TG.rh(r) < s + 6) return false;
-    const x = rng.int(r[0] + 3, r[2] - 3 - s), y = rng.int(r[1] + 3, r[3] - 3 - s);
-    return walk.column([x, y, x + s, y + s]);
-  }
-
   // ------------------------------------------------------------ ragged hall
   FILL.register({
-    id: 'ragged_hall', name: 'Ragged hall', feel: 'open', weight: 5,
+    id: 'ragged_hall', name: 'Ragged hall', feel: 'open', weight: 3,
     blurb: 'A big room with a notched, uneven outline, a few columns and sometimes a solid block in the middle.',
     doors: { opening: 0.7, wide: 0.3 }, loops: 0.3,
     fits: (S) => Math.min(...dims(S)) >= 24,
@@ -345,7 +308,7 @@
 
   // ------------------------------------------------------------ pillar hall
   FILL.register({
-    id: 'pillar_hall', name: 'Pillar hall', feel: 'open', weight: 5,
+    id: 'pillar_hall', name: 'Pillar hall', feel: 'open', weight: 2,
     blurb: 'An open floor on a grid of columns; the rare big space between the enclosed stretches.',
     doors: { opening: 0.6, wide: 0.4 }, loops: 0.3,
     fits: (S) => Math.min(...dims(S)) >= 24,

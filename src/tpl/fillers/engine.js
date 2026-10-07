@@ -51,8 +51,8 @@
     room: { zone: 'public', tags: ['backrooms'], ceil: [2.4, 3.0] },
     hall: { zone: 'public', tags: ['backrooms', 'large'], ceil: [2.8, 4.2] },
     passage: { zone: 'circulation', tags: ['backrooms', 'circulation'], ceil: [2.3, 2.7] },
-    cell: { zone: 'private', tags: ['backrooms', 'small'], ceil: [2.2, 2.6] },
-    alcove: { zone: 'private', tags: ['backrooms', 'alcove'], ceil: [2.2, 2.6] },
+    cell: { zone: 'public', tags: ['backrooms', 'small'], ceil: [2.2, 2.6] },
+    alcove: { zone: 'public', tags: ['backrooms', 'alcove'], ceil: [2.2, 2.6] },
     closet: { zone: 'service', tags: ['backrooms', 'closet'], ceil: [2.2, 2.5] }
   };
 
@@ -651,12 +651,13 @@
    */
   function widenPinch(P, C, small, starts) {
     // first from solid alone; else taking a cell or two from a third room
-    // (never a landing), which the next split settles
-    return widenWith(P, C, small, starts, false) || widenWith(P, C, small, starts, true);
+    // (never a landing), which the next split settles: one of another piece,
+    // or at last one of the small piece itself
+    return widenWith(P, C, small, starts, 0) || widenWith(P, C, small, starts, 1) || widenWith(P, C, small, starts, 2);
   }
   function widenWith(P, C, small, starts, take) {
     const W = P.W, R = P.R.a;
-    const okFor = (cells, v) => cells.every(([x, y]) => { const j = y * W + x, o = R[j]; return P.inSite(x, y) && (o === VOID || o === v || (take && !P.land[j] && C.label[j] !== small)); });
+    const okFor = (cells, v) => cells.every(([x, y]) => { const j = y * W + x, o = R[j]; return P.inSite(x, y) && (o === VOID || o === v || (take && !P.land[j] && (take > 1 || C.label[j] !== small))); });
     for (const i of starts) {
       const x = i % W, y = (i - x) / W, a = R[i];
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
@@ -734,6 +735,8 @@
     for (let i = 0; i < R.length; i++) if (R[i] >= 0) R[i] = map[R[i]];
     P.rooms = rooms;
     P.require = P.require.map(([a, b]) => [map[a], map[b]]).filter(([a, b]) => a >= 0 && b >= 0 && a !== b);
+    if (P.open) P.open = P.open.map(([a, b]) => [map[a], map[b]]).filter(([a, b]) => a >= 0 && b >= 0 && a !== b);
+    if (typeof P.hall === 'number' && P.hall >= 0) P.hall = map[P.hall];          // a filler's hall, for its furnish
   }
 
   /** 4. openings: portals at the connections, a spanning tree of openings, loops, open boundaries as a last resort. */
@@ -789,6 +792,13 @@
       }
       return false;
     };
+    // filler-asked open boundaries first (no wall at all), then its required links
+    for (const [a, b] of P.open || []) {
+      const k = key(a, b);
+      if (!pairs.has(k) || linked.has(k) || !pairs.get(k).some((w) => w.s1 - w.s0 >= 2)) continue;
+      for (const w of pairs.get(k)) w.kind = 'open';
+      links.push({ a, b, kind: 'open', opening: null }); linked.add(k); uf.union(a, b);
+    }
     for (const [a, b] of P.require) if (!linked.has(key(a, b))) link(a, b);
     const edges = [...pairs.keys()].sort().map((k) => {
       const [a, b] = k.split('|').map(Number), len = pairs.get(k).reduce((s, w) => s + w.s1 - w.s0, 0);
@@ -805,13 +815,6 @@
       for (const w of pairs.get(e.k)) w.kind = 'open';
       links.push({ a: e.a, b: e.b, kind: 'open', opening: null });
       linked.add(e.k); uf.union(e.a, e.b);
-    }
-    // filler-asked open boundaries
-    for (const [a, b] of P.open || []) {
-      const k = key(a, b);
-      if (!pairs.has(k) || linked.has(k)) continue;
-      for (const w of pairs.get(k)) w.kind = 'open';
-      links.push({ a, b, kind: 'open', opening: null }); linked.add(k); uf.union(a, b);
     }
     return { walls, ops, portals, links, loops, issues, uf };
   }
@@ -908,6 +911,23 @@
         const alone = margin >= 1 && !P.partitions.some((p) => p.room === room);
         if (!alone && !ok()) { for (let y = r[1]; y < r[3]; y++) for (let x = r[0]; x < r[2]; x++) col[y * W + x] = 0; return false; }
         P.columns.push({ rect: r.slice(), room });
+        return true;
+      },
+      /** a pillar made of several disjoint rects (a plus, an L), all or nothing, as column() */
+      pillar(rects, margin) {
+        margin = margin === undefined ? 2 : margin;
+        const room = P.own(rects[0][0], rects[0][1]);
+        if (room < 0) return false;
+        const inside = (x, y) => rects.some((r) => x >= r[0] && x < r[2] && y >= r[1] && y < r[3]);
+        for (const r of rects) for (let y = r[1] - margin; y < r[3] + margin; y++) for (let x = r[0] - margin; x < r[2] + margin; x++) {
+          if (P.own(x, y) !== room) return false;
+          const i = y * W + x;
+          if (col[i] || (inside(x, y) && keep[i])) return false;
+        }
+        const set = (val) => { for (const r of rects) for (let y = r[1]; y < r[3]; y++) for (let x = r[0]; x < r[2]; x++) col[y * W + x] = val; };
+        set(1);
+        if ((margin < 2 || P.partitions.some((p) => p.room === room)) && !ok()) { set(0); return false; }
+        for (const r of rects) P.columns.push({ rect: r.slice(), room });
         return true;
       }
     };

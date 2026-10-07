@@ -12,14 +12,18 @@
  *     taken into account, so no join is narrower than 1 m
  *   - deterministic, and independent of load order and connection order
  *   - the pool picks only fillers that fit, and leans enclosed
+ *
+ * ONLY=warren,cells node tests/fillers.test.js 80  checks just those fillers
+ * (and skips the pool-wide checks).
  */
 const path = require('path');
-for (const f of ['core', 'tpl/grid', 'tpl/framework', 'tpl/fillers/engine', 'tpl/fillers/pool'])
+for (const f of ['core', 'tpl/grid', 'tpl/framework', 'tpl/fillers/engine', 'tpl/fillers/kit', 'tpl/fillers/pool', 'tpl/fillers/corridors', 'tpl/fillers/halls', 'tpl/fillers/rooms'])
   require(path.join(__dirname, '..', 'src', f + '.js'));
 const BR = globalThis.BR, FILL = BR.FILL, TPL = BR.TPL, { Rng, hash4 } = BR;
 const { walk1m } = require('./walk');
 
 const N = +(process.argv[2] || 40);
+const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 let failures = 0;
 function check(name, ok, detail) {
   console.log((ok ? 'ok   ' : 'FAIL ') + name + (detail ? '  (' + detail + ')' : ''));
@@ -111,7 +115,7 @@ function contract(b, spec) {
 // ---------------------------------------------------------------- every filler, many sites
 const stats = {};
 let errors = 0, total = 0;
-for (const F of FILL.list()) {
+for (const F of FILL.list().filter((F) => !ONLY || ONLY.indexOf(F.id) >= 0)) {
   const st = stats[F.id] = { n: 0, ok: 0, ms: 0, built: 0, open: 0, skipped: 0, bad: [] };
   for (let s = 1; s <= N; s++) {
     const seed = s * 7919 + F.id.length;
@@ -137,7 +141,7 @@ check('connections that do not fit are refused, not moved', (() => {
 })());
 
 // ---------------------------------------------------------------- tiny and odd sites
-{
+if (!ONLY) {
   const bad = [];
   const sites = [{ w: 2, h: 2 }, { w: 1.5, h: 9 }, { w: 3, h: 3 }, { rects: [[0, 0, 2, 12], [2, 10, 14, 12]] }, { rects: [[0, 0, 6, 6], [6, 2, 30, 4]] }];
   sites.forEach((site, k) => {
@@ -166,10 +170,10 @@ check('connections that do not fit are refused, not moved', (() => {
 }
 
 // ---------------------------------------------------------------- the pool
-{
-  const feel = { enclosed: 0, mixed: 0, open: 0 }, seen = new Set();
+if (!ONLY) {
+  const feel = { enclosed: 0, mixed: 0, open: 0 }, seen = new Set(), PICKS = 4000;
   let misfit = 0;
-  for (let s = 1; s <= 400; s++) {
+  for (let s = 1; s <= PICKS; s++) {
     const cs = caseFor(s * 31, 8), id = FILL.pick({ seed: s, site: cs.site }), F = FILL.fillers[id];
     if (F.fits && !F.fits(FILL.makeSite(cs.site))) misfit++;
     feel[F.feel]++; seen.add(id);
@@ -177,14 +181,14 @@ check('connections that do not fit are refused, not moved', (() => {
   check('the pool picks only fillers that fit the site', misfit === 0, misfit + ' misfits');
   check('every pool filler gets picked', seen.size === FILL.list().filter((F) => F.weight > 0).length, [...seen].join(', '));
   check('the pool leans enclosed', feel.enclosed > feel.mixed + feel.open && feel.open < feel.enclosed / 3,
-    'enclosed ' + feel.enclosed + ', mixed ' + feel.mixed + ', open ' + feel.open + ' of 400');
+    'enclosed ' + feel.enclosed + ', mixed ' + feel.mixed + ', open ' + feel.open + ' of ' + PICKS);
   const w = { enclosed: 0, mixed: 0, open: 0 };
   for (const F of FILL.list()) w[F.feel] += F.weight;
   check('pool weights are 70 / 20 / 10 enclosed / mixed / open', w.enclosed === 70 && w.mixed === 20 && w.open === 10, JSON.stringify(w));
 }
 
 // ---------------------------------------------------------------- speed
-{
+if (!ONLY) {
   let ms = 0, n = 0;
   for (let s = 1; s <= 200; s++) {
     const rng = new Rng(hash4(s, 0x7370, 0, 0)), site = { w: Math.round(rng.range(10, 24) * 2) / 2, h: Math.round(rng.range(10, 24) * 2) / 2 };

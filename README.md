@@ -10,7 +10,9 @@ Every site on the plane is built by a template from its outline and its
 connections:
 
 - **Fillers** build the plain Backrooms: warrens, winding passages, chains of
-  rooms, cell clusters, rings, broken rooms, and the occasional open hall.
+  rooms, corridors lined with rooms or dead ends, switchbacks, branching
+  tunnels, room mazes, partition fields, nested rings, and now and then a
+  hall of pillars.
 - **POI templates** build the places that should feel designed (houses,
   closets, restrooms, storage). A house stands toward the back of its own lot,
   in a big yard room. A template at least 8 m across can be a lot of its own
@@ -52,9 +54,9 @@ no furniture.
 - **House** (ranch, bungalow, split ranch, suburban) and **Rooms & small
   POIs** (closet, storage room, restroom, mechanical room, storage units).
   [Contract, pipeline and how to add archetypes](docs/templates.md)
-- **Fillers**: a pool of eight Backrooms fillers, weighted 70 / 20 / 10
+- **Fillers**: a pool of 33 Backrooms fillers, weighted 70 / 20 / 10
   enclosed / mixed / open, plus the yard round a house. Each builds a site in about
-  2 ms and honours every connection exactly.
+  2–3 ms and honours every connection exactly.
   [Filler pool, contract and pipeline](docs/fillers.md)
 
 Open `workbench.html` to:

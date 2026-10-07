@@ -6,13 +6,14 @@ places first: a house gets a lot with a front yard, a block-sized template a
 lot of its own, and a smaller one sits inside a filler's site. Every other site gets
 a **filler**, which also builds round any small POI inside it, taking its
 doors as connections. Fillers are the bulk of the
-map, so they are cheap (about 1 ms on a 10–24 m site), they cope with any
+map, so they are cheap (about 2–3 ms on a 10–24 m site), they cope with any
 rectilinear site, and they honour every connection they are given.
 
-They are Backrooms only and lean **enclosed**: clumps of small, irregular
-rooms, long thin passages and chains of rooms, with an open hall only now
-and then. Cells a filler leaves unbuilt are solid, the mass between rooms
-that the reference map is full of.
+They are Backrooms only and lean **enclosed**: clumps of irregular rooms,
+long thin corridors with rooms hung on them, mazes and chains of rooms,
+with a hall only now and then. Cells a filler leaves unbuilt are solid,
+the mass between rooms that the reference maps are full of. Every filler
+room draws in the one Backrooms carpet colour; zone colours are for POIs.
 
 ![One example of each filler](fillers-atlas.png)
 
@@ -33,25 +34,87 @@ passage to the lot edge.
 
 ## The pool
 
-| filler | feel | weight | what it builds |
-|---|---|---|---|
-| `warren` | enclosed | 26 | a clump of 3–10 m rooms with jagged outlines and off-centre openings; solid gaps, ragged edge |
-| `passage` | enclosed | 16 | a 1–2 m corridor that kinks between the connections, with alcoves and dead-end stubs |
-| `enfilade` | enclosed | 14 | a chain of rooms in a row through off-centre openings; sometimes it turns a corner |
-| `cells` | enclosed | 8 | tiny 2–4 m rooms packed together, mostly a tree, so it reads like a maze |
-| `ring` | enclosed | 6 | rooms around a solid core (sometimes a closet), joined in a loop; warren or solid around it |
-| `broken` | mixed | 20 | a 10–18 m room cut up by stub walls and gapped partitions, with small rooms or solid around it |
-| `ragged_hall` | open | 5 | a big room with a notched outline, a few columns, sometimes a solid block to walk around |
-| `pillar_hall` | open | 5 | an open floor on a 3.5–6 m column grid |
-| `yard` | open | 0 | not in the pool: a house's front yard (a strip across the front of the house and a lane out to the lot edge) and the passages from its other doors to the lot edge; the rest of the lot is solid (`src/tpl/lot.js`; the yard comes as a `hint`) |
+33 fillers in four files, most drawn from the hand-drawn and pixel reference
+maps. *Smallest* is the smallest square site (or, for a long one, the
+narrowest 1 : 2 site) the filler takes; *map* is the share of the world's
+filler sites it fits, since most of them are only 8–12 m across.
+
+`pool.js`, the first fillers:
+
+| filler | feel | weight | smallest | map | what it builds |
+|---|---|---|---|---|---|
+| `warren` | enclosed | 18 | 5.5 m | 100% | a clump of 3–10 m rooms, most made of 2–3 overlapping rectangles, with off-centre openings and solid pockets between them |
+| `passage` | enclosed | 8 | any | 100% | a 1–2 m corridor that kinks between the connections, with alcoves and dead-end stubs |
+| `enfilade` | enclosed | 6 | 8 m | 100% | a chain of rooms in a row through off-centre openings; sometimes it turns a corner |
+| `cells` | enclosed | 4 | 6 m | 72% | a pocket of 2–4 m rooms and closets among ordinary rooms: a cluster in one end, closets off a short corridor, or small rooms round a middle one; sites up to 250 m² only |
+| `ring` | enclosed | 3 | 11 m | 40% | rooms around a solid core (sometimes a closet), joined in a loop; warren or solid around it |
+| `broken` | mixed | 4 | 7 m | 100% | a mid-size room cut up by stub walls and gapped partitions, with small rooms or solid around it |
+| `ragged_hall` | open | 3 | 12 m | 31% | a big room with a notched outline, a few columns, sometimes a solid block to walk around |
+| `pillar_hall` | open | 2 | 12 m | 31% | an open floor on a 3.5–6 m column grid |
+
+`corridors.js`, the long thin passages and the rooms hung on them (all enclosed):
+
+| filler | weight | smallest | map | what it builds |
+|---|---|---|---|---|
+| `corridor_rooms` | 4 | 7 × 14 m | 91% | one or two long 1–1.5 m corridors with small rooms and closets packed along both sides, like an empty office or hotel floor |
+| `beads` | 4 | 5 × 10 m | 91% | a thin corridor wandering across the site with small 2–4 m rooms strung on it like beads |
+| `tunnels` | 3 | 9 m | 92% | tunnels of mixed widths (1–2.5 m) branching like a tree from the connections, each branch ending in a small room |
+| `doors_nowhere` | 2 | 6 × 12 m | 91% | a 1.5–2.5 m hall lined with doors, most onto 1 m closets or tiny dead ends, one or two onto a real room |
+| `comb` | 2 | 8 m | 100% | a corridor with a row of short dead-end stubs or alcoves down one side |
+| `long_hall` | 2 | 5 × 10 m | 91% | a narrow hall the length of the site with one or two turns and hardly a door |
+| `stair_step` | 2 | 8 m | 100% | a corridor stepping diagonally across the site in 1–2 m jogs |
+| `switchback` | 2 | 8 m | 100% | a corridor folding back and forth on itself, thin solid between the runs |
+| `corridor_loop` | 2 | 7 m | 100% | a narrow corridor round a solid block, square or stepped, with spurs out to the connections |
+
+`halls.js`, one big space that sets the tone of the site:
+
+| filler | feel | weight | smallest | map | what it builds |
+|---|---|---|---|---|---|
+| `room_maze` | enclosed | 2 | 9 m | 70% | one square-ish room packed with short walls on a 1.5–2 m lattice, a maze inside a single room |
+| `loop_hall` | mixed | 3 | 10 m | 52% | a wide 3–5 m hall in an L, U or ring round a block of 2–4 rooms that open off it, closing into a loop |
+| `partitions` | mixed | 3 | 9 m | 70% | a large room full of free-standing straight, L and T wall pieces: the classic Level 0 look |
+| `office` | mixed | 2 | 10 m | 52% | a big room with loose rows of cubicle stubs and a few small offices along one or two edges |
+| `meander` | mixed | 2 | 10 m | 69% | a 3–6 m hall that bends across the site, its width wobbling like a cave, a few stray columns |
+| `tail` | mixed | 1 | 9 × 18 m | 61% | a long room that ends in a thin winding 1 m corridor, sometimes to a small end room |
+| `aisles` | mixed | 1 | 9 m | 70% | long parallel walls with gaps to cross between them, like shelving rows |
+| `cross_pillars` | open | 3 | 9 m | 70% | a big hall with rows of plus-shaped pillars and a scalloped edge |
+| `scattered_pillars` | open | 2 | 9 m | 70% | a big room with small pillars at random spacing and a notched edge |
+
+`rooms.js`, where the shape of the rooms is the point:
+
+| filler | feel | weight | smallest | map | what it builds |
+|---|---|---|---|---|---|
+| `tiny_doors` | enclosed | 3 | 9 m | 70% | 4–8 m rooms behind 0.5–1 m of solid, joined only by 1 m doors |
+| `sliver` | enclosed | 1 | 5 × 10 m | 62% | one very long room 1.5–3 m wide with a nub on one side; long sites only |
+| `nested` | enclosed | 1 | 9 m | 70% | ring corridors one inside the other round a small core, each entered on a different side |
+| `repetition` | enclosed | 1 | 8.5 m | 84% | the same room, with the same partition or columns, copied 3–6 times in a row or grid |
+| `big_rooms` | mixed | 2 | 10 m | 52% | 2–5 big rooms joined through wide openings or no wall at all into one sprawling space |
+| `stepped` | mixed | 1 | 8 m | 99% | a mostly rectangular room whose outline climbs in square steps along one or two sides |
+| `gallery` | mixed | 1 | 8 m | 99% | a central room ringed by shallow bays between solid piers or wall stubs |
+
+Not in the pool: `yard` (weight 0), a house's front yard (a strip across the
+front of the house and a lane out to the lot edge) and the passages from its
+other doors to the lot edge; the rest of the lot is solid (`src/tpl/lot.js`;
+the yard comes as a `hint`).
 
 The weights add up to 70 enclosed, 20 mixed and 10 open. `BR.FILL.pick`
 chooses by weight among the fillers that fit the site (each has a `fits`
-rule, for example halls need 12 m). A biome can pass its own `weights`.
+rule). A biome can pass its own `weights`; the world's biome tilts them
+between deep warrens and open stretches. Across the map (8 seeds, about
+15,000 sites) that comes to 71% of filler area enclosed, 19% mixed and 10%
+open, with warren on about a fifth of the sites and every other filler
+somewhere between 0.5% and 10%.
 
-The old world-first fill's Backrooms zones (open, split, warren, ring, corridor rooms)
-and knobs (room scale, pillars, loops, wide openings) were the starting
-point, retuned for less open floor and more solid between rooms.
+Shared pieces for layouts and furnishings are in `src/tpl/fillers/kit.js`:
+`blob` (a room made of 2–3 overlapping rectangles, the room shape of the
+hand-drawn maps), `row` (rooms side by side in a strip), `slice`, `stub`,
+`alcove`, and for furnishing `stubWall`, `gappedWall`, `freeWall`, `column`,
+`plus` (a plus-shaped pillar) and `wallPiece` (a free-standing straight, L
+or T wall).
+
+The old world-first fill's Backrooms zones and knobs were the starting
+point for the first eight; the rest come from the reference maps in the
+filler discussion of 2026-10-07.
 
 ## Input
 
@@ -119,10 +182,11 @@ of the site once, and the shared pipeline makes the result sound:
    1 m of wall count as apart: the pinch between them is widened to 1 m, or a
    1 m passage joins them through the solid. A filler built in pieces (the
    yard) is settled the same way but never joined.
-5. **Openings.** Portals go exactly where the connections are. Then comes a
-   spanning tree of openings between rooms, the filler's required links (a
-   ring's loop, an enfilade's chain) and a few extra loops. Two rooms that
-   cannot share an opening lose the wall between them.
+5. **Openings.** Portals go exactly where the connections are. Then the
+   filler's open boundaries (no wall) and required links (a ring's loop, an
+   enfilade's chain, a corridor's side rooms), a spanning tree of openings
+   between the other rooms and a few extra loops. Two rooms that cannot
+   share an opening lose the wall between them.
 6. **Furnish.** The filler's partitions and columns are each kept only if
    the 1 m walker still reaches every floor cell. They keep clear of
    openings, and partitions never cross or double up.
@@ -131,7 +195,13 @@ of the site once, and the shared pipeline makes the result sound:
 A new filler is a `layout` (and maybe a `furnish`), registered with
 `BR.FILL.register({ id, name, feel, weight, blurb, fits, doors, loops, layout, furnish })`.
 The pipeline's helpers are in `BR.FILL.lib`: `bsp`, `voidSome`, `notch`,
-`paintRooms`, `route`, `paintPath`.
+`paintRooms`, `route`, `paintPath`; the shared layout pieces in `BR.FILL.kit`.
+A layout can ask for links in `P.require` (pairs of rooms that must share
+an opening) and for no wall at all in `P.open`; both, and `P.hall`, are
+carried through when the engine renumbers its rooms. A furnish places
+`walk.partition`, `walk.column` and `walk.pillar` (several rects as one
+pillar, such as a plus), each kept only if the 1 m walker still gets
+everywhere.
 
 ## Tests (`tests/fillers.test.js`)
 
@@ -148,13 +218,15 @@ seeds, site shapes (rect, L, U, notched, random) and 0–4 connections:
   order;
 * bad connections are refused, and tiny or odd sites still build;
 * the pool picks only fillers that fit and leans enclosed;
-* the average time on 10–24 m sites stays under 5 ms (it is about 1 ms).
+* the average time on 10–24 m sites stays under 5 ms (it is about 2.5 ms).
 
 ## Next
 
+* Zones or districts: neighbouring sites share a filler family or a carpet
+  colour, as the reference maps group similar spaces into named areas.
+* Ceiling lights drawn in rows along corridors and halls.
 * House and Rooms take their entrances from connections in the same way.
   Today they choose their own doors, and the world or the filler round them
   adapts (docs/world.md).
-* More variety: a gallery (a room with a ring of bays), a stair-ish split
-  level, corridor-with-rooms, and wrongness for fillers (false doors,
-  dead-end loops, a ceiling at the wrong height).
+* Wrongness for fillers (false doors, dead-end loops, a ceiling at the
+  wrong height), and later flooding and props.
