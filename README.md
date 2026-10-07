@@ -12,7 +12,8 @@ connections:
 - **Fillers** build the plain Backrooms: warrens, winding passages, chains of
   rooms, corridors lined with rooms or dead ends, switchbacks, branching
   tunnels, room mazes, partition fields, nested rings, and now and then a
-  hall of pillars.
+  hall of pillars. Curved fillers use architectural circles, semicircles and
+  radial sectors.
 - **POI templates** build the places that should feel designed (houses,
   closets, restrooms, storage, neighborhoods). A house stands toward the back
   of its own lot, in a big yard room. A template at least 8 m across can be a
@@ -71,7 +72,7 @@ no furniture.
   houses on both sides facing it, each built by the house template on its own
   lot and merged into one blueprint.
   [Templates inside templates](docs/templates.md#8-templates-inside-templates-srctplcompositejs)
-- **Fillers**: a pool of 33 Backrooms fillers, weighted 70 / 20 / 10
+- **Fillers**: a pool of 34 Backrooms fillers, weighted 70 / 20 / 10
   enclosed / mixed / open, plus the yard round a house. Each builds a site in about
   2–3 ms and honours every connection exactly.
   [Filler pool, contract and pipeline](docs/fillers.md)
