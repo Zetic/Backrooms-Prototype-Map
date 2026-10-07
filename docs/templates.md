@@ -175,7 +175,10 @@ BR.LOT.build({
    It works in the frame of what the buildings leave; `at` is where that
    frame's origin sits in the site.
 
-The workbench shows templates in their setting (section 9).
+The workbench shows templates in their setting (section 9). Where a
+template and the filler round it end up wall to wall, the shared wall is a
+seam, recorded once, and seam rules may cut a window or door through it
+([docs/world.md](world.md#seams-where-blueprints-meet-srcseamsjs)).
 
 ## 5. Entrances and exits are template-specific
 
@@ -396,7 +399,9 @@ connections, by count or exactly (fillers and lots).
   stands behind its front yard, with connections at the end of its lane and of
   its doors' passages; a block-sized template is flush, its doors on the edge.
 * **inside a filler**: the template inside a filler from the pool, 3–9 m of site
-  round it, with the filler taking its doors as connections.
+  round it, with the filler taking its doors as connections. The detail
+  panel counts the seams (shared walls) and what the seam rules cut through
+  them; they are drawn on the cards.
 * **template only**: the template alone, as `TPL.generate` builds it.
 
 **View options:**

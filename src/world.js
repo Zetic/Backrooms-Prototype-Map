@@ -490,7 +490,8 @@
     /**
      * The world's room graph over the sites of cells [i0..i1] x [j0..j1]:
      * every blueprint's own graph, joined where two portals share a
-     * connection. Nodes: 'siteId/roomId' or 'siteId/poiId/roomId'.
+     * connection, and through seam doors when seams.js is loaded.
+     * Nodes: 'siteId/roomId' or 'siteId/poiId/roomId'.
      * Returns { nodes: Set, edges: [[u, v]], dangling: [connection ids that leave the region] }.
      */
     graph(i0, j0, i1, j1) {
@@ -508,6 +509,17 @@
           for (const rm of B.b.rooms) nodes.add(bp + rm.id);
           for (const e of B.b.graph.edges) if (e[0] !== 'outside' && e[1] !== 'outside') edges.push([bp + e[0], bp + e[1]]);
           for (const p of B.b.portals) if (B.conns[p.id]) end(B.conns[p.id], bp + p.room);
+        }
+      }
+      // seam doors (seams.js): extra ways between rooms of two blueprints that
+      // happen to share a wall, both sides in the region
+      if (this.seamsBetween) {
+        const inR = (n) => n.i >= i0 && n.i <= i1 && n.j >= j0 && n.j <= j1;
+        for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) for (const s of this.cell(i, j).sites) {
+          for (const n of [s].concat(this.neighbours(s))) {
+            if (n.id < s.id || !inR(n)) continue;
+            for (const S of this.seamsBetween(s, n)) for (const op of S.openings) if (op.kind === 'door') edges.push([S.a.node, S.b.node]);
+          }
         }
       }
       const dangling = [];

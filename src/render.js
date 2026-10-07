@@ -39,12 +39,24 @@
       if (W.hasBuild(s) || now() < deadline) ready.push(W.build(s));
       else { complete = false; paintPlanSite(g, s, x0, y0, tz); }
     }
-    const at = (origin, layer, labels) => ({ scale: tz, ox: (origin[0] - x0) * tz, oy: (origin[1] - y0) * tz, site: false, portals: false, labels, layer });
+    // seams (seams.js): each shared wall drawn once, and what the seam rules
+    // cut through it. A neighbour not built in time leaves the tile a draft
+    const seams = new Map();
+    if (BR.SEAM && W.seamsBetween) for (const r of ready) {
+      for (const n of [r.site].concat(W.neighbours(r.site))) {
+        if (n !== r.site && !W.hasBuild(n) && now() > deadline) { complete = false; continue; }
+        for (const S of W.seamsBetween(r.site, n)) seams.set(S.id, S);
+      }
+    }
+    const cuts = BR.SEAM ? BR.SEAM.cuts([...seams.values()]) : new Map();
+    const cutsAt = (key, origin) => (cuts.get(key) || []).map((k) => ({ o: k.o, c: k.c - (k.o === 'h' ? origin[1] : origin[0]), s0: k.s0 - (k.o === 'h' ? origin[0] : origin[1]), s1: k.s1 - (k.o === 'h' ? origin[0] : origin[1]) }));
+    const at = (origin, layer, labels, key) => ({ scale: tz, ox: (origin[0] - x0) * tz, oy: (origin[1] - y0) * tz, site: false, portals: false, labels, layer, cuts: cutsAt(key, origin) });
     const lab = opts.labels !== false && tz >= LOD.labels;
     for (const layer of ['floors', 'walls']) for (const r of ready) {
-      if (r.filler) TPL.drawBuilding(g, r.filler, at(r.fillerOrigin, layer, false));
-      for (const B of r.buildings) TPL.drawBuilding(g, B.b, at(B.origin, layer, lab));
+      if (r.filler) TPL.drawBuilding(g, r.filler, at(r.fillerOrigin, layer, false, r.site.id));
+      for (const B of r.buildings) TPL.drawBuilding(g, B.b, at(B.origin, layer, lab, r.site.id + '/' + B.poi.id));
     }
+    if (seams.size) TPL.drawSeamOpenings(g, [...seams.values()], { scale: tz, ox: -x0 * tz, oy: -y0 * tz });
     return complete;
   }
 

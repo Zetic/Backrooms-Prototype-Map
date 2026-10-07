@@ -4,10 +4,13 @@
  * it doubles as a check that the contract carries everything a client needs.
  *
  *   BR.TPL.drawBuilding(ctx, building, { scale, ox, oy, level, theme: 'plan' | 'blueprint',
- *                       labels, dims, tags, graph, portals, highlight, site, layer })
+ *                       labels, dims, tags, graph, portals, highlight, site, layer, cuts })
+ *   BR.TPL.drawSeamOpenings(ctx, seams, { scale, ox, oy, theme })
  * (ox, oy) is where the site's (0, 0) lands in canvas pixels; scale is px/m.
  * layer 'floors' draws only the site and floors, 'walls' everything else, so
- * a map can draw every site's floors before any walls.
+ * a map can draw every site's floors before any walls. cuts: [{ o, c, s0,
+ * s1 }] (site frame) stretches left out of its walls: where a seam (seams.js)
+ * cuts an opening, or a shared wall the other side draws.
  */
 (function (root) {
   'use strict';
@@ -95,7 +98,7 @@
     for (const w of b.walls) if (onLv(w) && w.kind === 'open') { g.beginPath(); g.moveTo(X(w.a[0]), Y(w.a[1])); g.lineTo(X(w.b[0]), Y(w.b[1])); g.stroke(); }
     g.setLineDash([]);
     // ---- walls minus openings
-    const runs = wallRuns(b, lv);
+    const runs = wallRuns(b, lv, o.cuts);
     g.lineCap = 'square';
     for (const kind of ['interior', 'exterior']) {
       g.strokeStyle = kind === 'exterior' ? TH.wall : TH.thin;
@@ -159,7 +162,7 @@
    * 'false' door is drawn on a wall, so it leaves no gap):
    * { exterior: [[x0, y0, x1, y1]], interior: [...] } in site metres.
    */
-  function wallRuns(b, lv) {
+  function wallRuns(b, lv, cuts) {
     lv = lv || 0;
     const out = { exterior: [], interior: [] }, byWall = new Map();
     for (const op of b.openings) { if (!byWall.has(op.wall)) byWall.set(op.wall, []); byWall.get(op.wall).push(op); }
@@ -172,7 +175,9 @@
       const gaps = (byWall.get(w.id) || []).filter((op) => op.kind !== 'false').map((op) => {
         const a = horiz ? op.a[0] : op.a[1], bb = horiz ? op.b[0] : op.b[1];
         return [Math.min(a, bb), Math.max(a, bb)];
-      }).sort((p, q) => p[0] - q[0]);
+      });
+      for (const k of cuts || []) if (k.o === (horiz ? 'h' : 'v') && Math.abs(k.c - c) < 1e-9 && k.s1 > s0 && k.s0 < s1) gaps.push([k.s0, k.s1]);
+      gaps.sort((p, q) => p[0] - q[0]);
       const seg = (p, q) => { if (q - p > 1e-6) list.push(horiz ? [p, c, q, c] : [c, p, c, q]); };
       let t = s0;
       for (const gp of gaps) { seg(t, gp[0]); t = Math.max(t, gp[1]); }
@@ -279,7 +284,24 @@
     }
   }
 
+  /**
+   * What seam rules cut through shared walls (seams.js), drawn once over both
+   * blueprints: world metres, (ox, oy) where the world's (0, 0) lands.
+   */
+  function drawSeamOpenings(g, seams, o) {
+    const S = o.scale, TH = THEMES[o.theme] || THEMES.plan, X = (x) => o.ox + x * S, Y = (y) => o.oy + y * S;
+    for (const sm of seams) for (const op of sm.openings) {
+      const rooms = new Map();
+      if (op.kind !== 'window') {
+        const d = op.swing > 0 ? 1 : -1, r = sm.o === 'h' ? [op.s0, Math.min(sm.c, sm.c + d), op.s1, Math.max(sm.c, sm.c + d)] : [Math.min(sm.c, sm.c + d), op.s0, Math.max(sm.c, sm.c + d), op.s1];
+        rooms.set('into', { rects: [r] });
+      }
+      drawOpening(g, Object.assign({}, op, { swingInto: op.kind === 'window' ? undefined : 'into' }), rooms, X, Y, S, TH);
+    }
+  }
+
   TPL.drawBuilding = drawBuilding;
+  TPL.drawSeamOpenings = drawSeamOpenings;
   TPL.wallRuns = wallRuns;
   TPL.floorKey = floorKey;
   TPL.THEMES = THEMES;

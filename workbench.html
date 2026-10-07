@@ -195,6 +195,7 @@
 <script src="src/tpl/fillers/halls.js"></script>
 <script src="src/tpl/fillers/rooms.js"></script>
 <script src="src/tpl/lot.js"></script>
+<script src="src/seams.js"></script>
 <script src="src/tpl/render2d.js"></script>
 <script>
 (function () {
@@ -283,10 +284,12 @@
    */
   function buildLot(A, seed) {
     const s = specFor(A, seed), r = new BR.Rng(BR.hash4(seed, TG.hashStr(A.id), 0x6c6f74, 0));
+    // seams (seams.js): where the template and the setting round it share a wall
+    const seamsOf = (L) => (BR.SEAM && L.setting ? BR.SEAM.within([BR.SEAM.item('s', L.setting, L.at, 'setting')].concat(L.buildings.map((B, k) => BR.SEAM.item('b' + k, B.b, B.origin, 'lot', 'b' + k))), { seed }) : []);
     const t0 = performance.now(), wrap = (L, kind, main) => (!L.buildings.length
       ? { error: L.issues[0] || 'no layout', site: { w: L.site.w, h: L.site.h, rects: L.site.rects }, meta: {} }
       : { schema: LOT.SCHEMA, lot: true, kind, archetype: A.id, seed, site: L.site, setting: L.setting, settingAt: L.at, buildings: L.buildings, main: main || L.buildings[0].b,
-        conns: L.conns, issues: L.issues, meta: { ms: Math.round((performance.now() - t0) * 10) / 10 } });
+        conns: L.conns, issues: L.issues, seams: seamsOf(L), meta: { ms: Math.round((performance.now() - t0) * 10) / 10 } });
     if (state.setting === 'lot' && LOT.setting(A).kind === 'yard') {
       // the house first, then its lot round what was built (LOT.yard): the
       // lot meets the world at the end of the lane and at each door off the
@@ -327,11 +330,22 @@
   function drawAny(g, b, o) {
     if (!b.lot) { TPL.drawBuilding(g, b, o); return; }
     const hl = (pre) => (o.highlight && String(o.highlight).indexOf(pre) === 0 ? String(o.highlight).slice(pre.length) : null);
-    const at = (origin, layer, site, pre) => Object.assign({}, o, { ox: o.ox + origin[0] * o.scale, oy: o.oy + origin[1] * o.scale, layer, site, highlight: hl(pre) });
+    // shared walls drawn once, with what the seam rules cut through them
+    const cuts = BR.SEAM && b.seams ? BR.SEAM.cuts(b.seams) : new Map();
+    const cutsAt = (key, origin) => (cuts.get(key) || []).map((k) => ({ o: k.o, c: k.c - (k.o === 'h' ? origin[1] : origin[0]), s0: k.s0 - (k.o === 'h' ? origin[0] : origin[1]), s1: k.s1 - (k.o === 'h' ? origin[0] : origin[1]) }));
+    const at = (origin, layer, site, pre, key) => Object.assign({}, o, { ox: o.ox + origin[0] * o.scale, oy: o.oy + origin[1] * o.scale, layer, site, highlight: hl(pre), cuts: cutsAt(key, origin) });
     for (const layer of ['floors', 'walls']) {
-      if (b.setting) TPL.drawBuilding(g, b.setting, at(b.settingAt || [0, 0], layer, true, 's:'));
-      b.buildings.forEach((B, k) => TPL.drawBuilding(g, B.b, at(B.origin, layer, !b.setting, 'b' + k + ':')));
+      if (b.setting) TPL.drawBuilding(g, b.setting, at(b.settingAt || [0, 0], layer, true, 's:', 's'));
+      b.buildings.forEach((B, k) => TPL.drawBuilding(g, B.b, at(B.origin, layer, !b.setting, 'b' + k + ':', 'b' + k)));
     }
+    if (b.seams && b.seams.length && (o.level || 0) === 0) TPL.drawSeamOpenings(g, b.seams, { scale: o.scale, ox: o.ox, oy: o.oy, theme: o.theme });
+  }
+  /** one line on a lot's seams: shared walls, and what the rules cut */
+  function seamLine(L) {
+    if (!L.seams || !L.seams.length) return '';
+    const n = (k) => L.seams.reduce((s, S) => s + S.openings.filter((op) => op.kind === k).length, 0), d = n('door'), w = n('window');
+    const len = L.seams.reduce((s, S) => s + S.length, 0);
+    return L.seams.length + ' shared wall(s), ' + len.toFixed(1) + ' m' + (d + w ? ' · seam rules cut ' + [w ? w + ' window(s)' : '', d ? d + ' door(s)' : ''].filter(Boolean).join(', ') : '');
   }
   const cache = new Map();
   function build(id, seed) {
@@ -740,7 +754,7 @@
     const m = b.meta;
     if (isFillerB(b) && tab !== 'rooms' && tab !== 'portals' && tab !== 'json') { fillerPanel(b, A, body); return; }
     if (isFillerB(b)) fillerPanel(b, A, null);
-    else $('dsub').innerHTML = (L ? '<b>' + esc(lotLabel(L)) + '</b> · ' + (L.kind === 'flush' ? 'the doors are the lot edge' : 'lot ' + L.site.w + '×' + L.site.h + ' m · ' + L.conns.length + ' edge connection(s) · ' + L.meta.ms + ' ms') + (L.issues.length ? ' · <span class="bad">' + L.issues.length + ' problem(s)</span>' : '') + '<br>' : '') +
+    else $('dsub').innerHTML = (L ? '<b>' + esc(lotLabel(L)) + '</b> · ' + (L.kind === 'flush' ? 'the doors are the lot edge' : 'lot ' + L.site.w + '×' + L.site.h + ' m · ' + L.conns.length + ' edge connection(s) · ' + L.meta.ms + ' ms') + (L.issues.length ? ' · <span class="bad">' + L.issues.length + ' problem(s)</span>' : '') + (seamLine(L) ? '<br>' + esc(seamLine(L)) : '') + '<br>' : '') +
       'plan <b>' + esc(m.plan.type) + '</b> · site ' + b.site.w + '×' + b.site.h + ' m · main side ' + b.approach + ' · score <b>' + m.score + '</b> · ' + m.ms + ' ms<br>layout #' + m.chosen + ' · ' + m.candidates + ' layouts drawn, ' + m.resolved + ' resolved, ' + m.valid + ' valid' +
       (m.mutations.length ? '<br>' + m.mutations.map((k) => '<span class="pill w">' + esc(mutLabel(b, k)) + '</span>').join('') : '');
     if (L && tab === 'portals' && L.setting) {
