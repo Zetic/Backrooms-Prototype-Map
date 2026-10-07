@@ -46,7 +46,8 @@ The world allots each POI a **site**: any rectilinear shape (a rectangle, an
 L, a U, a notched block). The template builds inside it.
 
 There is no yard or apron around a template. POIs are buried, so a house uses
-its site almost to the edge. Any unbuilt cells go back to the backrooms fill.
+its site almost to the edge. On the map, the unbuilt part of the site (and a
+ring round it) is the floor of a host hall ([docs/world.md](world.md)).
 The only breathing room is each portal's `clear` depth: the floor the world
 must keep open in front of a door.
 
@@ -99,10 +100,11 @@ Guarantees, checked by `tests/templates.test.js`:
 
 ### How the world uses it
 
-* **Placement.** Place the POI, then fill the backrooms around its footprint.
-  Exterior walls become the boundary.
-* **Routes.** Connect routes to `portals`. Entrances are where routes arrive;
-  exits lead onward.
+* **Placement.** The world places the POI and builds it first. Its footprint
+  comes out of the host hall's site, and its exterior walls become the
+  boundary.
+* **Routes.** Every ground-floor portal becomes one of the host hall's
+  connections, so the hall cuts an opening in exactly that place.
 * **Clearance.** Keep each portal's `clear` box open.
 
 ## 4. Entrances and exits are template-specific
@@ -272,10 +274,10 @@ a new template in the library, which is the fastest way to grow the catalogue.
 * **Use the leftover arms of irregular sites.** For example, push a garage or
   a wing into the free arm of an L-shaped site.
 * **Composite engines** (a street of houses, a mall), then a tower engine.
-* **Templates in the map.** The world already places POIs and builds their
-  blueprints ([POI placement](POI_PLACEMENT.md)). Carving sites into the fill
-  and connecting portals to routes are next.
+* **Entrances from connections.** Today a template picks its own doors and
+  the host hall adapts. Next, House and Rooms take their entrances from the
+  connections they are given, as fillers do.
 
-The world reads three optional recipe fields when it places POIs: `weight`
-(frequency within the size tier), `areas` (which semantic areas the template
-appears in) and `poi: false` (keep the template out of the world).
+The world reads two optional recipe fields when it places POIs: `weight`
+(frequency within the size tier) and `poi: false` (keep the template out of
+the world). See [docs/world.md](world.md).

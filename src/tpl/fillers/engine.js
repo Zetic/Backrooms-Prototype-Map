@@ -116,6 +116,8 @@
     }
     return out;
   };
+  /** Can this connection be honoured on this site? null if so, else why not (the world checks before it asks). */
+  FILL.checkConnection = (site, c) => landConnection(c, makeSite(site), 0).error || null;
 
   // the cell just inside / just outside an outline line at position s
   function cellIn(side, L, s) { return side === 'N' ? [s, L] : side === 'S' ? [s, L - 1] : side === 'W' ? [L, s] : [L - 1, s]; }
@@ -469,8 +471,12 @@
     }
   }
 
-  /** 3. one floor: bridge solid gaps with 1 m passages (shortest, so they read as gaps in a wall run). */
-  function bridge(P) {
+  /**
+   * 3. one floor: bridge solid gaps with 1 m passages (shortest, so they read
+   * as gaps in a wall run). brush is the passage width in cells; the engine
+   * widens it when a 1 m bridge keeps getting cleaned away as a sliver.
+   */
+  function bridge(P, brush) {
     const R = P.R.a;
     let carved = 0;
     for (let guard = 0; guard < 64; guard++) {
@@ -487,7 +493,7 @@
       // be a sliver); a longer one is a passage of its own, or grows one
       const from = R[path[0]];
       const v = path.length <= 5 || P.rooms[from].type === 'passage' ? from : P.add('passage', ['bridge']);
-      carved += paintPath(P, path.slice(1, -1), 2, v);
+      carved += paintPath(P, path.slice(1, -1), brush || 2, v);
     }
     return carved;
   }
@@ -677,7 +683,7 @@
   function fitting(S, weights) {
     const out = [];
     for (const F of FILL.list()) {
-      const w = weights && weights[F.id] !== undefined ? weights[F.id] : F.weight || 1;
+      const w = weights && weights[F.id] !== undefined ? weights[F.id] : F.weight !== undefined ? F.weight : 1;
       if (w > 0 && (!F.fits || F.fits(S))) out.push({ id: F.id, w });
     }
     return out;
@@ -696,7 +702,8 @@
   // ============================================================ generate
   /**
    * spec: { filler (id; picked from the pool when omitted), seed, site: { w, h } | { rects } (metres),
-   *         connections: [{ id, side, at, width, line?, kind?, route? }], weights? }
+   *         connections: [{ id, side, at, width, line?, kind?, route? }], weights?,
+   *         hint? ({ hall: [rects] }, metres: where a host filler's hall goes) }
    * Returns a filler blueprint (docs/fillers.md) or { error }.
    */
   function generate(spec) {
@@ -721,11 +728,12 @@
     const rs = (salt) => new Rng(hash4(base, salt, 0, 0x66));
 
     const P = makePlan(S, conns, base);
+    P.hint = spec.hint && spec.hint.hall ? { hall: spec.hint.hall.map((q) => q.map(U)) } : null;
     F.layout(P, rs(SALT.LAYOUT), F);
     land(P);
     clean(P);
     let carved = 0;
-    for (let round = 0; round < 6 && builtComponents(P).count > 1; round++) { carved += bridge(P); clean(P); }
+    for (let round = 0; round < 6 && builtComponents(P).count > 1; round++) { carved += bridge(P, round < 2 ? 2 : 3); clean(P); }
     if (!builtComponents(P).count) P.paint(P.inner, P.add('room', ['fallback']));   // too small for the layout: one plain room
     compact(P);
     const J = openings(P, rs(SALT.OPEN), F);
