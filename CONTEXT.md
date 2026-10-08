@@ -27,7 +27,8 @@ the exported data is milestone 6.
   `elevation.html` the elevation lab. Serve the folder statically to inspect
   (`python3 -m http.server 8765`).
 - `main` holds everything up to layered ownership (PR #24, `a58c8f8`). Growth
-  step 2 is on `claude/house-branch`. The branches `claude/world-journeys`,
+  step 2 is on `claude/house-branch`, in
+  [PR #25](https://github.com/Zetic/Backrooms-Prototype-Map/pull/25). The branches `claude/world-journeys`,
   `claude/kept-stairs` and `claude/fast-test-runs-l53vww` are merged and can
   be deleted.
 - Lesson from #21: it was stacked on `claude/world-journeys` and merged into
@@ -48,7 +49,7 @@ the exported data is milestone 6.
 | [#21](https://github.com/Zetic/Backrooms-Prototype-Map/pull/21), [#22](https://github.com/Zetic/Backrooms-Prototype-Map/pull/22) | Kept stairs: a template's stairs laid out once at generation and drawn on the map (#22 brought #21 to `main`) |
 | [#23](https://github.com/Zetic/Backrooms-Prototype-Map/pull/23) | Fast test runs: parallel runner, quick and full modes, CI on every PR |
 | [#24](https://github.com/Zetic/Backrooms-Prototype-Map/pull/24) | Milestone 5 (growth step 1): layered ownership, a hand-placed raised branch over the ground and a pit drilled back down |
-| `claude/house-branch` | Growth step 2: biomes, a house pillar, and a branch of house rooms grown from it |
+| [#25](https://github.com/Zetic/Backrooms-Prototype-Map/pull/25) | Growth step 2: biomes, a house pillar, and a branch of house rooms grown from it |
 
 ## What the user wants
 
