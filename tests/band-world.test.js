@@ -336,7 +336,8 @@ console.log('ok   the level schedule: exact legs on the half metre, a storey und
 {
   const pool = new Set(BR.BIOME.templates('houseroom').map((a) => a.id)), fillers = new Set(BR.BIOME.fillers('houseroom').map((F) => F.id));
   const K = GROWTH.CFG.block;
-  let origins = 0, growths = 0, steered = 0, arrived = 0, levels2 = 0, blocks = 0, reached = 0, plain = 0, kept = 0;
+  let origins = 0, growths = 0, steered = 0, arrived = 0, levels2 = 0, blocks = 0, reached = 0, plain = 0, kept = 0, houses = 0, floors = 0;
+  const roomTypes = new Set(), HOUSE = new Set(BR.FILL.HOUSE_TYPES);
   for (const seed of MODE.size([7], [7, 31337, 99])) {
     const w = seed === 7 ? w7 : new BR.BandWorld(seed), owner = new Map(), byBlock = new Map();
     for (let i = -4; i <= 3; i++) for (let j = -4; j <= 3; j++) {
@@ -376,7 +377,14 @@ console.log('ok   the level schedule: exact legs on the half metre, a storey und
         const r = w.raisedBuild(rs), b = r.filler;
         assert(fillers.has(b.filler), rs.id + ': a ' + b.filler + ' is not a houseroom filler');
         const kinds = r.buildings.map((x) => x.poi.archetype);
-        assert(kinds.every((a) => pool.has(a)) && new Set(kinds).size === kinds.length, rs.id + ': rooms from the pool, none twice: ' + kinds);
+        assert(kinds.every((a) => pool.has(a)) && new Set(kinds).size === kinds.length, rs.id + ': whole houses from the pool, none twice: ' + kinds);
+        // a floor of a house: every room a house room (but the landings of climbs)
+        for (const rm of b.rooms) {
+          if (String(rm.id).startsWith('elev:')) continue;
+          assert(HOUSE.has(rm.type) && rm.tags.includes('house'), rs.id + ': ' + rm.type + ' is not a house room');
+          roomTypes.add(rm.type);
+        }
+        floors++; houses += kinds.length;
         for (const x of [b].concat(r.buildings.map((y) => y.b))) for (const s of x.surfaces) {
           if (String(s.room).startsWith('elev:landing:')) continue;
           assert(s.floorZ >= rs.floorZ - EPS && s.ceilingZ <= rs.top + EPS, rs.id + ' keeps inside its claim');
@@ -405,8 +413,10 @@ console.log('ok   the level schedule: exact legs on the half metre, a storey und
   assert(steered >= 0.5 * growths && arrived >= 0.6 * steered, 'steered growths mostly arrive: ' + arrived + ' of ' + steered);
   assert(reached >= 0.6 * blocks, 'most blocks have a way up: ' + reached + ' of ' + blocks);
   assert(kept > 0 && kept < 0.3 * plain, 'band 1 keeps a few plain sites for arrivals, not a share of them all: ' + kept + ' of ' + plain);
+  assert(houses >= 0.1 * floors && roomTypes.size >= 14, 'house floors of every kind of room, whole houses in some: ' + houses + ' houses on ' + floors + ' floors, ' + [...roomTypes].sort());
   console.log('ok   every growth: its own cells, floors over plain ground (cut down nowhere) or the floor below, its biome only, inside its claims, exact legs, no shafts (' +
-    growths + ' growths from ' + origins + ' origins, ' + arrived + ' reach band 1, ' + reached + ' of ' + blocks + ' blocks with a way up; ' + kept + ' of ' + plain + ' plain sites kept for arrivals)');
+    growths + ' growths from ' + origins + ' origins, ' + arrived + ' reach band 1, ' + reached + ' of ' + blocks + ' blocks with a way up; ' + kept + ' of ' + plain + ' plain sites kept for arrivals; ' +
+    houses + ' whole houses on ' + floors + ' floors of ' + roomTypes.size + ' kinds of house room)');
 }
 
 // A tall room is never grown over unless it fits under the floor as it is:
@@ -428,6 +438,32 @@ console.log('ok   the level schedule: exact legs on the half metre, a storey und
   assert.equal(BR.CLAIM.topOf(hall(6.1)), 6.1);
   assert.equal(BR.CLAIM.topOf({ rooms: [{ id: 'g', level: 1, ceiling: 2.6, rects: [] }], levels: [{ index: 0, elevation: 0 }, { index: 1, elevation: 3.5 }] }), 6.1);
   console.log('ok   tall fillers are tagged, every other filler stays under 4.5 m, and a site that would lose height is never grown over');
+}
+
+// the house-room biome (biomes.js, fillers/house.js): floors of a house, every
+// room a house room of the catalogue, and whole houses standing in some; none
+// of it on the ground
+{
+  same(BR.BIOME.fillers('houseroom').map((F) => F.id), ['house_bedrooms', 'house_living', 'house_upstairs']);
+  same(BR.BIOME.templates('houseroom').map((a) => a.id), ['bungalow', 'cottage', 'ranch', 'split_ranch', 'suburban']);
+  assert(BR.BIOME.fillers('houseroom').every((F) => F.weight === 0) && BR.TPL.archetypes.cottage.poi === false, 'not in the ground\'s pools');
+  for (const t of BR.FILL.HOUSE_TYPES) assert(BR.BIOME.rooms('houseroom').includes(t === 'hallway' ? 'hall' : t), t + ' is a catalogued house room');
+  // each kind of floor has the rooms of its kind, every one off the hallway or a room of its own
+  const seen = {};
+  for (const id of ['house_bedrooms', 'house_living', 'house_upstairs']) for (let k = 0; k < 12; k++) {
+    const site = { w: 14 + (k % 4) * 5, h: 12 + (k % 3) * 4 }, f = BR.FILL.generate({ filler: id, seed: k, site, connections: BR.FILL.sampleConnections(site, 1 + (k % 3), k) });
+    same(f.meta.issues, [], id + ' #' + k);
+    for (const rm of f.rooms) { assert(rm.tags.includes('house') && !rm.tags.includes('backrooms'), id + ': ' + rm.type); (seen[id] = seen[id] || new Set()).add(rm.type); }
+  }
+  assert(['bedroom', 'bath', 'linen', 'master', 'ensuite'].every((t) => seen.house_bedrooms.has(t)), 'a bedroom wing: ' + [...seen.house_bedrooms]);
+  assert(['living', 'dining', 'kitchen', 'pantry', 'laundry'].every((t) => seen.house_living.has(t)), 'the living rooms: ' + [...seen.house_living]);
+  assert(['bedroom', 'bath', 'office', 'family'].every((t) => seen.house_upstairs.has(t)), 'an upstairs hall: ' + [...seen.house_upstairs]);
+  // a whole house stands where a site has room for one, its front into the site
+  const spot = BR.BIOME.furnish({ biome: 'houseroom', site: { rects: [[0, 0, 24, 20]] }, conns: [], count: 1, seed: 3 });
+  assert(spot.length === 1 && spot[0].floors === false && BR.BIOME.templates('houseroom').some((a) => a.id === spot[0].archetype));
+  const built = BR.LOT.build({ seed: 3, site: { rects: [[0, 0, 24, 20]] }, filler: 'house_living', connections: [], buildings: spot, floors: false });
+  assert(built.buildings.length === 1 && built.setting.filler === 'house_living' && !built.setting.meta.issues.length, 'a house inside a house floor');
+  console.log('ok   house rooms: three floors of a house (bedroom wing, living rooms, upstairs hall) of catalogued house rooms, whole houses inside them, none on the ground');
 }
 
 // A raised floor that cannot be built is dropped with everything grown from

@@ -11,8 +11,8 @@ state of each build step. Implementation detail lives in
 | 1 | Layered ownership: claims with height ranges, ground ceilings capped where something sits above; one hand-placed branch over a ground site proves the stacking | Done: milestone 5, PR #24 |
 | 2 | One house pillar and its branch: a multi-storey house's stairwell carries on up; one houseroom branch grows at a pillar floor, drawn from a first tagged pool | Done: PR #25 |
 | 3 | Recursive growth: pillars from branches, a per-region budget and plan, steering toward the next band; today's journey plot becomes the fallback | Done: PR #26 (see below). The journey plot is removed from the world rather than kept as a fallback (owner's call) |
-| 3b | Denser growth: an origin in every 2 × 2 block placed by the ground plan, bigger branches, tall rooms grown round, a smaller landing reserve, every growth on the zoomed-out map, planning spread over frames | Done: this step (see below) |
-| 4 | Houseroom variety: new houseroom fillers, so a district never repeats itself | |
+| 3b | Denser growth: an origin in every 2 × 2 block placed by the ground plan, bigger branches, tall rooms grown round, a smaller landing reserve, every growth on the zoomed-out map, planning spread over frames | Done: PR #27 (see below) |
+| 4 | Houseroom variety: house rooms, literally: hallways, bedrooms, living rooms and whole houses, not generic layouts that read as a house | Done: PR #28 (see below) |
 | 5 | Emergent connections: pits that drill down to the next exposed volume first, then holes rolled on shared walls; drilled walls after | Pits between a branch and the ground exist (milestone 5) |
 | 6 | Linking growths: branches of the same biome that come close join up, and districts cross region borders at planned points | |
 
@@ -128,6 +128,52 @@ Over 8 × 8 cells of three seeds, 46-47 of the 48 origins plant a growth house,
 *Seed 7, band 0, zoomed out to about 2 km across: the purple patches are
 growths' floors.*
 
+**Step 4 as built.** The owner's ask: the house biome should be literal
+house rooms (house hallways, living rooms, more houses), not rooms that
+merely read like a house's insides.
+
+- *Three house fillers* (`src/tpl/fillers/house.js`), the only fillers in the
+  houseroom pool. Each lays one to three hallways through the floor (joined by
+  a cross hallway when there are several) and packs house rooms along both
+  sides, every room with a door onto the hallway. A hallway may end in a room
+  of its own; leftover pockets become closets, pantries, utility rooms or
+  offices off the room beside them.
+  - *Bedroom hallway*: bedrooms, bathrooms and linen closets, a master
+    bedroom with its ensuite and walk-in closet at the end, now and then an
+    office.
+  - *Living rooms*: living room, dining room, kitchen, family room, pantry,
+    laundry, foyer and mudroom, some joined open plan, a living or family room
+    at the end.
+  - *Upstairs hall*: bedrooms round a landing, a bathroom, a family room or
+    office, a laundry.
+  Rooms are capped by the floor's size (one kitchen, a bathroom for every two
+  or three bedrooms), so a big floor reads as a big house, not a dormitory.
+  Their rooms carry the catalogue's names and colours (tagged `house`), and
+  the hallways connecting them are hallways, not backrooms passages.
+- *Whole houses in a branch.* A branch floor stands a whole small house in
+  it, a ranch, bungalow, split ranch, suburban house or a new two-bedroom
+  cottage (a cottage stays off the ground). The chance is 70% on the floor
+  beside the pillar, 50% one site out and 35% further; a house is placed only
+  where it fits, its front door facing into the floor. It replaces the single
+  catalogue rooms that stood in branch floors before.
+- *Generic layouts gone from the pool.* Enfilade, corridor with rooms, cell
+  cluster, beads, ring, loop hall and doors to nowhere no longer grow in
+  branches; they stay on the ground as before. The ground is unchanged: the
+  house fillers and the cottage have no ground weight.
+- *Unchanged.* No overlapping claims, the same growth whichever cell is built
+  first, the walk up and back, tall rooms grown round.
+
+Over 8 × 8 cells of three seeds, 40 of 48 origins grow and 30 arrive in band 1
+(as in step 3b). Their 271 floors hold 64 whole houses and 17 kinds of house
+room.
+
+![House-room floors in a branch](house-rooms.png)
+
+*Seed 7, cut at +9.5 m. On the left a floor at +6.2 m with a master bedroom,
+ensuite and hallway beside the stairwell; in the middle a living-rooms floor
+(living room, kitchen, family room, dining, pantry, foyer, mudroom, offices)
+with a ladder on up to band 1; on the right a cottage standing in a floor.*
+
 ---
 
 ## Summary
@@ -227,6 +273,8 @@ district of house rooms, not generic backrooms.
   first houseroom pool.
 - New houseroom fillers add the variety: corridors of doors, landings, attic
   crawlspaces, stairwells that turn the wrong way, rooms of odd sizes.
+  *Step 4 took this literally: house hallways lined with house rooms, and
+  whole houses standing in a floor.*
 - **Size.** A biome district stays small: a few sites around its pillars, dense
   near a pillar and thinning with distance.
 - **No repetition.** The atrium was rejected for repeating same-size rooms. The
@@ -357,3 +405,5 @@ the old plot stops being the only way up.
 - [x] Does today's journey plot survive as a rare style of its own once growth
   works? *Removed from the world for now (step 3); the generator stays in the
   elevation lab.*
+- [ ] Should the houseroom pool get stranger house rooms later (attics,
+  crawlspaces, stairs that turn the wrong way), or stay literal houses?

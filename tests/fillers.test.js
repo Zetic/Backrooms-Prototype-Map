@@ -17,7 +17,7 @@
  * (and skips the pool-wide checks).
  */
 const path = require('path');
-for (const f of ['core', 'tpl/grid', 'tpl/framework', 'tpl/fillers/engine', 'tpl/fillers/kit', 'tpl/fillers/pool', 'tpl/fillers/corridors', 'tpl/fillers/halls', 'tpl/fillers/rooms', 'tpl/fillers/architectural'])
+for (const f of ['core', 'tpl/grid', 'tpl/framework', 'tpl/catalogue', 'tpl/fillers/engine', 'tpl/fillers/kit', 'tpl/fillers/pool', 'tpl/fillers/corridors', 'tpl/fillers/halls', 'tpl/fillers/rooms', 'tpl/fillers/architectural', 'tpl/fillers/house'])
   require(path.join(__dirname, '..', 'src', f + '.js'));
 const BR = globalThis.BR, FILL = BR.FILL, TPL = BR.TPL, { Rng, hash4 } = BR;
 const { walk1m } = require('./walk');
@@ -51,7 +51,8 @@ function contract(b, spec) {
   for (const r of b.site.rects) for (let y = Math.round(r[1] / G); y < Math.round(r[3] / G); y++) for (let x = Math.round(r[0] / G); x < Math.round(r[2] / G); x++) site[y * W + x] = 1;
   const ids = new Map(b.rooms.map((r, i) => [r.id, i]));
   b.rooms.forEach((rm, i) => {
-    if (!Array.isArray(rm.tags) || rm.tags.indexOf('backrooms') < 0) bad.push(rm.id + ' not tagged backrooms');
+    // (a house floor's rooms are house rooms: fillers/house.js)
+    if (!Array.isArray(rm.tags) || (rm.tags.indexOf('backrooms') < 0 && rm.tags.indexOf('house') < 0)) bad.push(rm.id + ' not tagged backrooms (or house)');
     let wide = false;
     for (const r of rm.rects) {
       if (!r.every(onGrid)) bad.push(rm.id + ' off grid');

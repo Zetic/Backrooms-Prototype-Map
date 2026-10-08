@@ -173,7 +173,8 @@
     const P = {
       W, H, site: S, mask: S.mask, inner: S.inner, conns, seed,
       R: new TG.Raster(W, H, VOID), rooms: [], require: [], partitions: [], columns: [],
-      land: new Uint8Array(W * H)
+      land: new Uint8Array(W * H),
+      passage: 'passage'                         // the room type the engine carves to join floors (a layout may change it)
     };
     for (const c of conns) for (let y = c.landing[1]; y < c.landing[3]; y++) for (let x = c.landing[0]; x < c.landing[2]; x++) P.land[y * W + x] = 1;
     P.add = (type, tags) => { P.rooms.push({ type, tags: tags || [] }); return P.rooms.length - 1; };
@@ -406,7 +407,7 @@
           if (!inside && o >= 0) nb.set(o, (nb.get(o) || 0) + 1);
         }
         for (const [k, n] of nb) if (n > best || (n === best && k < v)) { v = k; best = n; }
-        if (v < 0) v = P.add('passage', ['landing']);
+        if (v < 0) v = P.add(P.passage, ['landing']);
       }
       P.paint(q, v, false);
     }
@@ -514,7 +515,7 @@
       // a short gap widens the room it starts from (a new 1 m room there would
       // be a sliver); a longer one is a passage of its own, or grows one
       const from = R[path[0]];
-      const v = path.length <= 5 || P.rooms[from].type === 'passage' ? from : P.add('passage', ['bridge']);
+      const v = path.length <= 5 || P.rooms[from].type === P.passage ? from : P.add(P.passage, ['bridge']);
       carved += paintPath(P, path.slice(1, -1), brush || 2, v);
     }
     return carved;
@@ -720,7 +721,7 @@
         const path = route(P, starts, { ok: (i) => P.mask.a[i] === 1 && R[i] === VOID, goal: (i) => R[i] >= 0 && C.label[i] !== small && !touch[i] });
         if (!path || path.length <= 2) break;
         const from = R[path[0]];
-        carved += paintPath(P, path.slice(1, -1), 2, path.length <= 5 || P.rooms[from].type === 'passage' ? from : P.add('passage', ['bridge']));
+        carved += paintPath(P, path.slice(1, -1), 2, path.length <= 5 || P.rooms[from].type === P.passage ? from : P.add(P.passage, ['bridge']));
       }
       clean(P);
     }
@@ -1160,7 +1161,7 @@
       rects.sort((p, q) => (q[2] - q[0]) * (q[3] - q[1]) - (p[2] - p[0]) * (p[3] - p[1]));
       counts[rm.type] = (counts[rm.type] || 0) + 1;
       const ty = TYPES[rm.type] || TYPES.room;
-      return { id: id(v), type: rm.type, name: rm.type + (counts[rm.type] > 1 ? ' ' + counts[rm.type] : ''), zone: ty.zone, level: 0,
+      return { id: id(v), type: rm.type, name: (ty.label || rm.type) + (counts[rm.type] > 1 ? ' ' + counts[rm.type] : ''), zone: ty.zone, level: 0,
         rects, area: Math.round(cells[v] * G * G * 100) / 100, ceiling: rm.ceiling, tags: ty.tags.concat(rm.tags || []) };
     });
     const THICK = { exterior: 0.3, interior: 0.15, open: 0 };

@@ -75,7 +75,8 @@ no furniture.
   [Templates inside templates](docs/templates.md#8-templates-inside-templates-srctplcompositejs)
 - **Fillers**: a pool of 34 Backrooms fillers, weighted 70 / 20 / 10
   enclosed / mixed / open, plus the yard round a house. Each builds a site in about
-  2–3 ms and honours every connection exactly.
+  2–3 ms and honours every connection exactly. Three more fillers of house
+  rooms (bedroom hallway, living rooms, upstairs hall) grow only in branches.
   [Filler pool, contract and pipeline](docs/fillers.md)
 
 Open `workbench.html` to:
@@ -95,11 +96,12 @@ both the workbench and the map draw the stairs that reach each floor: the map
 shows them at their width with the heights they join, and clicking one moves
 the cut height to where it arrives.
 
-Bands are joined by growth ([the growth design](docs/growth.md), steps 2-3b).
+Bands are joined by growth ([the growth design](docs/growth.md), steps 2-4).
 Every block of 2 × 2 cells has one cell, by the seed, whose ground plan places
 a two-storey house or a townhouse that carries its stairwell on up a flight.
 From that landing, floors of house rooms grow over the ground sites
-round it (hallways and rooms of the house-room biome, densest by the stair),
+round it (house hallways lined with bedrooms, bathrooms, living rooms,
+kitchens and the like, often with a whole small house standing in them),
 then a stair from one of those floors climbs to the next level, and so on: a
 townhouse's floor at +9.5 m climbs straight to the band above, a two-storey
 house's at +6.5 m has one more level at +9.5-11.75 m first. Floors grow round
@@ -249,7 +251,8 @@ The runner checks:
   inside its claims, climbs by exact legs with no climb over another, and
   arrives only in landing sites; every 2 × 2 block has one origin with its
   house planted, most growths arrive, tall rooms are never grown over, and
-  under a third of plain sites are kept for landings.
+  under a third of plain sites are kept for landings. Every room of a branch
+  floor is a house room, and some floors hold whole houses.
 - **Fillers.** Every filler keeps the contract on any site shape and honours
   every connection. The pool leans enclosed, and fillers are fast.
 - **The world, on five seeds (two in quick mode).** Sites tile every cell exactly. Connections are

@@ -198,7 +198,7 @@ the atrium generator, world placement policy and associated previews are removed
 | Template floors | Milestone 3: two- and three-storey houses, sunken floors, galleries over an undercroft; the template's own stairs are real connectors |
 | World connections between reference bands | Growth steps 3-3b: growths climb from house pillars through floors of their biome, by legs with exact rises, and most land in the next band's landing sites; one growth house is planted per block of 2 × 2 cells, three growths in four steered. Milestone 4's journey plots are gone from the world (the generator stays in the lab). Other templates' zones stay unselected in exports |
 | Several owners in one column | Milestone 5: claims with height ranges, the ground below a raised claim capped but otherwise unchanged, and a pit drilled one way down into it |
-| Growth | Steps 2-3b: the ground plan plants a growth house in one cell of every 2 × 2 block, and its stairwell carries on up (its pillar); floors of its biome grow at each level over 2-6 sites (houseroom fillers with house rooms in them), round any tall room, each level reached by a leg from the one below, the last reaching the next band. Districts cross cell and region borders. Houseroom variety is next ([growth.md](growth.md)) |
+| Growth | Steps 2-4: the ground plan plants a growth house in one cell of every 2 × 2 block, and its stairwell carries on up (its pillar); floors of its biome grow at each level over 2-6 sites (house hallways lined with bedrooms, living rooms, kitchens and the like, often with a whole small house standing in them), round any tall room, each level reached by a leg from the one below, the last reaching the next band. Districts cross cell and region borders ([growth.md](growth.md)) |
 
 Old abstract stair annotations in source templates are not proof of a physical
 vertical connection. The adapter reports differing-floor legacy links as
@@ -682,7 +682,7 @@ above, a climb from below shows through its landing site's opening; *Way ↑* an
 `level` and claim top, and slices list the growth's connections with an end in
 the cell.
 
-Not yet: houseroom variety (step 4), emergent connections beyond the first
+Not yet: emergent connections beyond the first
 level's pit (step 5), growths joining each other (step 6), growth downward
 toward the band below, and seeds other than houses.
 
@@ -717,6 +717,35 @@ rooms never grown over, and every growth on the zoomed-out map
 
 Over 8 × 8 cells of three seeds, 40-43 of 48 origins grow and 32-34 arrive in
 band 1: about 21 growths and 17 ways up per 100 cells.
+
+### Growth step 4 — House rooms (implemented)
+
+The owner asked for literal house rooms in the house biome: house hallways,
+living rooms, more houses ([growth.md](growth.md), step 4).
+
+- **The pool.** `BIOME.fillers('houseroom')` is now the three house fillers
+  of `src/tpl/fillers/house.js` (bedroom hallway, living rooms, upstairs
+  hall), picked by their `biomeWeight`; the seven generic fillers lost their
+  tag and stay on the ground only. `BIOME.templates('houseroom')` is now whole
+  houses: ranch, bungalow, split ranch, suburban and the new `cottage`
+  (`poi: false`, kept off the ground). Lone catalogue rooms and the closet
+  are no longer in it; the house fillers make those rooms themselves.
+- **Whole houses in a floor.** `GROWTH.raisedSite` asks for one house with a
+  chance by hop (`houseroom.houses`: 70%, 50%, 35%); `BIOME.furnish` tries
+  sizes from the small end of the archetype's range, both orientations, front
+  door facing the middle of the site, 1 m inside it and 2 m from its doorways.
+  The house is built flat (`floors: false`, passed through `LOT.build` to
+  `TPL.generate`) and its ceilings are capped like the rest of the floor.
+- **Engine.** A filler may name the type of the corridors the engine adds
+  (`P.passage`, default `passage`), and a room type's `label` names its rooms.
+- **Checks.** `tests/band-world.test.js` checks that every room of every
+  branch floor is a house room (tagged `house`), that at least one floor in
+  ten holds a whole house and at least 14 kinds of house room appear, that
+  the pool is exactly these fillers and houses, and that each house filler
+  makes its kinds of room; the ground pools are unchanged.
+
+Over 8 × 8 cells of three seeds, 40 of 48 origins grow and 30 arrive, as
+before; their 271 floors hold 64 whole houses.
 
 ### Milestone 6 — Unreal consumer proof
 
