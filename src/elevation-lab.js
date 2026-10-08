@@ -11,8 +11,17 @@
   const fillers = document.createElement('optgroup'); fillers.label = 'Fillers · compact connection variants';
   for (const a of BR.FILL.list().sort((a, b) => a.name.localeCompare(b.name))) option(fillers, 'filler:' + a.id, a.name);
   $('template').appendChild(fillers);
+  // journeys (journeys.js): a stack of templates climbing from band 0 to band 1
+  if (BR.JOURNEY) {
+    const journeys = document.createElement('optgroup'); journeys.label = 'Journeys · templates stacked between two bands';
+    option(journeys, 'journey:any', 'Journey · style from the seed');
+    for (const k of Object.keys(BR.JOURNEY.STYLES)) option(journeys, 'journey:' + k, 'Journey · ' + k);
+    $('template').appendChild(journeys);
+  }
+  const isJourney = () => $('template').value.startsWith('journey:');
   function defaults() {
     const id = $('template').value;
+    if (isJourney()) { $('width').value = 48; $('depth').value = 40; return; }
     const a = id.startsWith('template:') ? BR.TPL.archetypes[id.slice(9)] : BR.FILL.fillers[id.slice(7)];
     $('width').value = Math.round((a.site.w[0] + a.site.w[1])) / 2;
     $('depth').value = Math.round((a.site.h[0] + a.site.h[1])) / 2;
@@ -48,11 +57,17 @@
     if (!current) return;
     selected = level; $('floor').value = String(level); $('mode').value = 'exact'; setHeight(current.levels.find((l) => l.index === level).elevation, false);
   }
+  /** a journey's climbs and stages, in place of a template's capabilities */
+  function journeyReport(b) {
+    const src = b.source, legs = src.stages.filter((st) => st.leg);
+    return '<div><b>' + esc(src.style) + '</b> journey · ' + legs.length + ' climbs: ' + legs.map((st, k) => esc(st.leg) + ' ' + E.zLabel(src.rises[k])).join(', ') + '</div>' +
+      '<div class="muted">' + src.stages.map((st) => esc(st.filler) + ' at ' + E.zLabel(b.bands[0].elevation + st.z)).join(' → ') + '</div>';
+  }
   function report(b) {
     const check = E.validate(b);
     $('status').innerHTML = '<span class="' + (check.errors.length ? 'bad' : 'good') + '">' + (check.errors.length ? check.errors.length + ' spatial issue(s)' : 'Spatial checks passed') + '</span>' +
       (check.errors.length ? '<br>' + check.errors.map(esc).join('<br>') : '') + (check.warnings.length ? '<br><span class="warn">' + check.warnings.map(esc).join('<br>') + '</span>' : '');
-    $('capabilities').innerHTML = ['up', 'down'].map((dir) => {
+    $('capabilities').innerHTML = b.kind === 'journey' ? journeyReport(b) : ['up', 'down'].map((dir) => {
       const c = b.capabilities[dir], fits = (b.connectionZones || []).filter((z) => z.direction === dir);
       return '<div>' + (dir === 'up' ? '↑ Upward' : '↓ Downward') + ' · ' + (c.candidates.length ? 'fits ' + (fits.map((z) => z.type + (z.shape !== 'shaft' ? ' (' + z.shape + ')' : '')).join(', ') || 'ladder') : 'needs another layout') +
         (c.selected ? ' · <b>' + esc(c.type || 'connected') + '</b> in this variant' : ' · optional') + '</div>';
@@ -72,8 +87,15 @@
       const seed = Number($('seed').value), w = Number($('width').value), h = Number($('depth').value), id = $('template').value, direction = $('connection').value;
       if (!Number.isInteger(seed) || seed < 0 || seed > 4294967295 || ![w,h].every((v) => Number.isFinite(v) && v >= 1 && v <= 128 && v * 2 % 1 === 0)) throw new Error('Use a whole seed and site dimensions from 1–128 m in 0.5 m increments.');
       const site = { w, h };
+      for (const k of ['connection', 'type', 'rise']) $(k).disabled = isJourney();
+      if (isJourney()) {
+        current = BR.JOURNEY.generate({ id: 'journey:lab', seed, w, h, lower: 0, style: id === 'journey:any' ? undefined : id.slice(8) });
+        current.capabilities = E.capabilities(current); // as the world export has it
+      }
+      else {
       const source = id.startsWith('template:') ? BR.TPL.generate({ archetype: id.slice(9), seed, site, wrongness: 0 }) : BR.FILL.generate({ filler: id.slice(7), seed, site, connections: BR.FILL.sampleConnections(site, 2, seed) });
       current = direction === 'none' ? E.prepare(source) : E.connectionVariant(source, { direction, type: typeOf(), rise: riseOf() });
+      }
       $('floor').innerHTML = current.levels.map((l) => {
         const band = current.bands.find((b) => b.elevation === l.elevation);
         return '<option value="' + l.index + '">' + E.zLabel(l.elevation) + (band ? ' · ' + esc(band.id) + ' band' : ' · internal floor') + '</option>';
@@ -106,7 +128,7 @@
   $('export').addEventListener('click', () => {
     if (!current) return;
     const url = URL.createObjectURL(new Blob([JSON.stringify(current, null, 2)], { type: 'application/json' })), link = document.createElement('a');
-    link.href = url; link.download = 'elevation-' + current.archetype + '-' + current.seed + '.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    link.href = url; link.download = 'elevation-' + (current.archetype || current.filler || current.kind) + '-' + current.seed + '.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
   $('plan').addEventListener('pointermove', (event) => {
     if (!current || !frame) return;

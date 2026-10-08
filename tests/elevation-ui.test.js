@@ -96,6 +96,18 @@ assert.deepEqual(BR.ELEV.validate(b()).errors,[]);
 $('seed').value='-1';$('seed').dispatch('change');
 assert.equal(b(),null);assert($('export').disabled);assert.equal($('error').style.display,'block');
 $('seed').value='7';$('seed').dispatch('change');assert(b());
+// a journey: templates stacked from band 0 to band 1, its route the profile
+$('template').value='journey:ramps';$('template').dispatch('change');
+assert.equal(b().kind,'journey');assert.equal(b().source.style,'ramps');assert.equal(Number($('width').value),48);
+assert($('connection').disabled&&$('type').disabled&&$('rise').disabled,'a journey chooses its own climbs');
+assert(b().source.stages.some((st)=>st.leg==='ramp'),'a ramp-heavy journey has ramps');
+assert.equal(b().bands[1].elevation,16);
+assert(b().route.length>2&&b().route[0][2]===0&&b().route[b().route.length-1][2]===16,'the profile runs from a door on band 0 to a door on band 1');
+assert($('capabilities').innerHTML.includes('ramps</b> journey'));
+assert.deepEqual(BR.ELEV.validate(b()).errors.filter((e)=>!/^no physical/.test(e)),[]);
+$('floor').value=String(b().levels[b().levels.length-1].index);$('floor').dispatch('change');assert.equal(Number($('height-value').value),16);
+$('export').click();assert(downloaded.filename.includes('journey'));
+$('template').value='filler:circular_hall';$('template').dispatch('change');assert(!$('connection').disabled&&b().kind!=='journey');
 assert(!html.includes('src/world.js'),'lab does not generate the flat infinite world');
 for(const m of html.matchAll(/<script src="([^"]+)"/g)) assert(fs.existsSync(path.join(__dirname,'..',m[1])),m[1]);
 console.log('ok   lab starts, switches floors/direction/template, handles compact variants, exports JSON and recovers from invalid input');

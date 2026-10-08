@@ -86,9 +86,16 @@ check('selection clears ghost focus', !window.__cutaway.selected && !last.opts.f
 elements.get('band-up').dispatch('click'); flush();
 check('band selection resets cut to its reference height', window.__world().band === 1 && last.opts.cutZ === 16 && new URLSearchParams(location.hash.slice(1)).get('band') === '1');
 elements.get('export-world').dispatch('click'); flush();
-check('world JSON export keeps spatial geometry and matched horizontal connections', exported?.schema === 'br.world-elevation/0.1' && exported.bands.length === 3 && exported.portalMatches.length > 0 && exported.issues.length === 0 && exported.policy.verticalJourneys === 'none');
+check('world JSON export keeps spatial geometry and matched connections', exported?.schema === 'br.world-elevation/0.1' && exported.bands.length === 3 && exported.portalMatches.length > 0 && exported.issues.length === 0 && exported.policy.verticalJourneys === 'composed');
 elements.get('band-down').dispatch('click'); flush();
 check('ground band resets to ground zero', window.__world().band === 0 && last.opts.cutZ === 0);
 check('retired atrium controls are absent', !elements.has('find-up') && !elements.has('find-down'));
+elements.get('journey-up').dispatch('click'); flush();
+{
+  const p = window.__world().nearestJourney('up', 0, 0);
+  check('the journey button centres the view on the nearest journey up', p && last.view.cx === (p.rect[0] + p.rect[2]) / 2 && last.view.cy === (p.rect[1] + p.rect[3]) / 2 && /Journey up to band 1/.test(elements.get('export-status').textContent));
+  elements.get('c').dispatch('pointermove', { clientX: 450, clientY: 300 }); flush();
+  check('hovering a journey names its bands, style and stages', /Journey<\/b> · band 0 ↔ band 1/.test(elements.get('info').innerHTML) && / → /.test(elements.get('info').innerHTML));
+}
 for (const m of html.matchAll(/<script src="([^"]+)"/g)) check('map script exists: ' + m[1], fs.existsSync(path.join(__dirname, '..', m[1])));
 finish();

@@ -1,7 +1,8 @@
 # Elevation implementation plan
 
-Updated 2026-10-07 with milestone 3, template floors. Milestone 2 (connection
-zones) was merged in [PR #18](https://github.com/Zetic/Backrooms-Prototype-Map/pull/18),
+Updated 2026-10-08 with milestone 4, world journeys. Milestone 3 (template
+floors) was merged in [PR #19](https://github.com/Zetic/Backrooms-Prototype-Map/pull/19),
+milestone 2 (connection zones) in [PR #18](https://github.com/Zetic/Backrooms-Prototype-Map/pull/18),
 milestone 1 in [PR #16](https://github.com/Zetic/Backrooms-Prototype-Map/pull/16).
 For the next agent's repository entry points and implementation context, read
 [the handoff](../CONTEXT.md).
@@ -189,7 +190,7 @@ the atrium generator, world placement policy and associated previews are removed
 | Generated local vertical connections | Ladder, straight/switchback stair and ramp variants, chosen by template preference and fit; selected in the elevation lab |
 | Slope-following reservations | Implemented: one prism per 0.5 m of flight; space under the high end stays free |
 | Template floors | Milestone 3: two- and three-storey houses, sunken floors, galleries over an undercroft; the template's own stairs are real connectors |
-| World connections between reference bands | None after atrium removal; bands are separate horizontal networks. Exports carry the zones, unselected |
+| World connections between reference bands | Milestone 4: one journey per pair of neighbouring bands per 512 m region, a stack of different fillers joined by stairs, ramps and ladders; neighbouring bands are one network. Other templates' zones stay unselected in exports |
 
 Old abstract stair annotations in source templates are not proof of a physical
 vertical connection. The adapter reports differing-floor legacy links as
@@ -369,20 +370,106 @@ storey half a level up), pits without steps (a drop you cannot climb out of),
 stairs that leave a room through a doorway, and composites with storeys of
 their own.
 
-### Milestone 4 — World journeys composed from templates
+### Milestone 4 — World journeys composed from templates (implemented)
 
-Build sparse vertical journeys by matching the connection zones of successive
-templates. Influence a journey toward ramp-heavy, ladder-heavy, or mixed choices,
-while allowing variation. Every occupied floor needs horizontal exploration
-between arrival and the next departure; repeated connections at one fixed XY
-must not become the default chain.
+The world's bands are joined again, by journeys made of templates
+(`src/journeys.js`, placed by `src/band-world.js`).
 
-Allow a template to span several bands, branch into another band, or coordinate
-its territory with templates above and below. Plan related footprints, occupied
-space and protected voids together before generating neighbors. Replace the
-retired atrium policy with these journeys and restore connections between the
-world's horizontal band networks. Generation order and cache eviction must
-preserve the same ownership and matching decisions.
+![A journey in the elevation lab](journeys.png)
+
+*From the lab (mixed style, seed 3, 48 × 40 m): twin domes at 0 m, a stair up
+to partitions at +4.1 m, a stair to the stair-step hall at +8.15 m, a ladder
+to a pillar hall at +12.25 m, a ramp to scattered pillars at +16 m, the
+upper band's floor. Each floor sits somewhere new in the territory. The
+profile is the route from a door on band 0 to a door on band 1: every flat
+stretch is a floor crossed. Bottom right, the map zoomed out: journeys in
+teal.*
+
+**A journey** climbs from one band's floor to the next band's, 16 m up,
+inside a territory of 40-56 by 32-48 m. It is not one tall room:
+
+| Stage | What it is |
+| --- | --- |
+| Bottom | A filler on the whole territory at the lower band's floor, its doors onto that band |
+| Between (3 or 4) | A smaller filler (sides 11-22 m, 14-24 m for ramps, at least 9 m) at each step of about 4 m, built against the doorway of the landing the last climb arrived at |
+| Top | A filler on the whole territory at the upper band's floor, less the opening the last climb comes up through, its doors onto that band |
+
+Each climb (a *leg*) is a connection variant of the stage it leaves
+(milestone 2): a stair, ramp or ladder, its rise set exactly so it lands on
+the next stage's floor. Four rises are drawn from 3.4-4.6 m (five from
+2.9-3.5 m for ramps) and scaled to sum to 16 m exactly: 3.2-5 m each (2.75-3.7 m
+for ramps). The landing gets a doorway on a free side and the next
+stage is built against it. Stage ceilings stay under the next stage's slab.
+Fillers are built without floor patterns, and never repeat within a journey.
+
+What a journey must do, and is checked for:
+
+- **Cross every floor.** Where you arrive on a floor and where the next climb
+  leaves are at least max(6 m, 0.35 × the floor's longer side) apart. On the
+  bottom floor the first climb is at least max(6 m, 0.25 × the territory's
+  longer side) from every door in; on the top floor (the upper band's own) the
+  last landing is at least 6 m from every door out. The connection zones
+  already lay a climb away from the doors.
+- **No shafts.** No climb's footprint overlaps another's in plan, and no two
+  start within 4 m. Of the sides a landing could open to, the next floor goes
+  where it sits least over the floors before it, so a journey wanders across
+  its territory rather than stacking floors in one footprint (consecutive
+  floors overlap in plan by 20-35% of the smaller one, against 40-50% when
+  the biggest side was taken).
+- **Its style.** A journey leans one way, drawn from the seed: *mixed* (4 in
+  9: each floor's own preference), *stairs* (2 in 9), *ramps* (1.5 in 9: five
+  lower climbs on bigger floors, so ramps fit) or *ladders* (1.5 in 9). A
+  leaning journey insists on its type for its first fillers before falling
+  through to the others and the ladder. Over 20 journeys of each: stairs
+  90% stairs; ramps 72% ramps; ladders 99% ladders; mixed 66% stairs, 31%
+  ladders, 3% ramps.
+- **Be one blueprint.** All stages are composed into one `br.elevation`
+  blueprint (`kind: 'journey'`, absolute heights, ids prefixed `k<stage>.`),
+  validated as a whole: every floor reachable from either band's doors and
+  back, no volumes shared, every cutout explicit. Its `source` records the
+  style, the rises and each stage's filler, height, rectangle and leg; its
+  `route` runs from a door on the lower band through every climb to a door on
+  the upper band. A room's `band` is the band its floor is in.
+
+A journey takes 0.2-0.3 s to build on average (ladders fastest, mixed
+slowest), from under 0.1 s to about 0.9 s; the first in a session takes over a
+second while the code warms up. Where a landing opens onto the next floor,
+each keeps its own wall on the line, with matching openings, as two
+neighbouring sites do.
+
+**In the world.** Every 512 × 512 m region (4 × 4 cells) holds one journey per
+pair of neighbouring bands. `journeyPlan(lower, ri, rj)` places it from
+(seed, region, band pair) alone: a cell, a size, a rectangle at least 8 m
+inside the cell, clear of both bands' border openings. Pairs with an even
+lower band use the region's west half, odd ones its east half, so a band's
+journey down and its journey up never share ground. The plan also decides the
+doors (`JOURNEY.plan`): three onto each band, on the territory's edge. Both
+bands' cell plans reserve the rectangle as a lot of kind `reserved`, cut the
+cell round it, and wire its doors into their networks; it becomes a site of
+kind `transition` owned by the journey. Planning a cell never builds a
+journey: the journey is built (and cached) when its site is, and builds
+exactly the planned doors. Each band's slice binds only the doors at its own
+floor. The journey's reservation runs from the lower band's envelope floor to
+the upper band's ceiling limit, so nothing else is placed in it at any
+height. A journey that cannot be built (no seed of four fits) leaves an
+ordinary filler on its territory in each band, behind the same doors; the
+bands stay apart there, and the export lists no journey.
+
+Generation order and eviction cannot change any of it: the plan is a pure
+function of its keys, the journey of its plan, and the tests compare
+upper-first generation with tiny caches against a fresh world.
+
+**Inspection.** The lab has a journey per style; the map paints journey
+territories teal at plan zoom, its hover names a journey's bands, style and
+floors, and *Journey ↓ / ↑* centre the view on the nearest one. The cutaway
+shows each floor of a journey at its height.
+
+Not yet: a template spanning bands on its own (a journey is the only
+multi-band owner), branches from a journey into a band partway up,
+coordinated footprints with the templates above and below a journey (its
+neighbours are planned round its rectangle, not its floors), more than one
+journey per region or district-dependent density and style, and journeys of
+more than one band.
 
 ### Milestone 5 — Unreal consumer proof
 
@@ -401,7 +488,8 @@ a type (auto, ladder, stair, ramp) and optionally an exact rise. “Potential on
 · show zones” draws every available zone without connecting any. The reports
 list the types that fit each direction, the template's preference, each link's
 shape, run, slope and reserved prisms, and the zones table. A connected local
-variant does not connect world bands.
+variant does not connect world bands; the lab's journeys (one per style, or
+the style from the seed) are what the world places between them.
 
 ```js
 const source = BR.TPL.generate({ archetype: 'ranch', seed: 7 });
@@ -423,6 +511,19 @@ const p = BR.ELEV.prepare(house);              // its stairwell's switchback, bu
 p.connectors.filter((c) => c.internal);        // [{ kind: 'stair', shape: 'switchback', rise: 3.2, ... }]
 const hall = BR.FILL.generate({ filler: 'pillar_hall', seed: 3, site: { w: 26, h: 24 } });
 hall.meta.floors;                              // [{ pattern: 'gallery', at: 3.65, side: 'N', ... }]
+```
+
+Journeys, alone or as the world places them:
+
+```js
+const plan = BR.JOURNEY.plan({ seed: 3, w: 48, h: 40 });   // its doors onto each band, before building
+const j = BR.JOURNEY.generate({ id: 'j', seed: 3, w: 48, h: 40, lower: 0, doors: plan, style: 'ramps' });
+j.source;                         // { style, rises: [3.15, ...], stages: [{ filler, z, rect, leg }, ...] }
+BR.JOURNEY.doorsAt(j, 16);        // the doors it built onto band 1
+const world = new BR.BandWorld(7);
+const p = world.journeyPlan(0, 0, 0);          // band 0 to 1 in region (0, 0): cell, rectangle, seed
+world.journey(p);                              // its blueprint (cached), or null
+world.nearestJourney('up', 0, 0);              // from the active band
 ```
 
 `BR.ELEV.ladderVariant` remains for the compact fallback. Blueprints exported
@@ -456,7 +557,9 @@ a solid surface.
 
 - Reference-band spacing and variation between districts.
 - Frequency of local elevation changes and major journeys.
-- Minimum horizontal exploration between consecutive vertical departures.
+- Minimum horizontal exploration between consecutive vertical departures
+  (now max(6 m, 0.35 × the floor's longer side)), journey density (one per
+  band pair per region) and the style weights.
 - How often templates should have floors of their own, and which halls might
   take a gallery on a jogged wall.
 - Whether more zones should allow routes (today only lawns), and preferences

@@ -1204,7 +1204,8 @@
       }
     }, smooth);
     // floors at other heights (tpl/floors.js): a gallery, a sunken floor
-    return F.floors && BR.FLOORS ? BR.FLOORS.apply(out, F.floors, seed, F.id) : out;
+    // (spec.floors === false: a caller that stacks fillers itself, a journey's stages)
+    return F.floors && BR.FLOORS && spec.floors !== false ? BR.FLOORS.apply(out, F.floors, seed, F.id) : out;
   }
 
   FILL.generate = generate;

@@ -477,7 +477,7 @@
     if (!engine) throw new Error('unknown engine ' + arch.engine);
     // a composite engine builds other templates and merges them (tpl/composite.js)
     // floors at other heights (tpl/floors.js) are laid on the finished building
-    const floors = (b) => (arch.floors && BR.FLOORS && !b.error ? BR.FLOORS.apply(b, arch.floors, spec.seed >>> 0, arch.id) : b);
+    const floors = (b) => (arch.floors && BR.FLOORS && !b.error && spec.floors !== false ? BR.FLOORS.apply(b, arch.floors, spec.seed >>> 0, arch.id) : b);
     if (engine.composite) return floors(TPL.compose(spec, arch, engine));
     const seed = spec.seed >>> 0, ah = TG.hashStr(arch.id);
     const approach = spec.approach || 'S';

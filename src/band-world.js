@@ -1,11 +1,24 @@
-/* Independent deterministic horizontal bands. The retired atrium planner is
- * removed; replacement vertical journeys belong to a later milestone. */
+/* Deterministic horizontal bands, joined by vertical journeys (journeys.js).
+ *
+ * Every 512 x 512 m region holds one journey per pair of neighbouring bands:
+ * a territory reserved in both bands' cell plans (the same rectangle, a site
+ * of kind 'transition' in each), owned by the journey and filled by it. The
+ * plan, doors included, comes from (seed, region, band pair) alone, so
+ * whichever band or cell is asked for first, every band agrees where it is,
+ * and planning a cell never waits for a journey to be built. Even and odd
+ * pairs use opposite halves of a region, so a band's journey down and its
+ * journey up never claim the same ground. Each band's slice of a journey binds
+ * only the doors at its own floor to that band's network; the blueprint, and
+ * the climb between them, is one. A journey that cannot be built (no seed of
+ * four fits) leaves an ordinary filler on its territory in each band, behind
+ * the same doors. See docs/elevation-world.md. */
 (function (root) {
   'use strict';
   const BR = root.BR, E = BR.ELEV, C = BR.WORLD_CFG.cell;
   // a site's envelope: from its lowest allowed floor (a sunken floor, floorLimit)
   // less its slab, to ceilingLimit - one band spacing in all, so bands never overlap
-  const CFG = { spacing: 16, floorLimit: -1.25, ceilingLimit: 14.5, limits: { bands: 4 } };
+  const CFG = { spacing: 16, floorLimit: -1.25, ceilingLimit: 14.5, regionCells: 4, journey: { w: [40, 56], h: [32, 48], tries: 4 },
+    limits: { bands: 4, journeys: 64, claims: 256 } };
   const clone = (x) => JSON.parse(JSON.stringify(x));
   const bandId = (n) => 'band:' + n;
   const assertBand = (n) => { if (!Number.isInteger(n) || Math.abs(n) > 10000) throw new Error('band must be an integer between -10000 and 10000'); return n; };
@@ -44,7 +57,7 @@
       this.seed = seed >>> 0; this.options = options || {}; this.band = 0;
       this.limits = Object.assign({}, CFG.limits, this.options.elevationLimits);
       if (Object.values(this.limits).some((n) => !Number.isInteger(n) || n < 1)) throw new Error('elevation cache limits must be positive integers');
-      this.worlds = new Map();
+      this.worlds = new Map(); this.journeys = new Map(); this.claims = new Map();
       this.totals = { cellsPlanned: 0, sitesBuilt: 0, buildMs: 0, poisBuilt: 0, issues: 0 };
       this.setBand(this.options.band === undefined ? 0 : this.options.band);
     }
@@ -62,7 +75,8 @@
       assertBand(n);
       if (this.worlds.has(n)) { const w = this.worlds.get(n); this.worlds.delete(n); this.worlds.set(n, w); return w; }
       const seed = n === 0 ? this.seed : BR.hash4(this.seed, n, 0, 0xba01);
-      const w = new BR.World(seed, { band: n, floorZ: n * CFG.spacing, limits: this.options.limits });
+      const w = new BR.World(seed, { band: n, floorZ: n * CFG.spacing, limits: this.options.limits,
+        plannedLots: (i, j) => this.plannedLots(n, i, j), buildTransition: (s) => this.buildTransition(s) });
       this.worlds.set(n, w);
       while (this.worlds.size > this.limits.bands) {
         const first = this.worlds.keys().next().value, old = this.worlds.get(first);
@@ -70,6 +84,96 @@
         this.worlds.delete(first);
       }
       return w;
+    }
+    /**
+     * Where the journey between bands `lower` and lower + 1 lies in region
+     * (ri, rj): a territory in one cell of the region's half for that pair,
+     * placed so the strips the cell planner cuts round it miss both bands'
+     * border openings. null if no cell of the half has room.
+     */
+    journeyPlan(lower, ri, rj) {
+      assertBand(lower);
+      const R = CFG.regionCells, J = CFG.journey, rng = new BR.Rng(BR.hash4(this.seed, ri, rj, 0xba02 ^ Math.imul(lower, 0x9e3779b1)));
+      const half = ((lower % 2) + 2) % 2, w = rng.int(J.w[0], J.w[1]), h = rng.int(J.h[0], J.h[1]);
+      const cells = [], startX = rng.int(0, 1), startY = rng.int(0, R - 1);
+      for (let a = 0; a < 2; a++) for (let b = 0; b < R; b++) cells.push([ri * R + half * 2 + (startX + a) % 2, rj * R + (startY + b) % R]);
+      const seeds = [lower, lower + 1].map((n) => n === 0 ? this.seed : BR.hash4(this.seed, n, 0, 0xba01));
+      for (const [i, j] of cells) for (const split of ['h', 'v']) {
+        const span = split === 'h' ? h : w, candidates = [];
+        const openings = seeds.flatMap((s) => [BR.borderOpenings(s, split === 'h' ? 'v' : 'h', i, j),
+          BR.borderOpenings(s, split === 'h' ? 'v' : 'h', split === 'h' ? i + 1 : i, split === 'h' ? j : j + 1)]).flat();
+        for (let q = 8; q <= C - span - 8; q++) if ([q, q + span].every((cut) => openings.every(([a, b]) => cut <= a - 1 || cut >= b + 1))) candidates.push(q);
+        if (!candidates.length) continue;
+        const q = candidates[rng.int(0, candidates.length - 1)];
+        const x = i * C + (split === 'v' ? q : rng.int(8, C - w - 8)), y = j * C + (split === 'h' ? q : rng.int(8, C - h - 8));
+        return { id: 'journey:' + lower + ':' + ri + ',' + rj, lower, upper: lower + 1, ri, rj, i, j, split,
+          seed: BR.hash4(this.seed, ri, rj, 0xba03 ^ Math.imul(lower, 0x9e3779b1)), rect: [x, y, x + w, y + h] };
+      }
+      return null;
+    }
+    /** a journey's doors (its plan's, decided before it is built), from its territory and seed */
+    journeyDoors(p) { return BR.JOURNEY.plan({ seed: p.seed, w: p.rect[2] - p.rect[0], h: p.rect[3] - p.rect[1] }); }
+    /** the journey's blueprint (absolute heights), or null if none could be built there; cached */
+    journey(p) {
+      if (!p) return null;
+      const v = BR.World.lru(this.journeys, p.id, this.limits.journeys, () => {
+        const doors = this.journeyDoors(p);
+        for (let t = 0; t < CFG.journey.tries; t++) {
+          try { return BR.JOURNEY.generate({ id: p.id, seed: t ? BR.hash4(p.seed, t, 0xba04, 0) : p.seed, w: p.rect[2] - p.rect[0], h: p.rect[3] - p.rect[1], lower: p.lower, doors }); } catch (err) { /* another seed */ }
+        }
+        return false;
+      });
+      return v || null;
+    }
+    /** the journeys reserved in cell (i, j) of band n: one arriving from below, one leaving above, at most.
+     * Planning needs only their plans: nothing is built here. */
+    plannedLots(n, i, j) {
+      if (!BR.JOURNEY) return [];
+      const key = n + '|' + i + ',' + j;
+      return BR.World.lru(this.claims, key, this.limits.claims, () => {
+        const out = [], ri = Math.floor(i / CFG.regionCells), rj = Math.floor(j / CFG.regionCells);
+        for (const lower of [n - 1, n]) {
+          const p = this.journeyPlan(lower, ri, rj);
+          if (!p || p.i !== i || p.j !== j) continue;
+          const plan = this.journeyDoors(p), doors = BR.JOURNEY.doors(n === p.lower ? plan.low : plan.high).map((d) => d.o === 'h'
+            ? { ...d, c: d.c + p.rect[1], s0: d.s0 + p.rect[0], s1: d.s1 + p.rect[0] } : { ...d, c: d.c + p.rect[0], s0: d.s0 + p.rect[1], s1: d.s1 + p.rect[1] });
+          out.push({ id: p.id, kind: 'reserved', rect: p.rect.slice(), doors, pois: [], transition: p });
+        }
+        return out;
+      }).map((l) => clone(l)); // the world sets portalConns: cached plans are never mutated
+    }
+    /** an ordinary filler on a journey's territory in band n, behind that band's planned doors, for a journey that could not be built */
+    standIn(p, n) {
+      const plan = this.journeyDoors(p), site = { w: p.rect[2] - p.rect[0], h: p.rect[3] - p.rect[1] };
+      // a few picks from the pool, then every filler in turn: one of them fits a plain rectangle
+      const ids = [0, 1, 2, 3, 4, 5, 6, 7].map((t) => BR.FILL.pick({ seed: BR.hash4(p.seed, n, t, 0xba05), site })).concat(BR.FILL.list().map((F) => F.id).sort());
+      for (const [t, filler] of ids.entries()) {
+        const seed = BR.hash4(p.seed, n, t, 0xba05), f = BR.FILL.generate({ filler, seed, site, connections: clone(n === p.lower ? plan.low : plan.high) });
+        if (!f.error) return placeBlueprint(E.prepare(f, { fillId: p.id + '@' + bandId(n), deferCapabilities: true }), n * CFG.spacing, n, n);
+      }
+      throw new Error(p.id + ': no filler fits its territory');
+    }
+    /** a band's slice of a journey: the shared blueprint, with only that band's doors bound to its network */
+    buildTransition(site) {
+      const t0 = clock(), p = site.transition, j = this.journey(p), b = j ? clone(j) : this.standIn(p, site.band), L = site.lots[0];
+      // portals are keyed by their planned connection (low0.., high0..): each band planned only its own
+      for (const portal of b.portals) { const id = L.portalConns && L.portalConns[portal.connection]; if (id) portal.connection = id; else delete portal.connection; }
+      // its connections in the territory's frame, as every other site's build gives them
+      const conns = site.conns.map((id) => { const cn = this.worldFor(site.band).connection(site, id), lowSide = cn.a === site.id;
+        return { id: cn.id, side: cn.o === 'v' ? (lowSide ? 'E' : 'W') : (lowSide ? 'S' : 'N'), at: cn.s0 - (cn.o === 'h' ? p.rect[0] : p.rect[1]), width: cn.s1 - cn.s0,
+          line: cn.c - (cn.o === 'h' ? p.rect[1] : p.rect[0]), kind: 'opening', route: cn.route }; });
+      return { site, owner: p.id, origin: p.rect.slice(0, 2), fillerOrigin: p.rect.slice(0, 2), filler: b, buildings: [], conns, issues: [], ms: clock() - t0 };
+    }
+    /** the nearest journey up or down from (x, y) in the active band (among the 3 x 3 regions round it): its plan, or null */
+    nearestJourney(direction, x, y) {
+      if (!['up', 'down'].includes(direction)) throw new Error('direction must be up or down');
+      const lower = direction === 'up' ? this.band : this.band - 1, R = C * CFG.regionCells;
+      const ri = Math.floor(x / R), rj = Math.floor(y / R), list = [];
+      for (let i = ri - 1; i <= ri + 1; i++) for (let j = rj - 1; j <= rj + 1; j++) { const p = this.journeyPlan(lower, i, j); if (p) list.push(p); }
+      const d = (p) => ((p.rect[0] + p.rect[2]) / 2 - x) ** 2 + ((p.rect[1] + p.rect[3]) / 2 - y) ** 2;
+      list.sort((a, b) => d(a) - d(b) || a.id.localeCompare(b.id));
+      // (a journey that could not be built is not one: only the nearest are built to find out)
+      return list.find((p) => this.journey(p)) || null;
     }
     bandOf(siteOrId) { const id = typeof siteOrId === 'string' ? siteOrId : siteOrId.id; const m = /^b(-?\d+)\|/.exec(id); if (!m) throw new Error('missing band in site id'); return +m[1]; }
     cell(i, j, band) { return this.worldFor(band === undefined ? this.band : band).cell(i, j); }
@@ -86,6 +190,8 @@
      * painting. Keep the original blueprint and cache its spatial view beside it. */
     spatial(s) {
       const w = this.worldFor(s.band), r = w.build(s);
+      // a journey's blueprint is already spatial: absolute heights, both bands
+      if (s.kind === 'transition') return r;
       if (!r.spatial) {
         const adapt = (b, id) => {
           const a = E.prepare(b, { fillId: id, deferCapabilities: true });
@@ -103,7 +209,7 @@
     peer(s, cn) { return this.worldFor(s.band).peer(s, cn); }
     neighbours(s) { return this.worldFor(s.band).neighbours(s); }
     seamsBetween(a, b) {
-      if (a.band !== b.band) return [];
+      if (a.band !== b.band || a.kind === 'transition' || b.kind === 'transition') return [];
       this.build(a); this.build(b);
       return this.worldFor(a.band).seamsBetween(a, b);
     }
@@ -117,7 +223,9 @@
       for (let n = bandMin; n <= bandMax; n++) for (const s of this.cell(i, j, n).sites) {
         const owner = s.owner || s.id;
         if (owners.has(owner)) continue; owners.add(owner);
-        const v = { id: owner + ':envelope', kind: 'site-envelope', rects: s.rects, z0: n * CFG.spacing + CFG.floorLimit - E.SLAB, z1: n * CFG.spacing + CFG.ceilingLimit };
+        // a journey owns its territory through both bands' envelopes
+        const p = s.transition, v = p ? { id: owner + ':envelope', kind: 'journey-envelope', rects: [p.rect], z0: p.lower * CFG.spacing + CFG.floorLimit - E.SLAB, z1: p.upper * CFG.spacing + CFG.ceilingLimit }
+          : { id: owner + ':envelope', kind: 'site-envelope', rects: s.rects, z0: n * CFG.spacing + CFG.floorLimit - E.SLAB, z1: n * CFG.spacing + CFG.ceilingLimit };
         const r = index.reserve(owner, [v]);
         if (!r.ok) throw new Error(owner + ' reservation overlaps ' + r.conflicts[0].owner);
       }
@@ -160,7 +268,8 @@
           for (const cn of cell.conns) if (!cn.cross || (cn.peerCell[0] >= i0 && cn.peerCell[0] <= i1 && cn.peerCell[1] >= j0 && cn.peerCell[1] <= j1)) expected.add(cn.id);
           for (const s of cell.sites) {
             const r = this.spatial(s);
-            if (r.filler) add(s, r.filler, r.fillerOrigin, s.owner || s.id);
+            // (a journey's one blueprint is shared by both its bands; a stand-in is one per band)
+            if (r.filler) add(s, r.filler, r.fillerOrigin, s.kind === 'transition' ? r.filler.fillId : s.owner || s.id);
             for (const B of r.buildings) add(s, B.b, B.origin, s.id + '/' + B.poi.id, B.conns);
           }
         }
@@ -214,7 +323,9 @@
       }
       const g = this.graph(i0, j0, i1, j1, bands);
       if (g.issues.length) throw new Error('invalid spatial connections: ' + g.issues[0]);
-      return { schema: 'br.world-elevation/0.1', units: 'metres', axes: 'XY horizontal, Z up', seed: this.seed, policy: { spacing: CFG.spacing, verticalJourneys: 'none' },
+      const journeys = [...layouts.values()].filter((l) => l.blueprint.kind === 'journey').map((l) => ({ id: l.owner, origin: l.origin.slice(), bands: l.blueprint.bands.map((x) => x.id), style: l.blueprint.source.style,
+        stages: l.blueprint.source.stages.map((st) => ({ filler: st.filler, z: st.z, leg: st.leg })) }));
+      return { schema: 'br.world-elevation/0.1', units: 'metres', axes: 'XY horizontal, Z up', seed: this.seed, policy: { spacing: CFG.spacing, verticalJourneys: 'composed', journeysPerRegion: 1, regionCells: CFG.regionCells }, journeys,
         region: [i0, j0, i1, j1], bands: bands.map((n) => ({ id: bandId(n), elevation: n * CFG.spacing })), slices,
         layouts: [...layouts.values()].sort((a, b) => a.owner.localeCompare(b.owner)), reservations: [...reservations.values()].sort((a, b) => a.owner.localeCompare(b.owner)),
         navigation: g.navigation, portalMatches: g.matches, frontier: g.dangling, verticalFrontier: g.verticalFrontier, issues: g.issues, unresolved: g.unresolved };
