@@ -1,5 +1,5 @@
 /*
- * Filler checks (run: node tests/fillers.test.js [seedsPerFiller])
+ * Filler checks (run: node tests/fillers.test.js [seedsPerFiller] [--full])
  *
  * Everything is checked from the output JSON alone, independently of the
  * engine's own checks:
@@ -21,8 +21,9 @@ for (const f of ['core', 'tpl/grid', 'tpl/framework', 'tpl/fillers/engine', 'tpl
   require(path.join(__dirname, '..', 'src', f + '.js'));
 const BR = globalThis.BR, FILL = BR.FILL, TPL = BR.TPL, { Rng, hash4 } = BR;
 const { walk1m } = require('./walk');
+const MODE = require('./mode');
 
-const N = +(process.argv[2] || 40);
+const N = +(process.argv[2] || MODE.size(16, 40));
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 let failures = 0;
 function check(name, ok, detail) {
@@ -192,7 +193,7 @@ if (!ONLY) {
 
 // ---------------------------------------------------------------- the pool
 if (!ONLY) {
-  const feel = { enclosed: 0, mixed: 0, open: 0 }, seen = new Set(), PICKS = 4000;
+  const feel = { enclosed: 0, mixed: 0, open: 0 }, seen = new Set(), PICKS = MODE.size(1500, 4000);
   let misfit = 0;
   for (let s = 1; s <= PICKS; s++) {
     const cs = caseFor(s * 31, 8), id = FILL.pick({ seed: s, site: cs.site }), F = FILL.fillers[id];
@@ -210,14 +211,19 @@ if (!ONLY) {
 
 // ---------------------------------------------------------------- speed
 if (!ONLY) {
-  let ms = 0, n = 0;
-  for (let s = 1; s <= 200; s++) {
-    const rng = new Rng(hash4(s, 0x7370, 0, 0)), site = { w: Math.round(rng.range(10, 24) * 2) / 2, h: Math.round(rng.range(10, 24) * 2) / 2 };
-    const b = FILL.generate({ seed: s, site, connections: FILL.sampleConnections(site, rng.int(1, 4), s) });
-    if (!b.error) { ms += b.meta.ms; n++; }
-  }
-  console.log('     avg ' + (ms / n).toFixed(2) + ' ms per filler on 10-24 m sites');
-  check('fillers are fast (under 5 ms on average on 10-24 m sites)', ms / n < 5, (ms / n).toFixed(2) + ' ms');
+  // a busy machine gets another pass before it counts (tests/mode.js)
+  const t = MODE.timing(5, () => {
+    let ms = 0, n = 0;
+    for (let s = 1; s <= 200; s++) {
+      const rng = new Rng(hash4(s, 0x7370, 0, 0)), site = { w: Math.round(rng.range(10, 24) * 2) / 2, h: Math.round(rng.range(10, 24) * 2) / 2 };
+      const b = FILL.generate({ seed: s, site, connections: FILL.sampleConnections(site, rng.int(1, 4), s) });
+      if (!b.error) { ms += b.meta.ms; n++; }
+    }
+    console.log('     avg ' + (ms / n).toFixed(2) + ' ms per filler on 10-24 m sites');
+    return ms / n;
+  });
+  console.log(MODE.timingLine('fillers are fast (under 5 ms on average on 10-24 m sites)', t));
+  if (!t.ok) failures++;
 }
 
 console.log(failures ? '\n' + failures + ' check(s) failed' : '\nall checks passed');

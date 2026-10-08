@@ -1,11 +1,11 @@
 // The park: a hall whose floor is tiled by zones, sometimes with a building
-// built by its own template. run: node tests/park.test.js [seeds]
+// built by its own template. run: node tests/park.test.js [seeds] [--full]
 // (the br.building contract itself is checked for every archetype by
 // tests/templates.test.js)
-const { BR, components, harness } = require('./helpers');
+const { BR, components, harness, MODE } = require('./helpers');
 const { walk1m } = require('./walk');
 const { check, finish } = harness(), TPL = BR.TPL, TG = BR.TG;
-const N = +(process.argv[2] || 40), SIDES = ['S', 'E', 'N', 'W'], G = 0.5;
+const N = +(process.argv[2] || MODE.size(16, 40)), SIDES = ['S', 'E', 'N', 'W'], G = 0.5;
 const strip = (x) => JSON.stringify(x, (k, v) => (k === 'ms' ? undefined : v));
 const builds = [];
 for (let s = 1; s <= N; s++) {
@@ -128,16 +128,16 @@ const zoneAt = (b, x, y) => b.zones.find((z) => z.rects.some((q) => x > q[0] && 
 
 // ---- 6. on the map
 {
-  let found = null;
-  for (const seed of [31337, 7]) {
+  // a known place first (seed 31337, cell -3, -1); the search finds another
+  // if the generator moves it, and says so
+  const at = (W, i, j) => { const P = W.cell(i, j).pois.find((x) => x.archetype === 'park'); return P && { W, i, j, P }; };
+  let found = at(new BR.World(31337), -3, -1), moved = false;
+  for (const seed of found ? [] : [31337, 7]) {
     const W = new BR.World(seed);
-    for (let i = -3; i <= 3 && !found; i++) for (let j = -3; j <= 3 && !found; j++) {
-      const P = W.cell(i, j).pois.find((x) => x.archetype === 'park');
-      if (P) found = { W, i, j, P };
-    }
-    if (found) break;
+    for (let i = -3; i <= 3 && !found; i++) for (let j = -3; j <= 3 && !found; j++) found = at(W, i, j);
+    if (found) { moved = true; break; }
   }
-  check('the world places parks', !!found);
+  check('the world places parks', !!found, moved ? `none at its known place any more, found seed ${found.W.seed} cell ${found.i}, ${found.j}: update the test` : '');
   if (found) {
     const { W, i, j, P } = found, site = W.siteAt(P.cx, P.cy), B = W.build(site).buildings[0];
     check('a park is a flush lot of its own, joined through its own ways in', P.mode === 'flush' && site.kind === 'flush' && site.conns.length === B.b.portals.length, `${site.conns.length} ways in`);

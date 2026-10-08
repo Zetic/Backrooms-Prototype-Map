@@ -1,6 +1,6 @@
 // Real geometry, authoritative portal matches, and stateless world ownership.
 const assert = require('node:assert/strict');
-const { BR, components } = require('./helpers');
+const { BR, components, MODE } = require('./helpers');
 const C = BR.WORLD_CFG.cell, E = BR.ELEV;
 const same = (a, b) => assert.deepEqual(a, b);
 const inside = (r, q) => q[0] >= r[0] - 1e-7 && q[1] >= r[1] - 1e-7 && q[2] <= r[2] + 1e-7 && q[3] <= r[3] + 1e-7;
@@ -31,7 +31,7 @@ const envelope = (node) => {
   return [lower * 16 + BR.BAND_CFG.floorLimit, upper * 16 + BR.BAND_CFG.ceilingLimit];
 };
 let met = 0;
-for (const seed of [7,99,31337]) {
+for (const seed of MODE.size([31337], [7, 99, 31337])) {
   const w = new BR.BandWorld(seed), up = w.journeyPlan(0, -1, 0), down = w.journeyPlan(-1, -1, 0);
   // the cells holding the journeys up and down from band 0 of one region, in each of their bands
   for (const [p, n] of [[up, 0], [up, 1], [down, -1], [down, 0]]) {
@@ -55,13 +55,13 @@ for (const seed of [7,99,31337]) {
     for (const s of g.navigation.nodes) { const [lo, hi] = envelope(s); assert(s.floorZ >= lo - 1e-7 && s.ceilingZ <= hi + 1e-7, s.id); }
   }
 }
-assert(met >= 12, 'every seed met its journeys');
+assert(met >= 4 * MODE.size(1, 3), 'every seed met its journeys');
 console.log('ok   every band cell tiles exactly and is one network; journey sites own the same rectangle in both of their bands');
 
 // Journeys join the bands: two neighbouring cells of a region, holding the
 // journey from band -1 and the journey from band 0, make one network over
 // three bands, and you can walk from the bottom to the top and back.
-for (const seed of [7, 31337]) {
+for (const seed of MODE.size([31337], [7, 31337])) {
   const w = new BR.BandWorld(seed);
   const pairs = [];
   for (let ri = -2; ri <= 2; ri++) for (let rj = -2; rj <= 2; rj++) {
@@ -185,15 +185,22 @@ console.log('ok   cell plans build no journey; one that cannot be built leaves a
 
 // A corrupted height, clearance, side or missing endpoint cannot accidentally
 // become a connection merely because two XY territories touch.
-for (const fault of ['height', 'width', 'side', 'clearance', 'missing']) {
+// (one world: each fault is made on its cached blueprint, checked, and undone;
+// the graph is worked out afresh from the blueprints on every call)
+{
   const w = new BR.BandWorld(7), p = {i:0,j:0}, s = w.cell(0,0,0).sites.find((s) => w.spatial(s).filler?.portals.some((p)=>p.connection)), b = w.spatial(s).filler;
-  const portal = b.portals.find((p) => p.connection);
-  if (fault === 'height') portal.floorZ += 0.5;
-  if (fault === 'width') portal.width += 0.5;
-  if (fault === 'side') portal.side = BR.TG.opposite(portal.side);
-  if (fault === 'clearance') b.openings.find((o) => o.id === portal.opening).height = 1;
-  if (fault === 'missing') delete portal.connection;
-  assert(w.graph(p.i, p.j, p.i, p.j, [0, 1]).issues.length, fault);
+  const portal = b.portals.find((p) => p.connection), opening = b.openings.find((o) => o.id === portal.opening), keep = { ...portal }, height = opening.height;
+  same(w.graph(p.i, p.j, p.i, p.j, [0, 1]).issues, []);
+  for (const fault of ['height', 'width', 'side', 'clearance', 'missing']) {
+    if (fault === 'height') portal.floorZ += 0.5;
+    if (fault === 'width') portal.width += 0.5;
+    if (fault === 'side') portal.side = BR.TG.opposite(portal.side);
+    if (fault === 'clearance') opening.height = 1;
+    if (fault === 'missing') delete portal.connection;
+    assert(w.graph(p.i, p.j, p.i, p.j, [0, 1]).issues.length, fault);
+    Object.assign(portal, keep); if (height === undefined) delete opening.height; else opening.height = height;
+    same(w.graph(p.i, p.j, p.i, p.j, [0, 1]).issues, [], 'undone: ' + fault);
+  }
 }
 assert.throws(() => new BR.BandWorld(7, { band: 0.5 }), /integer/);
 assert.throws(() => new BR.BandWorld(7).exportRegion(0, 0, 8, 8, [0]), /64/);

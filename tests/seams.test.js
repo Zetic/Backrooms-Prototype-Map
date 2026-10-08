@@ -1,18 +1,21 @@
 // Seams: where two blueprints end up wall to wall, and what the seam rules
 // cut through those shared walls (src/seams.js).
-// run: node tests/seams.test.js
-const { BR, components, harness } = require('./helpers');
+// run: node tests/seams.test.js [--full]
+const { BR, components, harness, MODE } = require('./helpers');
 const { check, finish } = harness(), SEAM = BR.SEAM, TPL = BR.TPL, LOT = BR.LOT, TG = BR.TG;
 const strip = (x) => JSON.stringify(x);
 const EPS = 1e-9;
 
-// neighborhoods on a few maps: their houses stand on the lot edge, so they meet fillers
-const hoods = [];
-for (const seed of [31337, 7, 12345]) {
+// neighborhoods on a few maps: their houses stand on the lot edge, so they meet fillers.
+// Full mode looks at every one in 8 x 8 cells of three seeds; quick mode at
+// three known ones (seed, cell; one has the only seam door), and says so if the generator has moved them
+const hoods = [], KNOWN = [[7, 0, 1], [7, -2, 0], [12345, -1, -4]];
+const hoodsIn = (W, i, j) => { for (const P of W.cell(i, j).pois) if (P.archetype === 'neighborhood') hoods.push({ W, P, site: W.siteAt(P.cx, P.cy) }); };
+if (MODE.full) for (const seed of [31337, 7, 12345]) {
   const W = new BR.World(seed);
-  for (let i = -4; i < 4; i++) for (let j = -4; j < 4; j++) for (const P of W.cell(i, j).pois) if (P.archetype === 'neighborhood') hoods.push({ W, P, site: W.siteAt(P.cx, P.cy) });
-}
-check('there are neighborhoods to look at', hoods.length >= 3, hoods.length + '');
+  for (let i = -4; i < 4; i++) for (let j = -4; j < 4; j++) hoodsIn(W, i, j);
+} else for (const [seed, i, j] of KNOWN) hoodsIn(new BR.World(seed), i, j);
+check('there are neighborhoods to look at', hoods.length >= 3, hoods.length + (MODE.full || hoods.length >= 3 ? '' : ': the known places in seams.test.js no longer hold one each, update them'));
 const all = [];
 for (const h of hoods) for (const S of h.W.seams(h.site)) all.push({ h, S });
 const W0 = new BR.World(31337);

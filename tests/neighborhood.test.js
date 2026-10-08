@@ -1,10 +1,10 @@
 // The neighborhood: a composite template, built from other templates.
-// run: node tests/neighborhood.test.js [seeds]
+// run: node tests/neighborhood.test.js [seeds] [--full]
 // (the br.building contract itself is checked for every archetype, this one
 // included, by tests/templates.test.js)
-const { BR, components, harness } = require('./helpers');
-const { check, finish } = harness(), TPL = BR.TPL, TG = BR.TG;
-const N = +(process.argv[2] || 24), SIDES = ['S', 'E', 'N', 'W'];
+const { BR, components, harness, MODE } = require('./helpers');
+const { check, timed, finish } = harness(), TPL = BR.TPL, TG = BR.TG;
+const N = +(process.argv[2] || MODE.size(10, 24)), SIDES = ['S', 'E', 'N', 'W'];
 const strip = (x) => JSON.stringify(x, (k, v) => (k === 'ms' ? undefined : v));
 const builds = [];
 for (let s = 1; s <= N; s++) {
@@ -126,22 +126,26 @@ check('the neighborhood builds on every seed and main side', ok.length === build
   const a = strip(TPL.generate(spec));
   for (let k = 0; k < 3; k++) TPL.generate({ archetype: 'ranch', seed: 10 + k });
   check('same spec gives the same neighborhood, whatever was built before', a === strip(TPL.generate(spec)));
-  const avg = ok.reduce((s, x) => s + x.b.meta.ms, 0) / ok.length;
-  check('a neighborhood builds in reasonable time (under 300 ms)', avg < 300, avg.toFixed(0) + ' ms on average');
+  // the builds above are the first pass; a busy machine gets another (tests/mode.js)
+  let pass = 0;
+  const t = MODE.timing(300, () => pass++ ? builds.map(({ spec }) => (TPL.generate(spec).meta || {}).ms || 0).reduce((s, v) => s + v, 0) / builds.length
+    : ok.reduce((s, x) => s + x.b.meta.ms, 0) / ok.length, { digits: 0 });
+  t.detail = t.detail.replace(' ms', ' ms on average');
+  timed('a neighborhood builds in reasonable time (under 300 ms)', t);
 }
 
 // ---- 6. on the map: its own lot, joined through its doors, part of one world
 {
-  let found = null;
-  for (const seed of [31337, 7, 12345]) {
+  // a known place first (seed 31337, cell 3, 3); the search finds another if
+  // the generator moves it, and says so
+  const at = (W, i, j) => { const P = W.cell(i, j).pois.find((x) => x.archetype === 'neighborhood'); return P && { W, i, j, P }; };
+  let found = at(new BR.World(31337), 3, 3), moved = false;
+  for (const seed of found ? [] : [31337, 7, 12345]) {
     const W = new BR.World(seed);
-    for (let i = -4; i <= 4 && !found; i++) for (let j = -4; j <= 4 && !found; j++) {
-      const P = W.cell(i, j).pois.find((x) => x.archetype === 'neighborhood');
-      if (P) found = { W, i, j, P };
-    }
-    if (found) break;
+    for (let i = -4; i <= 4 && !found; i++) for (let j = -4; j <= 4 && !found; j++) found = at(W, i, j);
+    if (found) { moved = true; break; }
   }
-  check('the world places neighborhoods', !!found);
+  check('the world places neighborhoods', !!found, moved ? `none at its known place any more, found seed ${found.W.seed} cell ${found.i}, ${found.j}: update the test` : '');
   if (found) {
     const { W, i, j, P } = found, site = W.siteAt(P.cx, P.cy), r = W.build(site), B = r.buildings[0];
     check('a neighborhood is a flush lot of its own, joined through its own doors', P.mode === 'flush' && site.kind === 'flush' && !!B &&
