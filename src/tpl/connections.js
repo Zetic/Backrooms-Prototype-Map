@@ -207,7 +207,7 @@
   }
 
   /** the best spot for one type and shape in one room, or null */
-  function fit(b, g, type, shape, dir, rise, why) {
+  function fit(b, g, type, shape, dir, rise, why, within) {
     const R = CAT.CONNECTIONS[type], host = g.s, dz = dir === 'up' ? rise : -rise;
     if (host.ceilingZ - host.floorZ < R.clearance - EPS) { why.push(type + ': ' + host.id + ' too low'); return null; }
     if (rise < minRise(dir, host) - EPS) { why.push(type + ': a ' + rise + ' m ' + dir + ' route cannot clear ' + host.id); return null; }
@@ -216,6 +216,8 @@
     for (const pl of placements(g, lay)) {
       const all = lay.pieces.map((p) => toRect(pl, [p.u0, p.v0, p.u1, p.v1])), dest = toRect(pl, lay.landing);
       const foot = all.concat([dest]);
+      // (a caller may keep the whole route inside given rects: where the floor above it is its own)
+      if (within && !within.some((q) => { const bx = TG.bbox(foot); return bx[0] >= q[0] - EPS && bx[1] >= q[1] - EPS && bx[2] <= q[2] + EPS && bx[3] <= q[3] + EPS; })) continue;
       // the whole footprint is this room's floor
       let ok = true;
       for (const r of foot) for (let y = r[1]; ok && y < r[3] - EPS; y += G) for (let x = r[0]; x < r[2] - EPS; x += G) { const [i, j] = g.at(x, y); if (i < 0 || j < 0 || i >= g.W || j >= g.H || !g.cell[j * g.W + i]) { ok = false; break; } }
@@ -288,7 +290,7 @@
           for (const s of hosts) {
             const rise = riseFor(dir, s, o.rise);
             if (!grids.has(s.id)) grids.set(s.id, hostGrid(b, s));
-            const k = fit(b, grids.get(s.id), type, shape, dir, rise, notes[dir]);
+            const k = fit(b, grids.get(s.id), type, shape, dir, rise, notes[dir], o.within);
             if (k) { found = zoneOf(b, grids.get(s.id), type, shape, dir, rise, k); break; }
           }
           if (found) break;
@@ -484,7 +486,8 @@
    * A connected variant of any template: { direction: 'up' | 'down', type:
    * 'auto' (the template's preference, falling back to the ladder) | 'ladder'
    * | 'stair' | 'ramp', rise (m, exact; default: the least that clears),
-   * reservations (a ReservationIndex to claim the space in) }. An explicit type
+   * reservations (a ReservationIndex to claim the space in), within (rects,
+   * blueprint frame: the whole route and its landing inside one of them) }. An explicit type
    * that does not fit is refused with the reason.
    */
   function connectionVariant(source, options) {
@@ -496,10 +499,10 @@
       if (type === 'ladder') {
         try { return E.ladderVariant(source, Object.assign({}, o, { direction: dir, rise: o.rise === undefined ? undefined : o.rise })); } catch (err) { tried.push('ladder: ' + err.message); continue; }
       }
-      const zones = o.rise === undefined ? b.connectionZones : findZones(b, b.capabilities, { rise: o.rise, direction: dir, types: [type] });
+      const zones = o.rise === undefined && !o.within ? b.connectionZones : findZones(b, b.capabilities, { rise: o.rise, direction: dir, types: [type], within: o.within });
       const z = zones.find((x) => x.direction === dir && x.type === type);
       if (!z) { tried.push(...((zones.notes && zones.notes[dir]) || []).filter((n) => n.startsWith(type)).slice(0, 2)); if (!zones.notes) tried.push(type + ': no zone'); continue; }
-      if (o.rise !== undefined) { b.connectionZones = (b.connectionZones || []).filter((x) => x.id !== z.id).concat(z); }
+      if (o.rise !== undefined || o.within) { b.connectionZones = (b.connectionZones || []).filter((x) => x.id !== z.id).concat(z); }
       const v = build(b, z), check = E.validate(v);
       if (check.errors.length) { tried.push(type + ': ' + check.errors[0]); continue; }
       if (o.reservations) {

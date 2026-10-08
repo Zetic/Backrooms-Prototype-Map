@@ -24,164 +24,27 @@ function tile(c) {
   assert(own.every((v) => v === 1), 'band ownership tiles the cell exactly');
 }
 
-// Every band is a horizontal network; a journey owns one territory in both
-// bands of its pair (the same rectangle, a transition site in each).
-const envelope = (node) => {
-  const m = /^journey:(-?\d+):/.exec(node.owner), lower = m ? +m[1] : node.band === undefined ? 0 : +String(node.band).split(':')[1], upper = m ? lower + 1 : lower;
-  return [lower * 16 + BR.BAND_CFG.floorLimit, upper * 16 + BR.BAND_CFG.ceilingLimit];
-};
-let met = 0;
+// Every band is a horizontal network of its own: its cells tile exactly,
+// nothing is reserved between bands any more (no journey plots), and every
+// floor keeps to the envelope of the band it is in.
+const envelope = (node) => { const n = +String(node.band).split(':')[1]; return [n * 16 + BR.BAND_CFG.floorLimit, n * 16 + BR.BAND_CFG.ceilingLimit]; };
+const groundNode = (id) => !/^growth:/.test(id) && !/:raised/.test(id);
 for (const seed of MODE.size([31337], [7, 99, 31337])) {
-  const w = new BR.BandWorld(seed), up = w.journeyPlan(0, -1, 0), down = w.journeyPlan(-1, -1, 0);
-  // the cells holding the journeys up and down from band 0 of one region, in each of their bands
-  for (const [p, n] of [[up, 0], [up, 1], [down, -1], [down, 0]]) {
-    const c = w.cell(p.i, p.j, n); tile(c);
-    const ts = c.sites.filter((s) => s.kind === 'transition');
-    assert(ts.some((s) => s.owner === p.id));
-    for (const s of ts) {
-      const q = s.transition; met++;
-      same(s.rects, [q.rect]); assert.equal(s.owner, q.id); assert(n === q.lower || n === q.upper);
-      assert.equal(w.fillerOf(s), 'journey');
-      // the world's connections to it are exactly the doors its plan gave that band
-      const plan = BR.JOURNEY.plan({ seed: q.seed, w: q.rect[2] - q.rect[0], h: q.rect[3] - q.rect[1] })[n === q.lower ? 'low' : 'high'], key = (c) => [c.side, c.at, c.width, c.line].join();
-      same(w.build(s).conns.map(key).sort(), plan.map(key).sort());
-    }
-    const g = w.graph(p.i, p.j, p.i, p.j, [n]);
-    same(g.issues,[]); same(g.unresolved,[]);
-    assert.equal(components(g.nodes,g.edges).sizes.length,1);
-    // templates keep their own floors (storeys, galleries, sunken floors) inside the band's
-    // envelope; a journey's floors stay inside the envelope of its two bands
-    assert(g.navigation.nodes.some((s)=>s.floorZ===n*16));
+  const w = new BR.BandWorld(seed);
+  assert.equal(w.journeyPlan, undefined, 'no journey plots');
+  for (const n of [-1, 0, 1]) {
+    const c = w.cell(0, 0, n); tile(c);
+    assert(c.sites.every((s) => ['filler', 'lot', 'flush'].includes(s.kind)), 'a cell holds fillers and lots only');
+    const g = w.graph(0, 0, 0, 0, [n]);
+    same(g.issues, []); same(g.unresolved, []);
+    // the ground is one network; a growth's floors join it, or lead out of the cell
+    const comp = components(g.nodes, g.edges);
+    assert.equal(new Set([...g.nodes].filter(groundNode).map((id) => comp.labels.get(id))).size, 1, seed + ' band ' + n + ': one ground network');
+    assert(g.navigation.nodes.some((s) => s.floorZ === n * 16));
     for (const s of g.navigation.nodes) { const [lo, hi] = envelope(s); assert(s.floorZ >= lo - 1e-7 && s.ceilingZ <= hi + 1e-7, s.id); }
   }
 }
-assert(met >= 4 * MODE.size(1, 3), 'every seed met its journeys');
-console.log('ok   every band cell tiles exactly and is one network; journey sites own the same rectangle in both of their bands');
-
-// Journeys join the bands: two neighbouring cells of a region, holding the
-// journey from band -1 and the journey from band 0, make one network over
-// three bands, and you can walk from the bottom to the top and back.
-for (const seed of MODE.size([31337], [7, 31337])) {
-  const w = new BR.BandWorld(seed);
-  const pairs = [];
-  for (let ri = -2; ri <= 2; ri++) for (let rj = -2; rj <= 2; rj++) {
-    const a = w.journeyPlan(-1, ri, rj), b = w.journeyPlan(0, ri, rj);
-    if (!a || !b) continue;
-    // a band's journey down and its journey up never share ground: they use opposite halves of the region
-    assert(!BR.TG.roverlap(a.rect, b.rect)); assert.notEqual(Math.floor(a.i / 2), Math.floor(b.i / 2));
-    pairs.push({ a, b, n: (Math.abs(a.i - b.i) + 1) * (Math.abs(a.j - b.j) + 1) });
-  }
-  const best = pairs.filter((q) => q.n <= 2).find((q) => w.journey(q.a) && w.journey(q.b));
-  assert(best, 'some region puts its two journeys in neighbouring cells');
-  const { a, b } = best, i0 = Math.min(a.i, b.i), i1 = Math.max(a.i, b.i), j0 = Math.min(a.j, b.j), j1 = Math.max(a.j, b.j);
-  const g = w.graph(i0, j0, i1, j1, [-1, 0, 1]);
-  same(g.issues, []); same(g.unresolved, []);
-  assert.equal(components(g.nodes, g.edges).sizes.length, 1, 'three bands, one network');
-  // each journey's own climbs are navigation edges (not just some template's stairs)
-  for (const p of [a, b]) {
-    const climbs = g.navigation.edges.filter((e) => e.connector && e.connector.startsWith(p.id + '/k'));
-    assert(climbs.length >= 4 && climbs.every((e) => ['ladder', 'stair', 'ramp'].includes(e.kind)), p.id + ' climbs');
-  }
-  const bottom = g.navigation.nodes.find((s) => s.floorZ === -16 && !s.owner.startsWith('journey:')), top = g.navigation.nodes.find((s) => s.floorZ === 16 && !s.owner.startsWith('journey:'));
-  assert(walk(g, bottom.id).has(top.id) && walk(g, top.id).has(bottom.id), 'band -1 to band +1 and back');
-  // each band binds only the doors at its own floor: none left over, none shared
-  for (const p of [a, b]) for (const n of [p.lower, p.upper]) {
-    const s = w.cell(p.i, p.j, n).sites.find((s) => s.owner === p.id), r = w.spatial(s);
-    const bound = r.filler.portals.filter((q) => q.connection);
-    assert(bound.length && bound.every((q) => q.floorZ === n * 16 && q.band === 'band:' + n));
-    same(bound.map((q) => q.connection).sort(), s.conns.slice().sort());
-  }
-}
-console.log('ok   journeys join neighbouring bands into one walkable network; each band binds only its own doors');
-
-// The plan is a function of (seed, region, band pair): fresh worlds agree,
-// whatever was asked first, and a journey's slice in one band does not need
-// the other band to have been planned.
-{
-  const a = new BR.BandWorld(99), b = new BR.BandWorld(99, { elevationLimits: { bands: 1, journeys: 1, claims: 1 } });
-  for (const lower of [-3, -1, 0, 2]) for (const [ri, rj] of [[0, 0], [-1, 2], [3, -4]]) {
-    const p = a.journeyPlan(lower, ri, rj);
-    same(p, b.journeyPlan(lower, ri, rj));
-    if (!p) continue;
-    assert(BR.TG.rcontains([p.i * C + 8, p.j * C + 8, p.i * C + C - 8, p.j * C + C - 8], p.rect));
-    assert.equal(Math.floor(p.i / 4), ri); assert.equal(Math.floor(p.j / 4), rj);
-  }
-  const p = a.journeyPlan(0, -1, 0); assert(p && a.journey(p));
-  const strip = (r) => JSON.parse(JSON.stringify({ ...r, site: r.site.id, ms: 0, conns: r.conns.map((c) => c.id) }));
-  const upFirst = strip(b.spatial(b.cell(p.i, p.j, 1).sites.find((s) => s.owner === p.id)));
-  for (const n of [5, -5]) b.cell(p.i + 9, p.j, n);
-  const downAfter = strip(b.spatial(b.cell(p.i, p.j, 0).sites.find((s) => s.owner === p.id)));
-  same(upFirst, strip(a.spatial(a.cell(p.i, p.j, 1).sites.find((s) => s.owner === p.id))));
-  same(downAfter, strip(a.spatial(a.cell(p.i, p.j, 0).sites.find((s) => s.owner === p.id))));
-  assert(b.journeys.size <= 1 && b.claims.size <= 1 && b.worlds.size <= 1);
-  const near = a.nearestJourney('up', (p.rect[0] + p.rect[2]) / 2, (p.rect[1] + p.rect[3]) / 2);
-  assert.equal(near.id, p.id);
-  a.setBand(1); assert.equal(a.nearestJourney('down', (p.rect[0] + p.rect[2]) / 2, (p.rect[1] + p.rect[3]) / 2).id, p.id);
-  assert.throws(() => a.nearestJourney('sideways', 0, 0), /up or down/);
-}
-console.log('ok   journey plans and slices are the same in fresh and evicting worlds, whichever band is asked first');
-
-// Planning a cell never builds a journey: its doors are part of the plan. A
-// journey that cannot be built leaves an ordinary filler behind the same
-// doors in each band, and the bands simply stay apart there.
-{
-  const w = new BR.BandWorld(31337), p = w.journeyPlan(0, -1, 0);
-  for (const n of [0, 1]) w.cell(p.i, p.j, n);
-  assert.equal(w.journeys.size, 0, 'cell plans need no journey built');
-  const real = new BR.BandWorld(31337), doorsOf = (W, n) => W.cell(p.i, p.j, n).sites.find((s) => s.owner === p.id).lots[0].doors;
-  const generate = BR.JOURNEY.generate;
-  BR.JOURNEY.generate = () => { throw new Error('no journey fits'); };
-  try {
-    const f = new BR.BandWorld(31337);
-    assert.equal(f.journey(p), null); assert.equal(f.nearestJourney('up', (p.rect[0] + p.rect[2]) / 2, (p.rect[1] + p.rect[3]) / 2), null, 'a journey that cannot be built is not found');
-    for (const n of [0, 1]) {
-      same(doorsOf(f, n), doorsOf(real, n));
-      const s = f.cell(p.i, p.j, n).sites.find((s) => s.owner === p.id), b = f.spatial(s).filler;
-      assert.notEqual(b.kind, 'journey'); assert.equal(b.fillId, p.id + '@band:' + n);
-      assert(b.surfaces.every((v) => v.floorZ >= n * 16 + BR.BAND_CFG.floorLimit && v.ceilingZ <= n * 16 + BR.BAND_CFG.ceilingLimit));
-      same(b.portals.filter((q) => q.connection).map((q) => q.connection).sort(), s.conns.slice().sort());
-    }
-    const g = f.graph(p.i, p.j, p.i, p.j, [0, 1]);
-    same(g.issues, []); assert.equal(components(g.nodes, g.edges).sizes.length, 2, 'no journey: the bands stay apart');
-    const x = f.exportRegion(p.i, p.j, p.i, p.j, [0, 1]);
-    same(x.journeys, []); assert(x.layouts.some((l) => l.owner === p.id + '@band:0') && x.layouts.some((l) => l.owner === p.id + '@band:1'));
-  } finally { BR.JOURNEY.generate = generate; }
-}
-console.log('ok   cell plans build no journey; one that cannot be built leaves a stand-in filler behind the same doors');
-
-// Canonical spatial export survives upper-first generation, tiny cell/build
-// caches, whole-band eviction, remote exploration and reordered band input.
-{
-  const seed = 31337, a = new BR.BandWorld(seed), plan = a.journeyPlan(0, -1, 0), p = { i: plan.i, j: plan.j };
-  const expected = a.exportRegion(p.i, p.j, p.i, p.j, [-1, 0, 1]);
-  assert(expected.journeys.some((j) => j.id === plan.id), 'the region holds a journey');
-  assert.equal(expected.policy.verticalJourneys, 'composed');
-  const b = new BR.BandWorld(seed, { limits: { cells: 2, builds: 2 }, elevationLimits: { bands: 1, journeys: 1, claims: 1 } });
-  for (const n of [1, 0, -1]) for (const s of b.cell(p.i, p.j, n).sites.slice().reverse()) b.build(s);
-  for (const n of [8, -8, 3]) for (const s of b.cell(20 + n, -30, n).sites.slice(0, 4)) b.build(s);
-  const actual = b.exportRegion(p.i, p.j, p.i, p.j, [1, -1, 0]);
-  same(actual, expected);
-  same(actual.issues, []);
-  const nodes = new Set(actual.navigation.nodes.map((n) => n.id));
-  for (const e of actual.navigation.edges) assert(nodes.has(e.from) && nodes.has(e.to));
-  for (const item of actual.layouts) {
-    for (const direction of ['up', 'down']) assert(!item.blueprint.capabilities[direction].deferred && item.blueprint.capabilities[direction].candidates.length, item.owner + ': export has physical vertical potential');
-    const r = actual.reservations.find((r) => r.owner === item.reservationOwner); assert(r);
-    for (const v of item.blueprint.volumes) for (const q of v.rects) {
-      const world = [q[0] + item.origin[0], q[1] + item.origin[1], q[2] + item.origin[0], q[3] + item.origin[1]];
-      assert(r.volumes.some((e) => {
-        let remainder = [world];
-        for (const rect of e.rects) remainder = remainder.flatMap((q) => BR.TG.rsub(q, rect));
-        return e.z0 <= v.z0 + 1e-7 && e.z1 >= v.z1 - 1e-7 && !remainder.length;
-      }), item.owner + ': geometry fits reservation');
-    }
-  }
-  assert(b.worlds.size <= 1);
-  // a journey whose other band is outside the export leaves its doors there as a vertical frontier
-  const one = a.exportRegion(p.i, p.j, p.i, p.j, [0]), up = one.verticalFrontier.filter((f) => f.owner === plan.id);
-  assert(up.length && up.every((f) => f.band === 'band:1' && f.state === 'outside-region' && f.at[2] === 16));
-  console.log('ok   identical canonical export after reverse generation and eviction; all geometry fits planned 3D reservations; a journey cut by the export leaves a vertical frontier');
-}
+console.log('ok   every band cell tiles exactly and its ground is one network; no journey plots; every floor inside its band\'s envelope');
 
 // A corrupted height, clearance, side or missing endpoint cannot accidentally
 // become a connection merely because two XY territories touch.
@@ -207,222 +70,357 @@ assert.throws(() => new BR.BandWorld(7).exportRegion(0, 0, 8, 8, [0]), /64/);
 assert.equal(E.generate,undefined);
 console.log('ok   invalid portal matching, region sizes and band indices rejected');
 
-// Layered ownership (milestone 5) and the first growth (step 2): a column of
-// the world holds several claims, stacked. A branch of house rooms stands over
-// whole ground sites beside a two-storey house, entered from its stairwell
-// carried on up (its pillar), with a pit drilled from it into the ground below.
-const KNOWN = { seed: 7, i: 3, j: -2 };            // band 0: a two-storey house, a branch of 4 sites and a pit
-{
-  const w = new BR.BandWorld(KNOWN.seed), i = KNOWN.i, j = KNOWN.j, B = w.branch(0, i, j);
-  assert(B, 'the known cell has a branch');
-  assert.equal(B.floorZ, 6.5); assert(B.sites.length >= 2 && B.sites.length <= 4);
-  assert.equal(B.archetype, 'two_storey'); assert.equal(B.biome, 'houseroom');
-  assert.equal(w.cell(i, j, 0).sites.find((s) => s.id === B.anchor).kind, 'lot', 'its anchor is a house on its own lot');
-  // the ground plan is identical with and without it
-  // (the world without claims is built with claims switched off; the world with
-  // them after they are back on, so its builds really have the branch over them)
-  const groundPlan = (W) => JSON.stringify(W.cell(i, j, 0).sites.map((s) => [s.id, s.kind, s.rects, s.conns, s.pois.map((P) => P.id)]));
-  const built = (W, s) => { const r = W.build(s), f = r.filler; return JSON.stringify([f && f.filler, f && f.rooms.map((q) => [q.id, q.rects, q.level || 0, q.floor || 0]), r.buildings.map((x) => [x.poi.id, x.b.footprint[0].rects])]); };
-  const CLAIM = BR.CLAIM, without = {};
-  let bareGround;
-  BR.CLAIM = null;
-  try {
-    const bare = new BR.BandWorld(KNOWN.seed);
-    assert.equal(bare.branch(0, i, j), null, 'without claims there is no branch');
-    bareGround = groundPlan(bare);
-    for (const s of bare.cell(i, j, 0).sites) without[s.id] = built(bare, s);
-  } finally { BR.CLAIM = CLAIM; }
-  assert(BR.CLAIM && BR.CLAIM.raiseStair, 'claims are back');
-  const plain = new BR.BandWorld(KNOWN.seed);
-  assert(plain.branch(0, i, j), 'and with them the branch');
-  same(groundPlan(plain), bareGround);
-  for (const s of plain.cell(i, j, 0).sites) assert.equal(built(plain, s), without[s.id], s.id + ': the floors below a claim are the same with and without it');
-  // only the ceilings under the branch change: capped under its slab
-  for (const id of B.over) assert(plain.build(plain.site(id)).filler.rooms.every((r) => (r.ceiling || 2.5) <= B.z - E.SLAB + 1e-7), id + ' is capped');
-
-  // no two claims in the column overlap in 3D, and the slab between them is the branch's floor
-  const res = w.reservationPlan(i, j, 0, 0), index = new E.ReservationIndex();
-  for (const r of res) assert(index.reserve(r.owner, r.volumes).ok, r.owner + ' overlaps another claim');
-  const over = new Map(B.caps.map((c) => [c.site, c.cap]));
-  for (const rs of B.sites) {
-    const mine = res.find((r) => r.owner === rs.owner), below = res.find((r) => r.owner === rs.over);
-    assert(mine && below, rs.id + ' and the ground under it are both owned');
-    assert.equal(below.volumes[0].z1, over.get(rs.over), 'the ground claim stops at the cap');
-    assert.equal(mine.volumes[0].z0, rs.floorZ - E.SLAB, 'the claim above starts at its own floor slab');
-    assert.equal(mine.volumes[0].z0, below.volumes[0].z1, 'one slab between them, no gap and no overlap');
-    assert.equal(mine.volumes[0].z1, BR.BAND_CFG.ceilingLimit, 'and it owns the rest of the column');
-    same(mine.volumes[0].rects, below.volumes[0].rects);
-    // the ground site keeps its floor and every room under the cap
-    const b = w.spatial(w.site(rs.over)).filler;
-    assert(b.surfaces.every((s) => s.floorZ === 0 || s.floorZ > BR.BAND_CFG.floorLimit - 1e-7), rs.over + ' kept its floor');
-    assert(b.surfaces.every((s) => s.ceilingZ <= over.get(rs.over) + 1e-7), rs.over + ' keeps under its cap');
-  }
-  // an unclaimed site still owns its whole band envelope
-  const free = w.cell(i, j, 0).sites.find((s) => s.kind === 'filler' && !B.over.includes(s.id));
-  assert.equal(w.ceilingOf(free), BR.BAND_CFG.ceilingLimit);
-
-  // the landing: the house's own stair carried on up, and a door into the branch
-  const host = w.spatial(w.site(B.anchor)), house = host.buildings.find((x) => x.poi.id === B.poi);
-  const landing = house.b.rooms.find((r) => r.id === B.landing.room);
-  assert(landing && landing.floorZ === B.floorZ, 'the landing stands at the branch floor');
-  assert(house.b.connectors.some((c) => c.to === 's:' + landing.id), 'the house own stair climbs to it');
-  assert.equal(house.conns[B.landing.portal], B.landing.connection, 'its door is the branch connection');
-  const g = w.graph(i, j, i, j, [0]);
+// ---- growth (growth.js): pillars, floors stacked over floors, legs, arrivals
+// in the next band. A column of the world holds several claims, stacked.
+const GROWTH = BR.GROWTH, CL = BR.BAND_CFG.ceilingLimit, EPS = 1e-7;
+const KNOWN = { seed: 7, i: 2, j: -2 };            // band 0: a townhouse's growth, 4 floors at +9.5 m over two cells, a pit, and a climb to band 1
+const STAIR = { seed: 7, i: -1, j: -1 };           // band 0: its block's stair cell: a stair from the ground to +4.5 m, floors at +11 m, and a climb to band 1
+const CROSS = { seed: 31337, i: -6, j: 1 };        // band 0: a stair cell whose floors spread over three cells
+const w7 = new BR.BandWorld(7);
+const at = (rects, p) => rects.some((q) => p[0] >= q[0] && p[0] < q[2] && p[1] >= q[1] && p[1] < q[3]);
+const span = (cells) => [Math.min(...cells.map((c) => c[0])), Math.min(...cells.map((c) => c[1])), Math.max(...cells.map((c) => c[0])), Math.max(...cells.map((c) => c[1]))];
+const within = (outer, rects) => rects.every((q) => { let rest = [q]; for (const r of outer) rest = rest.flatMap((x) => BR.TG.rsub(x, r)); return !rest.length; });
+/** a growth that reaches band 1: walk from its pillar's ground floor to its landing site's floor 16 m up, and back */
+function climbsToBand1(w, G) {
+  const [i0, j0, i1, j1] = span(G.cells.concat([G.arrival.cell]));
+  const g = w.graph(i0, j0, i1, j1, [0, 1]);
   same(g.issues, []); same(g.unresolved, []);
-  assert.equal(components(g.nodes, g.edges).sizes.length, 1, 'the branch is part of the cell network, not a second one');
-  const at = (z) => g.navigation.nodes.filter((s) => s.floorZ === z);
-  assert(at(B.floorZ).length > 4 && at(0).length > 4, 'floors at both heights');
-  // you can walk from the ground up into the branch and back down again, to every raised floor and every room in it
-  const ground = at(0).find((s) => !s.owner.startsWith('journey:')), raised = at(B.floorZ).filter((s) => s.owner.startsWith(B.id + ':'));
-  assert(raised.length && raised.every((r) => walk(g, ground.id).has(r.id) && walk(g, r.id).has(ground.id)), 'up into every room of the branch and back');
-  assert(raised.some((r) => r.owner.includes('/')), 'house rooms stand in it');
+  const start = g.navigation.nodes.find((n) => n.floorZ === 0 && n.id.startsWith(G.anchor + '/'));
+  const top = g.navigation.nodes.find((n) => n.floorZ === 16 && n.id.startsWith(G.arrival.ground + '/'));
+  assert(start && top, G.id + ': its ground floor and its landing site');
+  assert(walk(g, start.id).has(top.id), G.id + ': up to band 1');
+  assert(walk(g, top.id).has(start.id), G.id + ': and back down');
+  // the last climb is matched portal to portal on band 1's floor
+  const m = g.matches.find((x) => x.id === G.arrival.conn.id);
+  assert(m && m.a.at[2] === 16 && m.b.at[2] === 16, G.id + ': the climb meets the landing site at 16 m');
+  return g;
+}
+/** every claim over the growth's cells, in both bands, reserved together: none overlaps another */
+function claimsOf(w, G) {
+  const index = new E.ReservationIndex(), all = [];
+  for (const [i, j] of G.cells.concat(G.arrival ? [G.arrival.cell] : [])) for (const r of w.reservationPlan(i, j, 0, 1)) {
+    if (all.some((x) => x.owner === r.owner)) continue;
+    assert(index.reserve(r.owner, r.volumes).ok, r.owner + ' overlaps another claim');
+    all.push(r);
+  }
+  return all;
+}
 
-  // the pit: one way down, from the branch into the ground site below
-  assert(B.pit, 'the branch has a pit');
-  assert.equal(g.pits.length, 1);
-  const pit = g.pits[0];
-  assert(pit.fall >= 3, 'a pit is a drop');
-  const down = g.navigation.edges.filter((e) => e.kind === 'pit');
-  assert.equal(down.length, 1); assert.equal(down[0].direction, 'forward');
+{
+  const w = w7, G = w.growth(0, KNOWN.i, KNOWN.j);
+  assert(G, 'the known growth');
+  assert.equal(G.pillar, 'house'); assert.equal(G.archetype, 'townhouse'); assert.equal(G.biome, 'houseroom');
+  assert.equal(G.floorZ, 9.5); assert(G.steered && G.arrival, 'steered, and it arrives');
+  assert(G.cells.length >= 2, 'it may grow into a neighbouring cell');
+  assert.equal(w.cell(KNOWN.i, KNOWN.j, 0).sites.find((s) => s.id === G.anchor).kind, 'lot', 'its anchor is a house on its own lot');
+  // the landing: the house's own stair carried on up, and a door into the growth
+  const host = w.spatial(w.site(G.anchor)), house = host.buildings.find((x) => x.poi.id === G.poi);
+  const landing = house.b.rooms.find((r) => r.id === G.landing.room);
+  assert(landing && landing.floorZ === G.floorZ, 'the landing stands at the first floor');
+  assert(house.b.connectors.some((c) => c.to === 's:' + landing.id), 'the house own stair climbs to it');
+  assert.equal(house.conns[G.landing.portal], G.landing.connection, 'its door is the growth\'s connection');
+  // only the ceilings under it change: capped under its slab
+  for (const c of G.caps) assert(w.spatial(w.site(c.site)).filler.surfaces.every((s) => s.ceilingZ <= c.cap + EPS), c.site + ' is capped');
+  // claims: none overlaps; three owners stacked in one column (the ground,
+  // the floor over it, and band 1's landing site over that)
+  const all = claimsOf(w, G), A = G.arrival, from = G.sites.find((rs) => rs.id === A.site), up = w.site(A.ground);
+  let p = null;
+  for (const q of from.rects) for (let y = q[1] + 0.5; y < q[3] && !p; y++) for (let x = q[0] + 0.5; x < q[2] && !p; x++)
+    if (at(up.rects, [x, y]) && !at([A.box], [x, y]) && at(w.site(from.ground || from.over).rects || [], [x, y])) p = [x, y];
+  assert(p, 'a column under the landing site, over the arrival floor');
+  const column = all.flatMap((r) => r.volumes.filter((v) => at(v.rects, p)).map((v) => ({ owner: r.owner, z0: v.z0, z1: v.z1 }))).sort((a, b) => a.z0 - b.z0);
+  assert(column.length >= 3 && new Set(column.map((v) => v.owner)).size >= 3, 'three owners in one column: ' + column.map((v) => v.owner).join(', '));
+  for (let k = 1; k < column.length; k++) assert(column[k].z0 >= column[k - 1].z1 - EPS, 'stacked, never overlapping');
+  assert(column.some((v) => v.owner === from.owner && v.z0 === from.floorZ - E.SLAB), 'the raised floor\'s claim starts at its own slab');
+  // the climb lands exactly on band 1's floor, inside the landing site, which is built round it
+  const climb = w.raisedBuild(from).filler.connectors.find((c) => c.id.startsWith('elev:'));
+  assert(Math.abs(climb.landings[0][2] - from.floorZ) < EPS && Math.abs(climb.landings[1][2] - 16) < EPS, 'an exact rise to 16 m');
+  assert.equal(A.rise, 16 - from.floorZ); assert(GROWTH.landingSite(w, 1, up), 'it lands in one of band 1\'s landing sites');
+  const ub = w.spatial(up);
+  assert(ub.filler.surfaces.every((s) => s.rects.every((q) => !BR.TG.roverlap([q[0] + ub.fillerOrigin[0], q[1] + ub.fillerOrigin[1], q[2] + ub.fillerOrigin[0], q[3] + ub.fillerOrigin[1]], A.box))), 'the landing site leaves the climb its opening');
+  same(ub.filler.portals.filter((q) => q.connection).map((q) => q.connection).sort(), up.conns.concat([A.conn.id]).sort());
+  // you can walk from the house up through the growth to band 1, and back
+  const g = climbsToBand1(w, G);
+  // the pit: one way down, from the first floor into the ground site below
+  assert(G.pit, 'the growth has a pit');
+  const pit = g.pits.find((q) => q.id === G.pit.id);
+  assert(pit && pit.fall >= 3, 'a pit is a drop');
+  assert(g.navigation.edges.some((e) => e.kind === 'pit' && e.drop === G.pit.id && e.direction === 'forward'));
   assert(!g.edges.some((e) => e.includes(pit.from) && e.includes(pit.to)), 'a pit is never a two-way edge');
-  // its two halves agree, and each blueprint cuts its own side
-  const top = w.raisedBuild(B.sites.find((rs) => rs.id === B.pit.top.site)).filler, low = w.spatial(w.site(B.pit.bottom.site)).filler;
+  const top = w.raisedBuild(G.sites.find((rs) => rs.id === G.pit.top.site)).filler, low = w.spatial(w.site(G.pit.bottom.site)).filler;
   for (const [b, role, face] of [[top, 'top', 'floor'], [low, 'bottom', 'ceiling']]) {
-    const d = b.drops.filter((x) => x.id === B.pit.id);
+    const d = b.drops.filter((x) => x.id === G.pit.id);
     assert.equal(d.length, 1, role + ' names the pit once');
-    assert.equal(d[0].role, role);
-    assert(b.holes.some((h) => h.connector === B.pit.id && h.face === face), role + ' cuts its ' + face);
+    assert(b.holes.some((h) => h.connector === G.pit.id && h.face === face), role + ' cuts its ' + face);
     same(E.validate(b).errors.filter((e) => !/^no physical/.test(e)), []);
   }
-  assert(low.voids.some((v) => v.id === 'void:' + B.pit.id), 'the lower claim keeps the shaft clear');
+  assert(low.voids.some((v) => v.id === 'void:' + G.pit.id), 'the lower claim keeps the shaft clear');
 }
-console.log('ok   a column holds stacked claims: a raised branch over capped ground sites, its landing, and a one-way pit back down');
+console.log('ok   a house growth: its stair carried up, floors over capped ground, three claims stacked in a column, a pit, and a walk to band 1 and back');
 
-// The branch is a function of (seed, band, cell): fresh worlds agree, caches
-// may be evicted, and the export says the same thing in any order.
+// A district is not kept inside its cell (or the old 4 x 4 cell regions): a
+// growth spreads into the cells round its origin that no other origin owns,
+// and its doors across cell borders are matched like any other.
 {
-  const i = KNOWN.i, j = KNOWN.j, a = new BR.BandWorld(KNOWN.seed), B = a.branch(0, i, j);
-  const expected = a.exportRegion(i, j, i, j, [0]);
-  assert.equal(expected.schema, 'br.world-elevation/0.2');
-  assert.equal(expected.policy.layeredOwnership, 'stacked-claims');
-  assert.equal(expected.policy.raisedBranches, 'house-pillars');
-  same(expected.policy.growth.biomes, ['houseroom']);
-  assert.equal(expected.pits.length, 1);
+  const w = new BR.BandWorld(CROSS.seed), G = w.growth(0, CROSS.i, CROSS.j);
+  const cells = [...new Set(G.sites.map((rs) => rs.i + ',' + rs.j))];
+  assert(cells.length >= 3, 'its floors stand in several cells: ' + cells.join(' '));
+  for (const c of cells) same(GROWTH.owner(w, 0, ...c.split(',').map(Number)), [CROSS.i, CROSS.j]);
+  const across = G.conns.filter((cn) => cn.cells[0].join() !== cn.cells[1].join());
+  assert(across.length >= 2, 'doors between its floors across cell borders');
+  const g = w.graph(-6, 0, -5, 1, [0]);
+  same(g.issues, []);
+  for (const cn of across) assert(g.matches.some((m) => m.id === cn.id), cn.id + ' is matched across the border');
+}
+console.log('ok   a growth crosses cell borders: floors in several cells, doors across them matched');
+
+// The ground plan is identical with and without growth: the sites, their
+// floors and their rooms; only ceilings, the pillars and the landing sites change.
+{
+  const i = KNOWN.i, j = KNOWN.j;
+  const groundPlan = (W) => JSON.stringify(W.cell(i, j, 0).sites.map((s) => [s.id, s.kind, s.rects, s.conns, s.pois.map((P) => P.id)]));
+  const built = (W, s) => { const r = W.build(s), f = r.filler; return JSON.stringify([f && f.filler, f && f.rooms.filter((q) => !String(q.id).startsWith('elev:')).map((q) => [q.id, q.rects, q.level || 0, q.floor || 0]), r.buildings.map((x) => [x.poi.id, x.b.footprint[0].rects])]); };
+  const keep = GROWTH, without = {};
+  let bare;
+  BR.GROWTH = null;
+  try {
+    const W = new BR.BandWorld(KNOWN.seed);
+    assert.equal(W.growth(0, i, j), null, 'without growth.js there is no growth');
+    bare = groundPlan(W);
+    for (const s of W.cell(i, j, 0).sites) without[s.id] = built(W, s);
+  } finally { BR.GROWTH = keep; }
+  same(groundPlan(w7), bare);
+  for (const s of w7.cell(i, j, 0).sites) if (!w7.arrivalInto(s)) assert.equal(built(w7, s), without[s.id], s.id + ': the floors below a growth are the same with and without it');
+}
+console.log('ok   the ground plan and its floors are the same with and without growth');
+
+// A block's stair cell grows from a plain ground site whose own filler takes a
+// stair up. Its floors stand over the rest of that site and beyond; each leg
+// climbs from a floor far from the last, never over another (no shafts).
+{
+  const w = w7, G = w.growth(0, STAIR.i, STAIR.j);
+  assert(G && G.pillar === 'stair', 'the known stair cell grows');
+  same(GROWTH.stairCell(w, 0, Math.floor(STAIR.i / 4), Math.floor(STAIR.j / 4)), [STAIR.i, STAIR.j]);
+  same(G.levels.map((l) => l.floorZ), [4.5, 11]);
+  assert(G.legs.length === 1 && G.arrival, 'a leg between its floors, and a climb to band 1');
+  const site = w.site(G.stair.site), b = w.build(site).filler;
+  assert(b.schema === E.SCHEMA && b.connectors.some((c) => c.id.startsWith('elev:') && Math.abs(c.landings[1][2] - 4.5) < EPS), 'the ground filler climbs to the first floor');
+  same(E.validate(b).errors.filter((e) => !/^no physical/.test(e)), []);
+  const first = G.sites.find((rs) => rs.level === 1 && rs.over === site.id);
+  assert(first && within(site.rects, first.rects) && first.rects.every((q) => !BR.TG.roverlap(q, G.stair.box)), 'the first floor stands over the rest of the stair site');
+  const boxes = [G.stair.box].concat(G.sites.filter((rs) => rs.leg).map((rs) => rs.leg.box));
+  assert.equal(boxes.length, 3);
+  for (let p = 0; p < boxes.length; p++) for (let q = p + 1; q < boxes.length; q++) assert(!BR.TG.roverlap(boxes[p], boxes[q]), 'no climb stands over another');
+  claimsOf(w, G);
+  climbsToBand1(w, G);
+}
+console.log('ok   a block\'s stair cell: a ground stair up, two floors, no shafts, and a walk to band 1 and back');
+
+// The growth is a function of (seed, band, origin cell): fresh worlds agree,
+// caches may be evicted, and the export says the same thing in any order.
+{
+  const i = KNOWN.i, j = KNOWN.j, G = w7.growth(0, i, j);
+  const expected = w7.exportRegion(i, j, i, j, [0]);
+  assert.equal(expected.schema, 'br.world-elevation/0.3');
+  assert.equal(expected.policy.verticalJourneys, 'grown'); assert.equal(expected.policy.layeredOwnership, 'stacked-claims');
+  same(expected.policy.growth.biomes, ['houseroom']); same(expected.policy.growth.pillars, ['house', 'stair']);
+  assert.equal(expected.journeys, undefined, 'no journeys');
+  const summary = expected.growths.find((x) => x.id === G.id);
+  assert(summary && summary.arrival && summary.arrival.band === 'band:1' && summary.levels[0].floorZ === 9.5, 'the export lists the growth and where it arrives');
   const slice = expected.slices[0];
-  assert.equal(slice.raised.length, B.sites.length);
+  assert.equal(slice.raised.length, G.sites.filter((rs) => rs.i === i && rs.j === j).length);
   for (const rs of slice.raised) {
-    assert.equal(rs.floorZ, B.floorZ); assert.equal(rs.biome, 'houseroom');
+    assert.equal(rs.biome, 'houseroom'); assert.equal(rs.level, 1);
     const under = slice.sites.find((s) => s.id === rs.over);
     assert(under && under.ceilingZ === rs.floorZ - E.SLAB, 'every slice says where one claim stops and the next begins');
-    assert(expected.layouts.some((l) => l.reservationOwner === rs.owner && l.owner === rs.owner), 'a raised floor is a layout of its own');
   }
-  // every raised floor's geometry fits the claim it was given
+  // every layout's geometry fits the claim it was given
   for (const item of expected.layouts) {
     const r = expected.reservations.find((q) => q.owner === item.reservationOwner);
     assert(r, item.owner + ' has a claim');
     for (const v of item.blueprint.volumes) for (const q of v.rects) {
       const world = [q[0] + item.origin[0], q[1] + item.origin[1], q[2] + item.origin[0], q[3] + item.origin[1]];
-      assert(r.volumes.some((e) => {
-        let remainder = [world];
-        for (const rect of e.rects) remainder = remainder.flatMap((p) => BR.TG.rsub(p, rect));
-        return e.z0 <= v.z0 + 1e-7 && e.z1 >= v.z1 - 1e-7 && !remainder.length;
-      }), item.owner + ': ' + v.id + ' fits its claim');
+      assert(r.volumes.some((e) => e.z0 <= v.z0 + 1e-7 && e.z1 >= v.z1 - 1e-7 && within(e.rects, [world])), item.owner + ': ' + v.id + ' fits its claim');
     }
   }
-  // every room standing in the branch is a layout of its own, owned by its raised floor's claim
-  for (const rs of B.sites) for (const x of rs.buildings) assert(expected.layouts.some((l) => l.owner === rs.owner + '/' + x.poi.id && l.reservationOwner === rs.owner), rs.id + '/' + x.poi.id + ' exported');
-  const b = new BR.BandWorld(KNOWN.seed, { limits: { cells: 2, builds: 2 }, elevationLimits: { bands: 1, journeys: 1, claims: 1, branches: 1, raised: 1 } });
+  // a climb whose other band is outside the export leaves its door there as a vertical frontier
+  assert(expected.verticalFrontier.some((f) => f.band === 'band:1' && f.at[2] === 16), 'the climb to band 1 is a vertical frontier');
+  const b = new BR.BandWorld(KNOWN.seed, { limits: { cells: 12, builds: 4 }, elevationLimits: { bands: 2, claims: 32, branches: 2, raised: 2 } });
   // asked for in another order, with everything evicted in between
-  for (const rs of b.raisedSites(0, i, j)) b.raisedBuild(rs);
+  for (const s of b.cell(i, j, 1).sites.slice(0, 3)) b.build(s);
   for (const s of b.cell(i, j, 0).sites.slice().reverse()) b.build(s);
-  for (const n of [4, -4]) for (const s of b.cell(i + 7, j - 5, n).sites.slice(0, 3)) b.build(s);
+  for (const n of [4, -4]) for (const s of b.cell(i + 7, j - 5, n).sites.slice(0, 2)) b.build(s);
   same(b.exportRegion(i, j, i, j, [0]), expected);
-  const strip = (B) => JSON.parse(JSON.stringify(B, (k, v) => (k === 'ms' ? undefined : v)));   // (build times are diagnostics, not plan)
-  same(strip(b.branch(0, i, j)), strip(a.branch(0, i, j)));
-  assert(b.branches.size <= 1 && b.raisedBuilds.size <= 1, 'branch caches stay bounded');
+  const strip = (x) => JSON.parse(JSON.stringify(x, (k, v) => (k === 'ms' ? undefined : v)));   // (build times are diagnostics, not plan)
+  same(strip(b.growth(0, i, j)), strip(G));
+  assert(b.growths.size <= 2 && b.raisedBuilds.size <= 2 && b.worlds.size <= 2, 'growth caches stay bounded');
 }
-console.log('ok   branches, their pits and their exports are the same in fresh and evicting worlds, in any order');
+console.log('ok   growths, their claims and their exports are the same in fresh and evicting worlds, in any order');
 
-// Every branch anywhere obeys the same rules: it grows from a house that
-// seeds growth, over whole plain sites joined edge to edge, from its biome's
-// pool only, rooms densest beside the pillar, and only a share of the houses
-// that could seed one do.
+// Across the bands too. The site a climb lands in is rebuilt from the band
+// below's plan: built first, before anything of that band, in an evicting
+// world, it still gives the same two-band export. And nothing built or
+// exported afterwards writes into a planned growth or a cell plan (frozen,
+// a write would throw).
 {
-  let seen = 0, pits = 0, eligible = 0, rooms = [0, 0], sites = [0, 0];
+  const strip = (x) => JSON.parse(JSON.stringify(x, (k, v) => (k === 'ms' ? undefined : v)));
+  const G = w7.growth(0, STAIR.i, STAIR.j), [ci, cj] = G.arrival.cell;
+  const want = strip(w7.exportRegion(ci, cj, ci, cj, [0, 1]));
+  const b = new BR.BandWorld(STAIR.seed, { limits: { cells: 12, builds: 4 }, elevationLimits: { bands: 2, claims: 32, branches: 2, raised: 2 } });
+  b.setBand(1);
+  b.spatial(b.site(G.arrival.ground));
+  for (const s of b.cell(ci, cj, 1).sites) b.build(s);
+  same(strip(b.exportRegion(ci, cj, ci, cj, [0, 1])), want);
+  const freeze = (o, seen = new Set()) => { if (!o || typeof o !== 'object' || seen.has(o)) return; seen.add(o); Object.freeze(o); for (const k of Object.keys(o)) freeze(o[k], seen); };
+  const f = new BR.BandWorld(STAIR.seed), F = f.growth(0, STAIR.i, STAIR.j);
+  for (const [i, j] of F.cells.concat([F.arrival.cell])) for (const n of [0, 1]) { const c = f.cell(i, j, n); for (const s of c.sites) f.fillerOf(s); freeze(c); }
+  freeze(F);
+  const [i0, j0, i1, j1] = span(F.cells.concat([F.arrival.cell]));
+  same(f.exportRegion(i0, j0, i1, j1, [0, 1]).issues, []);
+}
+console.log('ok   a climb from the band below lands the same whichever band is built first, and building never writes into a plan');
+
+// A level that cannot be built after the leg up to it was laid: the growth
+// stops at the level below, that level's leg is undone (its floor rebuilt
+// without the climb, its claim back to the band's ceiling), and what is left
+// is as sound as any growth.
+{
+  const real = GROWTH.raisedSite;
+  GROWTH.raisedSite = (rs, leg) => (!leg && rs.level === 2 ? null : real(rs, leg));
+  try {
+    const w = new BR.BandWorld(STAIR.seed), G = w.growth(0, STAIR.i, STAIR.j);
+    assert(G && G.planned.length >= 2, 'it planned more than one level');
+    assert.equal(G.levels.length, 1, 'it stops at its first level');
+    same(G.legs, []); assert.equal(G.arrival, null, 'and does not arrive');
+    for (const rs of G.sites) {
+      assert.equal(rs.leg, null, rs.id + ' carries no leg');
+      assert.equal(rs.top, CL, rs.id + ' claims up to the band\'s ceiling again');
+      assert(!rs.b.portals.some((p) => p.connection === 'b0|' + STAIR.i + ',' + STAIR.j + ':l2'), rs.id + ' has no door onto the undone leg');
+    }
+    assert(!G.conns.some((cn) => /:l2$/.test(cn.id)), 'the undone leg is not a connection');
+    const [i0, j0, i1, j1] = span(G.cells), g = w.graph(i0, j0, i1, j1, [0]);
+    same(g.issues, []); same(g.unresolved, []);
+    claimsOf(w, G);
+    const start = g.navigation.nodes.find((n) => n.floorZ === 0 && n.id.startsWith(G.anchor + '/'));
+    assert(G.sites.every((rs) => [...walk(g, start.id)].some((id) => id.startsWith(rs.owner + '/') || id.startsWith(rs.id + '/'))), 'every floor left is reached from the ground');
+  } finally { GROWTH.raisedSite = real; }
+}
+console.log('ok   a level that cannot be built undoes the leg up to it');
+
+// The levels a growth climbs through: from its first floor, legs of 3-6.5 m
+// on the half metre, the last floor a storey under the band's ceiling and one
+// leg under the next band. A steered growth always plans to arrive.
+{
+  const R = GROWTH.CFG.rise, top = CL - GROWTH.CFG.room;
+  for (const z1 of [4.5, 5, 6.5, 9.5, 11.5]) for (let t = 0; t < 12; t++) {
+    const plan = GROWTH.schedule(z1, new BR.Rng(BR.hash4(t, z1 * 2, 0x5c, 0)), true), zs = plan.zs;
+    assert(plan.arrive && zs[0] === z1, 'steered: ' + zs);
+    for (let k = 1; k < zs.length; k++) assert(zs[k] - zs[k - 1] >= R[0] - EPS && zs[k] - zs[k - 1] <= R[1] + EPS && Math.abs(zs[k] * 2 - Math.round(zs[k] * 2)) < EPS, String(zs));
+    const last = zs[zs.length - 1];
+    assert(last <= top + EPS && 16 - last <= R[1] + EPS && 16 - last >= R[0] - EPS, 'the last floor is within a leg of the next band: ' + zs);
+  }
+  same(GROWTH.schedule(9.5, new BR.Rng(1), true).zs, [9.5]);
+  let short = 0;
+  for (let t = 0; t < 40; t++) { const p = GROWTH.schedule(4.5, new BR.Rng(BR.hash4(t, 9, 0x5d, 0)), false); if (p.zs.length < 2 || !p.arrive) short++; }
+  assert(short > 5 && short < 40, 'an unsteered growth stops short by chance: ' + short + ' of 40');
+}
+console.log('ok   the level schedule: exact legs on the half metre, a storey under the ceiling, the last within a leg of the next band');
+
+// Every growth anywhere obeys the same rules. Origins: one stair cell a block,
+// and the houses that seed; ownership never shared. Floors over plain ground
+// or the floor below, from the biome's pool, inside their claims; legs exact,
+// never stacked; arrivals into landing sites only. Steered growths spread the
+// ways up: most blocks have one.
+{
   const pool = new Set(BR.BIOME.templates('houseroom').map((a) => a.id)), fillers = new Set(BR.BIOME.fillers('houseroom').map((F) => F.id));
-  for (const seed of MODE.size([7], [31337, 7, 12345, 4242])) {
-    const w = new BR.BandWorld(seed);
-    for (let i = -3; i <= 2; i++) for (let j = -3; j <= 2; j++) {
-      const cell = w.cell(i, j, 0);
-      eligible += cell.lots.filter((L) => L.kind === 'yard' && BR.BIOME.anchorOf(BR.TPL.archetypes[L.pois[0].archetype]) && BR.CLAIM.stairTop(L.b)).length;
-      const B = w.branch(0, i, j);
-      if (!B) continue;
-      seen++;
-      if (B.pit) pits++;
-      assert(BR.BIOME.anchorOf(BR.TPL.archetypes[B.archetype]) === B.biome, B.id + ' grows from a house that seeds its biome');
-      assert(B.z >= 3.3 + 3 - 1e-7 && B.z <= BR.BAND_CFG.ceilingLimit - 3 + 1e-7 && Math.abs(B.z * 2 - Math.round(B.z * 2)) < 1e-7, B.id + ': its pillar climbs a flight, on the half metre');
-      assert(B.sites.length >= 1 && B.sites.length <= 4 && B.sites.reduce((a, rs) => a + rs.area, 0) <= BR.BAND_CFG.branch.area);
-      tile(cell);                                  // the ground still tiles its cell exactly
-      for (const rs of B.sites) {
-        const under = cell.sites.find((s) => s.id === rs.over);
-        assert(under && under.kind === 'filler' && !under.pois.length, rs.id + ' stands over a plain filler site');
-        same(rs.rects, under.rects);                // whole sites, never part of one
-        // grown edge to edge from the site the landing opens onto
-        if (rs.parent >= 0) { const up = B.sites.find((x) => x.k === rs.parent); assert(up && up.hop === rs.hop - 1 && rs.conns.some((cn) => cn.a === up.id || cn.b === up.id), rs.id + ' joins the site it grew from'); }
-        else assert(rs.k === 0 && rs.hop === 0);
+  let growths = 0, steered = 0, arrived = 0, levels2 = 0, blocks = 0, reached = 0, eligible = 0;
+  for (const seed of MODE.size([7], [7, 31337, 99])) {
+    const w = seed === 7 ? w7 : new BR.BandWorld(seed), owner = new Map(), byBlock = new Map();
+    for (let i = -4; i <= 3; i++) for (let j = -4; j <= 3; j++) {
+      const c = GROWTH.candidate(w, 0, i, j), key = Math.floor(i / 4) + ',' + Math.floor(j / 4);
+      if (!byBlock.has(key)) byBlock.set(key, { stairs: 0, way: false });
+      eligible += w.cell(i, j, 0).lots.filter((L) => L.kind === 'yard' && BR.BIOME.anchorOf(BR.TPL.archetypes[L.pois[0].archetype]) && BR.CLAIM.stairTop(L.b)).length;
+      if (!c) continue;
+      if (c.stair) byBlock.get(key).stairs++;
+      const G = w.growth(0, i, j);
+      if (!G) continue;
+      growths++; if (G.steered) steered++; if (G.arrival) { arrived++; byBlock.get(key).way = true; }
+      if (G.levels.length > 1) levels2++;
+      // ownership: its cells are its own, and its floors stand in them
+      for (const cl of G.cells) { const k = cl.join(); assert(!owner.has(k), k + ' is owned twice'); owner.set(k, G.id); }
+      same(G.cells[0], [i, j]);
+      for (const rs of G.sites) assert(G.cells.some((cl) => cl[0] === rs.i && cl[1] === rs.j), rs.id + ' stands in its growth\'s cells');
+      // levels: on the half metre, each a leg above the last, the top one a storey under the band's ceiling
+      const zs = G.levels.map((l) => l.floorZ);
+      for (let k = 0; k < zs.length; k++) {
+        assert(Math.abs(zs[k] * 2 - Math.round(zs[k] * 2)) < EPS && zs[k] <= CL - GROWTH.CFG.room + EPS, G.id + ': ' + zs);
+        if (k) assert(zs[k] - zs[k - 1] >= GROWTH.CFG.rise[0] - EPS && zs[k] - zs[k - 1] <= GROWTH.CFG.rise[1] + EPS, G.id + ': ' + zs);
+      }
+      for (const rs of G.sites) {
+        const below = G.sites.find((x) => x.id === rs.over), ground = below ? null : w.site(rs.over);
+        if (below) assert(below.level === rs.level - 1 && within(below.rects, rs.rects) && below.top <= rs.floorZ - E.SLAB + EPS, rs.id + ' stands over the floor below');
+        else assert(ground && ground.kind === 'filler' && !ground.pois.length && !GROWTH.landingSite(w, 0, ground) && within(ground.rects, rs.rects), rs.id + ' stands over plain ground');
         const r = w.raisedBuild(rs), b = r.filler;
         assert(fillers.has(b.filler), rs.id + ': a ' + b.filler + ' is not a houseroom filler');
         const kinds = r.buildings.map((x) => x.poi.archetype);
         assert(kinds.every((a) => pool.has(a)) && new Set(kinds).size === kinds.length, rs.id + ': rooms from the pool, none twice: ' + kinds);
-        rooms[rs.hop ? 1 : 0] += kinds.length; sites[rs.hop ? 1 : 0]++;
-        for (const x of [b].concat(r.buildings.map((y) => y.b)))
-          assert(x.surfaces.every((s) => s.floorZ >= rs.floorZ - 1e-7 && s.ceilingZ <= BR.BAND_CFG.ceilingLimit + 1e-7), rs.id + ' keeps inside its claim');
-        assert(rs.conns.length && rs.conns.every((cn) => b.portals.some((p) => p.connection === cn.id)), rs.id + ' built every connection it was given');
+        for (const x of [b].concat(r.buildings.map((y) => y.b))) for (const s of x.surfaces) {
+          if (String(s.room).startsWith('elev:landing:')) continue;
+          assert(s.floorZ >= rs.floorZ - EPS && s.ceilingZ <= rs.top + EPS, rs.id + ' keeps inside its claim');
+        }
+        assert(rs.conns.every((cn) => b.portals.some((p) => p.connection === cn.id)), rs.id + ' built every connection it was given');
+        if (rs.leg) {
+          const c = b.connectors.find((x) => x.id.startsWith('elev:'));
+          assert(Math.abs(c.landings[1][2] - c.landings[0][2] - rs.leg.rise) < EPS && Math.abs(c.landings[0][2] - rs.floorZ) < EPS, rs.id + ': an exact rise');
+          assert(b.portals.some((p) => p.connection === rs.leg.conn), rs.id + ': its landing opens onto the next floor');
+          same(E.validate(b).errors.filter((e) => !/^no physical/.test(e)), [], rs.id + ' with its climb is a valid blueprint');
+        }
       }
-      const g = w.graph(i, j, i, j, [0]);
-      same(g.issues, []);
-      assert.equal(components(g.nodes, g.edges).sizes.length, 1, seed + ' ' + i + ',' + j + ': one network');
-      for (const p of g.pits) assert(p.fall >= 3 && p.from !== p.to);
-      w.exportRegion(i, j, i, j, [0]);             // throws on any invalid connection
+      // legs never stand over one another
+      const boxes = (G.stair ? [G.stair.box] : []).concat(G.sites.filter((rs) => rs.leg).map((rs) => rs.leg.box));
+      for (let p = 0; p < boxes.length; p++) for (let q = p + 1; q < boxes.length; q++) assert(!BR.TG.roverlap(boxes[p], boxes[q]), G.id + ': no shafts');
+      for (const cp of G.caps) assert(!GROWTH.landingSite(w, 0, w.site(cp.site)), 'a landing site never has a growth over it');
+      if (G.arrival) {
+        const up = w.site(G.arrival.ground), from = G.sites.find((rs) => rs.id === G.arrival.site);
+        assert(GROWTH.landingSite(w, 1, up) && from.level === G.levels.length, G.id + ' arrives from its top floor into a landing site');
+        assert(G.arrival.rise >= GROWTH.CFG.rise[0] - EPS && G.arrival.rise <= GROWTH.CFG.rise[1] + EPS && Math.abs(from.floorZ + G.arrival.rise - 16) < EPS);
+      }
     }
+    for (const B of byBlock.values()) { assert.equal(B.stairs, 1, 'every block has one stair cell'); blocks++; if (B.way) reached++; }
   }
-  assert(seen >= MODE.size(3, 8), 'branches were found: ' + seen);
-  assert(pits >= 1, 'and pits drilled: ' + pits);
-  assert(seen < eligible, 'not every house that could seed growth grew a branch: ' + seen + ' of ' + eligible);
-  assert(rooms[0] / sites[0] > rooms[1] / Math.max(1, sites[1]), 'rooms are densest beside the pillar: ' + (rooms[0] / sites[0]).toFixed(1) + ' against ' + (rooms[1] / Math.max(1, sites[1])).toFixed(1));
-  console.log('ok   every branch grows from a seeding house over whole plain sites, from its biome only, densest by its pillar, inside its claim, one network (' + seen + ' branches of ' + eligible + ' possible, ' + pits + ' with a pit)');
+  assert(growths >= MODE.size(8, 20) && levels2 >= 2, 'growths were found: ' + growths + ', ' + levels2 + ' climbing to a second floor');
+  assert(steered >= blocks && arrived >= 0.5 * steered, 'steered growths mostly arrive: ' + arrived + ' of ' + steered);
+  assert(reached >= 0.75 * blocks, 'most blocks have a way up: ' + reached + ' of ' + blocks);
+  console.log('ok   every growth: its own cells, floors over plain ground or the floor below, its biome only, inside its claims, exact legs, no shafts (' +
+    growths + ' growths, ' + arrived + ' reach band 1, ' + reached + ' of ' + blocks + ' blocks with a way up)');
 }
-// A share of the houses that could seed growth do; a branch only ever grows
-// from one that does. And a raised floor that cannot be built is dropped with
-// everything grown from it, the rest wired and built again.
+
+// A share of the houses that could seed growth do. And a raised floor that
+// cannot be built is dropped with everything grown from it, the rest wired
+// and built again.
 {
   let yes = 0, no = 0;
   for (const seed of [7, 31337, 99]) {
     const w = new BR.BandWorld(seed);
-    for (let i = -4; i <= 3; i++) for (let j = -4; j <= 3; j++) {
+    for (let i = -4; i <= 3; i++) for (let j = -4; j <= 3; j++)
       for (const L of w.cell(i, j, 0).lots.filter((x) => x.kind === 'yard' && BR.BIOME.anchorOf(BR.TPL.archetypes[x.pois[0].archetype]))) w.seedsGrowth(0, i, j, L.pois[0]) ? yes++ : no++;
-    }
-    for (let i = -2; i <= 1; i++) for (let j = -2; j <= 1; j++) {
-      const B = w.branch(0, i, j);
-      if (B) assert(w.seedsGrowth(0, i, j, w.cell(i, j, 0).lots.flatMap((L) => L.pois).find((P) => P.id === B.poi)), B.id + ' grew from a house that seeds');
-    }
   }
   assert(yes > 0 && no > 0 && yes > no, 'some seed, some do not: ' + yes + ' and ' + no);
   assert.equal(new BR.BandWorld(7).seedsGrowth(0, 0, 0, { id: 'x', archetype: 'ranch' }), false, 'a house with no stair of its own never seeds');
 
-  const w = new BR.BandWorld(KNOWN.seed), full = w.branch(0, KNOWN.i, KNOWN.j);
-  const victim = full.sites.find((rs) => rs.k > 0 && full.sites.some((c) => c.parent === rs.k)) || full.sites.find((rs) => rs.k > 0);
+  const full = w7.growth(0, KNOWN.i, KNOWN.j), first = full.sites.filter((rs) => rs.level === 1);
+  const victim = first.find((rs) => rs.parent >= 0 && first.some((c) => c.parent === rs.k)) || first.find((rs) => rs.parent >= 0);
   const lost = new Set([victim.k]);
-  for (const rs of full.sites) if (lost.has(rs.parent)) lost.add(rs.k);
-  const f = new BR.BandWorld(KNOWN.seed), real = f.raisedSite.bind(f);
-  f.raisedSite = (rs) => (rs.k === victim.k ? null : real(rs));
-  const B = f.branch(0, KNOWN.i, KNOWN.j);
-  same(B.sites.map((rs) => rs.k), full.sites.filter((rs) => !lost.has(rs.k)).map((rs) => rs.k), 'the failed floor and its subtree are gone, the rest stand');
-  same(B.over, B.sites.map((rs) => rs.over)); same(B.caps.map((c) => c.site), B.over);
-  for (const cn of B.conns) assert(B.sites.some((rs) => cn.a === rs.id || cn.b === rs.id), cn.id + ' joins a floor that stands');
-  for (const rs of B.sites) assert(rs.conns.every((cn) => B.conns.includes(cn)) && rs.conns.every((cn) => rs.b.portals.some((p) => p.connection === cn.id)), rs.id + ' builds exactly its doors');
-  const g = f.graph(KNOWN.i, KNOWN.j, KNOWN.i, KNOWN.j, [0]);
-  same(g.issues, []); assert.equal(components(g.nodes, g.edges).sizes.length, 1);
+  for (const rs of first) if (lost.has(rs.parent)) lost.add(rs.k);
+  const real = GROWTH.raisedSite;
+  GROWTH.raisedSite = (rs, leg) => (rs.k === victim.k && !leg ? null : real(rs, leg));
+  try {
+    const f = new BR.BandWorld(KNOWN.seed), G = f.growth(0, KNOWN.i, KNOWN.j), kept = G.sites.filter((rs) => rs.level === 1);
+    same(kept.map((rs) => rs.k), first.filter((rs) => !lost.has(rs.k)).map((rs) => rs.k), 'the failed floor and its subtree are gone, the rest stand');
+    for (const cn of G.conns) assert(G.sites.some((rs) => cn.a === rs.id || cn.b === rs.id), cn.id + ' joins a floor that stands');
+    for (const rs of G.sites) assert(rs.conns.every((cn) => G.conns.includes(cn)) && rs.conns.every((cn) => rs.b.portals.some((p) => p.connection === cn.id)), rs.id + ' builds exactly its doors');
+    same(G.over.slice().sort(), [...new Set(G.sites.filter((rs) => rs.ground).map((rs) => rs.ground))].sort());
+  } finally { GROWTH.raisedSite = real; }
   console.log('ok   a share of the houses that could seed growth do (' + yes + ' of ' + (yes + no) + '); a raised floor that cannot be built goes with its subtree, the rest rewired');
 }
 console.log('All band-world checks passed.');

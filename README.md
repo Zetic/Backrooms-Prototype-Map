@@ -95,22 +95,23 @@ both the workbench and the map draw the stairs that reach each floor: the map
 shows them at their width with the heights they join, and clicking one moves
 the cut height to where it arrives.
 
-Bands are joined by journeys (milestone 4): in every 512 m region, one
-territory climbs to the band above and another to the band below. A journey
-is a stack of different templates, each a floor of its own about 4 m above
-the last, joined by stairs, ramps or ladders, with a floor to cross between
-each climb and the next. Some journeys lean to ramps, some to ladders, some
-to stairs; the largest share (4 in 9) take each floor's own preference.
-
-A column can also hold two owners at once (milestone 5), and houses grow
-(growth step 2, [the growth design](docs/growth.md)): a two-storey house or a
-townhouse can carry its stairwell on up a flight, and from that landing a
-branch of house rooms grows at +6.5 m (+9.5 m over a townhouse) over one to
-four of the ground sites next to it: hallways and rooms of the house-room
-biome, densest beside the stair. The ground keeps its own
-floor with its ceiling capped under the branch, the two claims meet at the
-branch's floor slab, and a pit drilled through that floor drops into the site
-below — one way only, with no ladder and no rope.
+Bands are joined by growth ([the growth design](docs/growth.md), steps 2-3).
+A two-storey house or a townhouse can carry its stairwell on up a flight, and
+every block of 4 × 4 cells has a stair cell whose plain ground site takes a
+stair up. From that landing, floors of house rooms grow over the ground sites
+round it (hallways and rooms of the house-room biome, densest by the stair),
+then a stair from one of those floors climbs to the next level, and so on: a
+townhouse's floor at +9.5 m climbs straight to the band above, a two-storey
+house's at +6.5 m (or a stair pillar's at +4.5-6.5 m) has one more level at
++9.5-11.75 m first. The last climb lands on the next band's floor, in a site
+rebuilt round it. Growths spread across cell borders; every block's stair cell
+and half the houses always try to reach the band above, so ways up are spread
+over the world. A column holds several owners at once (milestone 5): the
+ground keeps its own floor with its ceiling capped under the floor above, the
+claims meet at the slabs, and a pit drilled through a first floor drops into
+the site below — one way only, with no ladder and no rope. The old journey
+plots (milestone 4: stacks of templates climbing 16 m in one territory) are
+gone from the world; the elevation lab still builds them.
 
 Open [the elevation lab](elevation.html) to inspect actual floors, continuous
 cutaway heights and the connection zones of every template and filler: where a
@@ -120,7 +121,7 @@ landing, cutouts and slope-following reservation. Exact local floor inspection,
 ghosting, route profiles and `br.elevation/0.2` JSON export remain available.
 "Carry its stair on up" climbs a two-storey house's stairwell one more flight to
 a landing above its roof, with a door out at the edge of its lot: the way into a
-raised branch, inspectable on any template that has a stair of its own.
+growth, inspectable on any template that has a stair of its own.
 The workbench detail panel opens the same template in the lab. The main map
 uses band controls, a continuous cut height, and template-specific inspection.
 [Elevation world planning, reservations and export](docs/elevation-world.md).
@@ -135,11 +136,11 @@ uses band controls, a continuous cut height, and template-specific inspection.
 | Wheel / pinch / `+` / `-` | Zoom. Blueprints from 1 px/m, room labels in POIs from 7 px/m |
 | Go to | Enter `x, y` |
 | Site outlines / Connection graph | Show the sites and the graph between them |
-| Band controls | Inspect another horizontal band (each generated independently, joined by journeys) |
-| Journey ↓ / Journey ↑ | Centre the view on the nearest journey down or up from the active band |
+| Band controls | Inspect another horizontal band (each generated independently, joined by what grows between them) |
+| Way ↓ / Way ↑ | Centre the view on where the nearest climb from the band below arrives, or where the nearest growth that reaches the band above starts |
 | Cutaway height | Highest floor below the cut at each XY; lower floors shaded by depth |
 | Click a template | Its actual floor choices, focused upper-floor ghosting and JSON export |
-| Hover | The site's template, size, connections, biome and build time; the POI, its setting and its doors; a journey's bands, style and floors; a raised branch with its pit, or the ground under one with its capped ceiling |
+| Hover | The site's template, size, connections, biome and build time; the POI, its setting and its doors; a raised floor (its level) with its pit, or the ground under one with its capped ceiling; a pillar's growth and whether it reaches the band above; a landing site and the climb into it |
 
 The URL hash keeps the seed, position, zoom, band, cut height and toggles, for example
 `#seed=31337&x=20&y=70&z=9&graph=1`.
@@ -157,10 +158,11 @@ The URL hash keeps the seed, position, zoom, band, cut height and toggles, for e
 | `tpl/elevation.js`, `tpl/elevation-view.js`, `elevation-lab.js` | Stacked surfaces, reservations, ladder variants, validation, cutaway, JSON renderer and standalone lab |
 | `tpl/connections.js` | Connection zones (ladder, stair, ramp), template preferences, slope-following reservations, `connectionVariant`, and `linkFloors` (a template's own stairs between its floors) |
 | `tpl/floors.js` | Floor patterns on a finished building: sunken floors with steps, galleries over an undercroft |
-| `journeys.js` | Vertical journeys: different fillers stacked from one band's floor to the next, joined by connection variants with exact rises |
+| `journeys.js` | Milestone 4's journeys, for the elevation lab: different fillers stacked from one band's floor to the next, joined by connection variants with exact rises |
 | `claims.js` | Layered ownership mechanics: capping a ceiling under a claim above, carrying a stair up to a raised landing, and finding and drilling a pit between two claims |
 | `biomes.js` | Growth biomes: which archetypes seed growth, the pools a branch draws from, and where a district's rooms stand in a site |
-| `band-world.js` | Deterministic reference-band networks, journey plans across band pairs, house pillars and the branches that grow from them, their pits, stacked spatial claims, exact portal matching and canonical world export |
+| `band-world.js` | Deterministic reference-band networks, the growths over them (cached, with their ground caps and arrivals applied to builds), stacked spatial claims, exact portal matching and canonical world export |
+| `growth.js` | Recursive growth: origins and who owns which cell, house and stair pillars, the level schedule, district floors with a leg to the next level, arrivals in the next band's landing sites, pits |
 
 ```js
 const W = new BR.World(31337);
@@ -179,7 +181,7 @@ node tests/run-all.js --full    # full: before pushing or opening a PR (CI runs 
 Run the **quick** mode while you work: it runs every check, on 2 world seeds
 and smaller samples where a check samples many seeds or sizes. Run the
 **full** mode before a PR: all 5 world seeds and the full samples, every check
-the suite has (392). GitHub Actions runs the full mode on every pull request to
+the suite has (397). GitHub Actions runs the full mode on every pull request to
 `main` (`.github/workflows/tests.yml`) and shows the result on the PR.
 
 Test files run in parallel, one per core and slowest first (`--jobs N` to
@@ -228,23 +230,24 @@ The runner checks:
   over an undercroft with headroom, reached by a stair up a side wall; every
   template stair is built, or stays abstract with a warning where nothing
   fits; exits up and down keep away from where those stairs arrive.
-- **Journeys.** Every journey climbs exactly 16 m through floors of different
-  fillers, never stacks one climb over another, makes you cross each floor
-  between arriving and leaving, builds exactly the doors the world planned,
-  and is walkable from either band. Styles tilt the climbs. In the world,
-  neighbouring bands become one network, whichever band is generated first and
-  whatever the caches drop; a journey that cannot be built leaves an ordinary
-  filler behind the same doors.
+- **Journeys (lab).** Every journey climbs exactly 16 m through floors of
+  different fillers, never stacks one climb over another, makes you cross each
+  floor between arriving and leaving, builds exactly its planned doors, and is
+  walkable from either band. Styles tilt the climbs.
 - **Layered ownership.** A ceiling capped under a claim above keeps its room
   usable, or the cap is refused; a stair carried on up reaches a landing with
   its door on the grid; a pit's shaft is clear of everything on both sides and
-  drilling it twice changes nothing. In the world no two claims overlap in 3D,
-  a ground claim and the raised claim over it meet exactly at the branch's
-  floor slab, the ground plan is the same with layering off, the branch is
-  walkable from the house to every room in it and back, and a pit only goes
-  down. Every branch grows from a house that seeds growth, over whole plain
-  sites joined edge to edge, from its biome's pool only (no room twice in a
-  site), densest beside its pillar, and only a share of such houses grow one.
+  drilling it twice changes nothing. In the world no two claims overlap in 3D
+  and three can share a column, each meeting the next at a slab; the ground
+  plan is the same with growth off; and a pit only goes down.
+- **Growth.** A known house growth and a known stair cell are walkable from
+  the ground up to the next band's floor and back; a growth's floors cross
+  cell borders with their doors matched; growths and exports are the same in
+  any order and with tiny caches. Every growth keeps to its own cells, stands
+  over plain ground or the floor below, draws from its biome's pool, keeps
+  inside its claims, climbs by exact legs with no climb over another, and
+  arrives only in landing sites; every block has one stair cell and most
+  blocks a way up.
 - **Fillers.** Every filler keeps the contract on any site shape and honours
   every connection. The pool leans enclosed, and fillers are fast.
 - **The world, on five seeds (two in quick mode).** Sites tile every cell exactly. Connections are

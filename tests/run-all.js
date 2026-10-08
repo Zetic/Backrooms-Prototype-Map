@@ -38,15 +38,15 @@ const FILES = [
   ['elevation', [], 'elevation (surfaces, vertical fills, capabilities and reservations)', 9],
   ['connections', [], 'connection zones (ladders, stairs, ramps, slope reservations)', 3],
   ['floors', [], 'floors at their own heights (storeys, sunken floors, galleries, template stairs)', 15],
-  ['journeys', [], 'vertical journeys (templates stacked between two bands)', 5],
+  ['journeys', [], 'journey generator (templates stacked between two bands; lab only)', 5],
   ['claims', [], 'layered ownership (capped ceilings, a stair carried up, pits)', 6],
   ['cutaway', [], 'cutaway visibility and full-width connection footprints', 0.1],
   ['elevation-ui', [], 'elevation lab controller', 2],
-  ['band-world', [], 'elevation world (ownership, matching, topology and eviction)', 26],
-  ['band-render', [], 'elevation map tiles, height and selection caches', 3],
+  ['band-world', [], 'elevation world (growth, stacked claims, matching, topology and eviction)', 60],
+  ['band-render', [], 'elevation map tiles, height and selection caches', 20],
   ['seams', [], 'seams (shared walls between blueprints)', 6],
   ...SEEDS.map((seed) => ['world', [seed], 'world: seed ' + seed, 11]),
-  ['ui-smoke', [], 'map page', 4]
+  ['ui-smoke', [], 'map page', 15]
 ].filter(([file]) => !only.length || only.some((o) => file === o || (file.startsWith(o) && !ALL.includes(o))));
 if (!FILES.length) { console.error('no test file matches ' + only.join(', ')); process.exit(2); }
 

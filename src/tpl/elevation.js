@@ -326,6 +326,7 @@
     const candidates = b.capabilities[dir].candidates;
     const rooms = new Map(b.rooms.map((r) => [r.id, r]));
     for (const p of candidates) {
+      if (o.within && !o.within.some((q) => p.landing[0] >= q[0] - EPS && p.landing[1] >= q[1] - EPS && p.landing[2] <= q[2] + EPS && p.landing[3] <= q[3] + EPS)) continue;
       const trial = clone(b), host = rooms.get(trial.surfaces.find((s) => s.id === p.surface).room);
       // Tall halls need a landing above their roof. An explicit requested rise
       // remains exact and can be rejected; the standalone default adapts to fit.

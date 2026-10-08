@@ -9,8 +9,8 @@ state of each build step. Implementation detail lives in
 | Step | What | State |
 | --- | --- | --- |
 | 1 | Layered ownership: claims with height ranges, ground ceilings capped where something sits above; one hand-placed branch over a ground site proves the stacking | Done: milestone 5, PR #24 |
-| 2 | One house pillar and its branch: a multi-storey house's stairwell carries on up; one houseroom branch grows at a pillar floor, drawn from a first tagged pool | Done: this step (see below) |
-| 3 | Recursive growth: pillars from branches, a per-region budget and plan, steering toward the next band; today's journey plot becomes the fallback | Next |
+| 2 | One house pillar and its branch: a multi-storey house's stairwell carries on up; one houseroom branch grows at a pillar floor, drawn from a first tagged pool | Done: PR #25 |
+| 3 | Recursive growth: pillars from branches, a per-region budget and plan, steering toward the next band; today's journey plot becomes the fallback | Done: this step (see below). The journey plot is removed from the world rather than kept as a fallback (owner's call) |
 | 4 | Houseroom variety: new houseroom fillers, so a district never repeats itself | |
 | 5 | Emergent connections: pits that drill down to the next exposed volume first, then holes rolled on shared walls; drilled walls after | Pits between a branch and the ground exist (milestone 5) |
 | 6 | Linking growths: branches of the same biome that come close join up, and districts cross region borders at planned points | |
@@ -30,6 +30,58 @@ mudroom, foyer, closet) and seven fillers that read as a house's insides
 loop hall). No room repeats within a site. Biome tags are data
 (`biomes: [...]` on catalogue rooms, templates and fillers), read by
 `src/biomes.js`.
+
+**Step 3 as built** (`src/growth.js`). The owner's answers: not every
+region must guarantee a way up, but guaranteed ways up should be spread over
+the world; districts may cross into other regions without limit; the old
+journey plots go.
+
+- *Origins.* A cell is an origin when a house in it seeds growth, or when it is
+  its block's stair cell: every block of 4 × 4 cells has one cell, by the seed,
+  that grows from a plain ground site whose own filler takes a stair (or ramp,
+  or ladder) up to +4.5-6.5 m. At most one growth per cell.
+- *No region bounds.* A growth uses its own cell and the cells round it that
+  have no origin of their own and whose top-priority origin neighbour it is.
+  Ownership is settled cell by cell from the cell plans alone, so a district
+  crosses cell (and old region) borders wherever it grows to, and two growths
+  never claim the same ground.
+- *Levels.* From the pillar's floor, legs of 3-6.5 m on the half metre, the top
+  floor at +9.5 to +11.75 m: a storey under the band's ceiling and one leg
+  under the next band's floor. A townhouse (+9.5 m) climbs straight to the next
+  band; a two-storey house (+6.5 m) or a stair pillar has one more level. Each
+  level grows over 1-4 sites, over plain ground and the level below.
+- *Pillars from branches.* A leg leaves from a floor of the level, the furthest
+  from where the level was entered: that floor's own filler takes a stair or
+  ramp (a ladder only where neither fits) with the exact rise. Its landing opens
+  onto the next level's first floor, which stands over the rest of that site.
+  No climb stands over another.
+- *Reaching a band.* The last leg climbs to the next band's floor inside one of
+  that band's landing sites (40% of its plain sites, by the seed, which no
+  growth of their own band uses). The landing site is rebuilt round the climb
+  with its own doors and one onto the landing; nothing else marks it.
+- *Steering, spread out.* Every block's stair cell and half the house growths
+  are steered: they plan every level and the arrival, and their top level
+  grows toward landing sites. The rest climb each level by chance. Over the
+  test window, about three steered growths in four arrive and about nine blocks in
+  ten have a way up; a block whose growths all fail simply has none, and its
+  neighbours carry it.
+- *Unchanged.* The ground plan (with the journey plots gone, every cell is
+  planned as before milestone 4), pits from the first level into the ground,
+  biomes and their pools, the claims mechanics.
+
+![A stair growth from the ground to band 1, on the map](growth-climb.png)
+
+*Seed 7, the stair cell of block (−1, −1), the same 49 × 32 m at four
+heights. At 0 m one plain ground site takes a stair up 4.5 m. At +4.5 m the
+first level of house-room floors stands over the ground, with a stair 6.5 m on
+up from its far side and a pit back down. At +11 m the second level stands
+over the first and the last climb rises 5 m. On band 1 it lands in an
+ordinary ground site rebuilt round it.*
+
+*Checked after review:* planning never writes into a cell plan or a planned
+growth (the suite freezes both and builds and exports over them), a level that
+cannot be built after its leg was laid undoes that leg cleanly, and a climb's
+landing site comes out the same whichever band is built first.
 
 ---
 
@@ -245,14 +297,16 @@ the old plot stops being the only way up.
 
 ## Open questions
 
-- [ ] Should every region guarantee a way up to the next band, or only most
-  regions, with neighbours covering the rest?
+- [x] Should every region guarantee a way up to the next band, or only most
+  regions, with neighbours covering the rest? *Not every region: ways up are
+  spread out, one steered growth tried per block of 4 × 4 cells (step 3).*
 - [ ] Which POIs seed growth besides houses, and with what biomes (park,
   office)?
 - [ ] What share of eligible POIs seed a pillar? This decides how rare a
   houseroom district feels. (Step 2 uses 75% of the houses that can.)
-- [ ] May a district cross region borders, or does each region keep its own
-  growth?
+- [x] May a district cross region borders, or does each region keep its own
+  growth? *Yes, without limit; ownership is settled cell by cell (step 3).*
 - [ ] Is a drop allowed to land somewhere with no quick way back up?
-- [ ] Does today's journey plot survive as a rare style of its own once growth
-  works?
+- [x] Does today's journey plot survive as a rare style of its own once growth
+  works? *Removed from the world for now (step 3); the generator stays in the
+  elevation lab.*
