@@ -10,7 +10,8 @@ state of each build step. Implementation detail lives in
 | --- | --- | --- |
 | 1 | Layered ownership: claims with height ranges, ground ceilings capped where something sits above; one hand-placed branch over a ground site proves the stacking | Done: milestone 5, PR #24 |
 | 2 | One house pillar and its branch: a multi-storey house's stairwell carries on up; one houseroom branch grows at a pillar floor, drawn from a first tagged pool | Done: PR #25 |
-| 3 | Recursive growth: pillars from branches, a per-region budget and plan, steering toward the next band; today's journey plot becomes the fallback | Done: this step (see below). The journey plot is removed from the world rather than kept as a fallback (owner's call) |
+| 3 | Recursive growth: pillars from branches, a per-region budget and plan, steering toward the next band; today's journey plot becomes the fallback | Done: PR #26 (see below). The journey plot is removed from the world rather than kept as a fallback (owner's call) |
+| 3b | Denser growth: an origin in every 2 × 2 block placed by the ground plan, bigger branches, tall rooms grown round, a smaller landing reserve, every growth on the zoomed-out map, planning spread over frames | Done: this step (see below) |
 | 4 | Houseroom variety: new houseroom fillers, so a district never repeats itself | |
 | 5 | Emergent connections: pits that drill down to the next exposed volume first, then holes rolled on shared walls; drilled walls after | Pits between a branch and the ground exist (milestone 5) |
 | 6 | Linking growths: branches of the same biome that come close join up, and districts cross region borders at planned points | |
@@ -31,7 +32,8 @@ loop hall). No room repeats within a site. Biome tags are data
 (`biomes: [...]` on catalogue rooms, templates and fillers), read by
 `src/biomes.js`.
 
-**Step 3 as built** (`src/growth.js`). The owner's answers: not every
+**Step 3 as built** (`src/growth.js`; origins, branch size and the landing
+reserve were changed in step 3b, below). The owner's answers: not every
 region must guarantee a way up, but guaranteed ways up should be spread over
 the world; districts may cross into other regions without limit; the old
 journey plots go.
@@ -82,6 +84,49 @@ ordinary ground site rebuilt round it.*
 growth (the suite freezes both and builds and exports over them), a level that
 cannot be built after its leg was laid undoes that leg cleanly, and a climb's
 landing site comes out the same whichever band is built first.
+
+**Step 3b as built.** The owner's asks after step 3: many more starting
+points, slightly bigger branches, tall rooms never grown over, and a map that
+shows every growth without freezing.
+
+- *Origins by the seed, placed by the ground plan.* Every block of 2 × 2
+  cells has one origin cell, picked by the seed alone (it was one stair cell
+  per 4 × 4 cells plus 75% of the houses that could seed growth). The ground
+  plan of that cell places a growth house first (`poi.js`: a two-storey house
+  or a townhouse, facing north or east, towards the middle of the cell), and
+  keeps it only when its stairwell can carry on up. A house elsewhere seeds
+  nothing. Stair growths from a plain ground site are gone: every pillar is a
+  house.
+- *Ownership without plans.* Every cell belongs to the nearest origin among
+  its own and the neighbouring blocks' (ties by the seed), so who owns a cell
+  needs no cell plan at all.
+- *Bigger branches.* Each level grows over 2-6 sites, 2,000 m² at most (it
+  was 1-4 sites, 1,200 m²). Three growths in four are steered (it was half the
+  houses).
+- *Tall rooms are grown round.* A filler that can be tall carries `tall: true`
+  (the halls with a gallery: loop hall, office, scattered pillars, pillar
+  hall). A floor stands over a tagged site only when the site, built as it is,
+  has no ceiling above the floor's slab; an untagged site needs 4.5 m under
+  the floor. Nothing is ever cut down to fit: the district grows round it.
+- *A smaller landing reserve.* The next band keeps for arrivals only its
+  plain sites within 36 m of each growth house below (where its top floors
+  stand), not 40% of every cell. About one plain site in ten is kept.
+- *The zoomed-out map draws every growth.* The plan view keeps a small
+  footprint of each growth's floors and arrivals (4,096 at most), and both map
+  views plan growths a few at a time within each frame, so the map fills in
+  rather than freezing.
+- *Not done: branch floors at balcony heights.* Galleries stand at +3.25 to
+  +3.75 m and the first branch floor at +6.5 m or +9.5 m, so lining them up
+  would mean a different first floor, not a tweak. Left for later.
+
+Over 8 × 8 cells of three seeds, 46-47 of the 48 origins plant a growth house,
+40-43 grow, and 32-34 arrive in band 1: about 21 growths and 17 ways up per
+100 cells, twice step 3's.
+
+![Every growth on the zoomed-out map](growth-density.png)
+
+*Seed 7, band 0, zoomed out to about 2 km across: the purple patches are
+growths' floors.*
 
 ---
 
@@ -299,11 +344,13 @@ the old plot stops being the only way up.
 
 - [x] Should every region guarantee a way up to the next band, or only most
   regions, with neighbours covering the rest? *Not every region: ways up are
-  spread out, one steered growth tried per block of 4 × 4 cells (step 3).*
+  spread out, one steered growth tried per block of 4 × 4 cells (step 3), and
+  since step 3b a growth in every block of 2 × 2, three in four steered.*
 - [ ] Which POIs seed growth besides houses, and with what biomes (park,
   office)?
-- [ ] What share of eligible POIs seed a pillar? This decides how rare a
-  houseroom district feels. (Step 2 uses 75% of the houses that can.)
+- [x] What share of eligible POIs seed a pillar? This decides how rare a
+  houseroom district feels. *Not a share any more: the ground plan places one
+  growth house in every block of 2 × 2 cells (step 3b).*
 - [x] May a district cross region borders, or does each region keep its own
   growth? *Yes, without limit; ownership is settled cell by cell (step 3).*
 - [ ] Is a drop allowed to land somewhere with no quick way back up?

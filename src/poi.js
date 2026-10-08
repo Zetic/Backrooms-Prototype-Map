@@ -30,6 +30,12 @@
  * Lots keep a block's width from the cell edge and from each other, so the
  * world can cut every lot out as a site of its own (world.js).
  *
+ * Planted: a cell the world says grows (W.plants(i, j) gives { fits(lot) },
+ * band-world.js) places a house that seeds growth (an archetype with `grows`)
+ * before anything else, on its own seed, so the rest of the cell is drawn as
+ * before round it, and only where `fits` says its stairwell can carry on up.
+ * It is marked `grows: true`; growth.js carries its stairwell on up.
+ *
  * Data hook (optional): archetype.weight, its relative frequency within its
  * tier (default 1), scaled by its pool (archetype.pool: 'expected', the
  * default, or 'weird': CFG.pools). archetype.poi === false keeps a template
@@ -66,7 +72,7 @@
   const TIERS = ['huge', 'large', 'medium', 'small', 'tiny'];     // placement order: big first
   const RANK = { tiny: 0, small: 1, medium: 2, large: 3, huge: 4 };
   const SIDES = ['S', 'E', 'N', 'W'];
-  const S = { CELL: 0x9017, DENS: 0x9018, QUIET: 0x9019, TPL: 0x901a };
+  const S = { CELL: 0x9017, DENS: 0x9018, QUIET: 0x9019, TPL: 0x901a, PLANT: 0x901b };
 
   // ------------------------------------------------------------- catalogue
   // Template lists per tier, sorted by id so registration order never matters.
@@ -178,6 +184,50 @@
     };
     const poi = (arch, tier, approach, shape, cw, ch, rects, mode, cluster) =>
       ({ tier, archetype: arch.id, name: arch.name, engine: arch.engine, approach, shape, w: cw, h: ch, rects, cluster: cluster || null, mode, lot: null });
+    /** a house on its own lot with a front yard, built now so the lot fits it; the POI, or null where it did not fit */
+    const yardHouse = (arch, tier, approach, shape, cw, ch, canon, r, px, py, accept) => {
+      const k = placed.length, O = BR.TG.orient(approach, cw, canon.depth), site = canon.rects.map((q) => O.rect(q));
+      const b = LOT.template({ archetype: arch.id, seed: hash4(seed, i, j, (k << 8) ^ S.TPL), approach, rects: site, tries: CFG.buildTries });
+      if (b.error) return null;
+      const Y = LOT.yard(b, approach, LOT.margins(arch, r, BR.openness ? BR.openness(seed, px, py) : 0.5));
+      let rect = null;
+      for (let t = 0; t < CFG.attempts && !rect; t++) {
+        if (t) { px = r.range(ux0, ux1); py = r.range(uy0, uy1); }
+        const x0 = Math.round(px - Y.w / 2), y0 = Math.round(py - Y.h / 2);
+        if (free([x0, y0, x0 + Y.w, y0 + Y.h], true)) rect = [x0, y0, x0 + Y.w, y0 + Y.h];
+      }
+      if (!rect) return null;
+      const hx = rect[0] + Y.origin[0], hy = rect[1] + Y.origin[1], mv = (q) => [q[0] + hx, q[1] + hy, q[2] + hx, q[3] + hy];
+      if (accept && !accept({ rect, b, origin: [hx, hy] })) return null;
+      const P = add(poi(arch, tier, approach, shape, cw, ch, b.footprint[0].rects.map(mv), 'yard', null));
+      P.origin = [hx, hy];
+      const L = { id: i + ',' + j + ':L' + lots.length, kind: 'yard', rect, approach, pois: [P],
+        yard: Y.yard.map((q) => [q[0] + rect[0], q[1] + rect[1], q[2] + rect[0], q[3] + rect[1]]),
+        doors: Y.doors.map((d) => Object.assign({}, d, { c: d.c + (d.o === 'h' ? rect[1] : rect[0]), s0: d.s0 + (d.o === 'h' ? rect[0] : rect[1]), s1: d.s1 + (d.o === 'h' ? rect[0] : rect[1]),
+          adapter: d.adapter && [d.adapter[0] + rect[0], d.adapter[1] + rect[1], d.adapter[2] + rect[0], d.adapter[3] + rect[1]] })) };
+      Object.defineProperty(L, 'b', { value: b, enumerable: false });
+      P.lot = L.id;
+      lots.push(L);
+      return P;
+    };
+
+    // ---- planted: a house that seeds growth, first, on its own seed (and one
+    // whose stairwell can carry on up from where its lot puts it: `plant.fits`)
+    const plant = W.plants && W.plants(i, j);
+    if (plant) {
+      const prng = new Rng(hash4(seed, i, j, S.PLANT)), w8 = {};
+      for (const a of Object.values(BR.TPL.archetypes).filter((x) => x.grows && x.poi !== false && BR.TPL.engines[x.engine]).sort((p, q) => (p.id < q.id ? -1 : 1))) w8[a.id] = a.weight || 1;
+      for (let at = 0; at < CFG.attempts && Object.keys(w8).length; at++) {
+        const arch = BR.TPL.archetypes[prng.weighted(w8)], site = arch.site || { w: [10, 20], h: [10, 20] };
+        // (facing north or east, a house's stairwell mostly faces east or south:
+        // the sides a landing can be run out on, inside its own frame: claims.js)
+        const cw = sizeIn(prng, site.w), ch = sizeIn(prng, site.h), approach = prng.f() < 0.5 ? 'N' : 'E';
+        // (towards the middle of the cell, so the district round it has room on every side)
+        const P = yardHouse(arch, BR.TPL.sizeClass(arch), approach, 'rect', cw, ch, siteOutline(cw, ch, 'rect', prng), prng,
+          prng.range(ux0 + 0.3 * (ux1 - ux0), ux1 - 0.3 * (ux1 - ux0)), prng.range(uy0 + 0.3 * (uy1 - uy0), uy1 - 0.3 * (uy1 - uy0)), plant.fits);
+        if (P) { P.grows = true; break; }
+      }
+    }
 
     for (const tier of TIERS) {
       const list = cat[tier];
@@ -199,27 +249,7 @@
           if (kind === 'yard') {
             // the house is built now: its lot is sized round what was built,
             // and its doors decide where the lot meets the world (LOT.yard)
-            const k = placed.length, O = BR.TG.orient(approach, cw, cd), site = canon.rects.map((q) => O.rect(q));
-            const b = LOT.template({ archetype: arch.id, seed: hash4(seed, i, j, (k << 8) ^ S.TPL), approach, rects: site, tries: CFG.buildTries });
-            if (b.error) continue;
-            const Y = LOT.yard(b, approach, LOT.margins(arch, rng, BR.openness ? BR.openness(seed, px, py) : 0.5));
-            let rect = null;
-            for (let t = 0; t < CFG.attempts && !rect; t++) {
-              if (t) { px = rng.range(ux0, ux1); py = rng.range(uy0, uy1); }
-              const x0 = Math.round(px - Y.w / 2), y0 = Math.round(py - Y.h / 2);
-              if (free([x0, y0, x0 + Y.w, y0 + Y.h], true)) rect = [x0, y0, x0 + Y.w, y0 + Y.h];
-            }
-            if (!rect) continue;
-            const hx = rect[0] + Y.origin[0], hy = rect[1] + Y.origin[1], mv = (q) => [q[0] + hx, q[1] + hy, q[2] + hx, q[3] + hy];
-            const P = add(poi(arch, tier, approach, shape, cw, ch, b.footprint[0].rects.map(mv), kind, null));
-            P.origin = [hx, hy];
-            const L = { id: i + ',' + j + ':L' + lots.length, kind, rect, approach, pois: [P],
-              yard: Y.yard.map((q) => [q[0] + rect[0], q[1] + rect[1], q[2] + rect[0], q[3] + rect[1]]),
-              doors: Y.doors.map((d) => Object.assign({}, d, { c: d.c + (d.o === 'h' ? rect[1] : rect[0]), s0: d.s0 + (d.o === 'h' ? rect[0] : rect[1]), s1: d.s1 + (d.o === 'h' ? rect[0] : rect[1]),
-                adapter: d.adapter && [d.adapter[0] + rect[0], d.adapter[1] + rect[1], d.adapter[2] + rect[0], d.adapter[3] + rect[1]] })) };
-            Object.defineProperty(L, 'b', { value: b, enumerable: false });
-            P.lot = L.id;
-            lots.push(L);
+            if (!yardHouse(arch, tier, approach, shape, cw, ch, canon, rng, px, py)) continue;
             break;
           }
 

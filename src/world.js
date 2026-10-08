@@ -12,7 +12,8 @@
  *               other
  *   2. POIs     claim their places first (poi.js): houses on lots with a
  *               yard, block-sized templates on flush lots, smaller ones
- *               inside filler sites
+ *               inside filler sites; a cell the world says grows (`plants`,
+ *               band-world.js) places a house that seeds growth first
  *   3. blocks   every lot is cut out along its own edges; the rest of the
  *               cell is cut into 8-32 m blocks (whole metres) that keep a
  *               block's width from a lot, 2 m from a POI inside a filler and
@@ -427,6 +428,8 @@
       this.seed = seed >>> 0;
       if (opts && opts.band !== undefined) { this.band = opts.band; this.floorZ = opts.floorZ; }
       if (opts && opts.afterBuild) this.afterBuild = opts.afterBuild;
+      // (`plants(i, j)`: does the cell's plan place a house that seeds growth? poi.js)
+      if (opts && opts.plants) this.plants = opts.plants;
       this.limits = Object.assign({}, CFG.limits, opts && opts.limits);
       this.cells = new Map();
       this.builds = new Map();
