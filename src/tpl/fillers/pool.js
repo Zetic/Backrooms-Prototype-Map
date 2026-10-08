@@ -88,7 +88,7 @@
 
   // ------------------------------------------------------------ enfilade
   FILL.register({
-    id: 'enfilade', biomes: ['houseroom'], name: 'Enfilade', feel: 'enclosed', weight: 6,
+    id: 'enfilade', name: 'Enfilade', feel: 'enclosed', weight: 6,
     blurb: 'A chain of rooms in a row, each through an off-centre opening; sometimes it turns a corner.',
     doors: { opening: 0.85, door: 0.15 }, loops: 0,
     fits: (S) => Math.max(...dims(S)) >= 16 && Math.min(...dims(S)) >= 6,
@@ -121,7 +121,7 @@
 
   // ------------------------------------------------------------ cells
   FILL.register({
-    id: 'cells', biomes: ['houseroom'], name: 'Cell cluster', feel: 'enclosed', weight: 4,
+    id: 'cells', name: 'Cell cluster', feel: 'enclosed', weight: 4,
     blurb: 'A pocket of 2-4 m rooms and closets among ordinary rooms: a cluster in one end, closets off a short corridor, or small rooms round a middle one.',
     doors: { opening: 0.55, door: 0.45 }, loops: 0.06,
     fits: (S) => S.area >= 144 && S.area <= 1000 && Math.min(...dims(S)) >= 10,
@@ -204,7 +204,7 @@
 
   // ------------------------------------------------------------ ring
   FILL.register({
-    id: 'ring', biomes: ['houseroom'], name: 'Ring', feel: 'enclosed', weight: 3,
+    id: 'ring', name: 'Ring', feel: 'enclosed', weight: 3,
     blurb: 'Rooms around a solid core (sometimes a closet), joined in a loop; a warren or solid around it.',
     doors: { opening: 0.85, door: 0.15 }, loops: 0.1,
     fits: (S) => Math.min(...dims(S)) >= 22,

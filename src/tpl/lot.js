@@ -145,14 +145,14 @@
   // ------------------------------------------------------------ building
   /**
    * One building on its site (site frame, origin at the site's bbox corner):
-   * spec { archetype, seed, approach, rects, flush?, wrongness?, tries? }. A few template
+   * spec { archetype, seed, approach, rects, flush?, wrongness?, floors?, tries? }. A few template
    * seeds are tried before giving up. Returns a br.building or { error }.
    */
   LOT.template = (spec) => {
     const tries = spec.tries || 3;
     let b = null;
     for (let t = 0; t < tries; t++) {
-      b = TPL.generate({ archetype: spec.archetype, seed: t ? mix32(spec.seed + t) : spec.seed, site: { rects: spec.rects }, approach: spec.approach, flush: !!spec.flush, wrongness: spec.wrongness });
+      b = TPL.generate({ archetype: spec.archetype, seed: t ? mix32(spec.seed + t) : spec.seed, site: { rects: spec.rects }, approach: spec.approach, flush: !!spec.flush, wrongness: spec.wrongness, floors: spec.floors });
       if (!b.error) { b.try = t; return b; }
     }
     return { error: (b && b.error) || 'no layout', archetype: spec.archetype };
@@ -163,7 +163,7 @@
    * Buildings and what surrounds them, in one site (metres, site frame):
    * spec { seed, site: { rects }, filler (id; picked from the pool with
    *        `weights` when omitted), weights?, connections (edge, filler form),
-   *        buildings: [{ id, archetype, seed, approach, rects, flush?, wrongness?,
+   *        buildings: [{ id, archetype, seed, approach, rects, flush?, wrongness?, floors?,
    *                      b? (prebuilt), origin? (where a prebuilt b's site frame sits),
    *                      edge? ({ portalId: connId }: doors that are themselves
    *                      edge connections of the site, not the filler's) }],
@@ -180,7 +180,7 @@
     for (const q of rects) R.fill(q.map(U), 1);
     const inner = [];
     for (const S of spec.buildings || []) {
-      const sb = S.rects ? TG.bbox(S.rects) : null, b = S.b || LOT.template({ archetype: S.archetype, seed: S.seed, approach: S.approach, rects: S.rects.map((q) => [q[0] - sb[0], q[1] - sb[1], q[2] - sb[0], q[3] - sb[1]]), flush: S.flush, wrongness: S.wrongness });
+      const sb = S.rects ? TG.bbox(S.rects) : null, b = S.b || LOT.template({ archetype: S.archetype, seed: S.seed, approach: S.approach, rects: S.rects.map((q) => [q[0] - sb[0], q[1] - sb[1], q[2] - sb[0], q[3] - sb[1]]), flush: S.flush, wrongness: S.wrongness, floors: S.floors });
       if (b.error) { out.issues.push((TPL.archetypes[S.archetype] || {}).name + ': no layout fit its site'); continue; }
       const px = S.origin ? S.origin[0] : sb[0], py = S.origin ? S.origin[1] : sb[1];
       const B = { id: S.id, origin: [px, py], b, conns: {} };

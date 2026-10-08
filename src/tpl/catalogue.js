@@ -26,8 +26,8 @@
   const BR = root.BR, TPL = BR.TPL = BR.TPL || {};
 
   // ------------------------------------------------------------ rooms
-  // `biomes`: the growth biomes a room's lone template belongs to (biomes.js);
-  // the house rooms are the first `houseroom` pool
+  // `biomes`: the growth biomes a room type belongs to (biomes.js): the house
+  // rooms are what a `houseroom` branch's floors are made of (fillers/house.js)
   const ROOMS = {
     // living
     foyer: { zone: 'public', minW: 3, maxAsp: 3, area: [4, 7], ceil: [2.5, 2.9], tags: ['entry'], biomes: ['houseroom'], lone: { pool: 'weird' } },
@@ -35,7 +35,7 @@
     family: { zone: 'public', minW: 7, maxAsp: 2.2, area: [14, 20], ceil: [2.4, 2.7], tags: ['living', 'social'], label: 'family room', biomes: ['houseroom'], lone: { pool: 'weird' } },
     dining: { zone: 'public', minW: 6, maxAsp: 2, area: [9, 13], ceil: [2.4, 2.7], tags: ['dining', 'social'], biomes: ['houseroom'], lone: { pool: 'weird' } },
     kitchen: { zone: 'public', minW: 5, maxAsp: 2.6, area: [9, 14], ceil: [2.4, 2.6], tags: ['kitchen', 'wet', 'cooking'], biomes: ['houseroom'], lone: { pool: 'weird' } },
-    office: { zone: 'private', minW: 5, maxAsp: 2, area: [7, 10], ceil: [2.4, 2.6], tags: ['work'], lone: { pool: 'expected', weight: 0.5 } },
+    office: { zone: 'private', minW: 5, maxAsp: 2, area: [7, 10], ceil: [2.4, 2.6], tags: ['work'], biomes: ['houseroom'], lone: { pool: 'expected', weight: 0.5 } },
     // sleeping and washing
     bedroom: { zone: 'private', minW: 6, maxAsp: 2, area: [9, 13], ceil: [2.4, 2.6], tags: ['sleeping', 'private'], biomes: ['houseroom'], lone: { pool: 'weird' } },
     master: { zone: 'private', minW: 7, maxAsp: 2, area: [13, 18], ceil: [2.4, 2.8], tags: ['sleeping', 'private', 'primary'], label: 'master bedroom', biomes: ['houseroom'], lone: { pool: 'weird', weight: 0.6 } },
@@ -45,10 +45,10 @@
     // storage
     closet: { zone: 'service', minW: 2, maxAsp: 4, ceil: [2.2, 2.4], tags: ['storage', 'closet'], lone: { template: 'closet' } },
     wic: { zone: 'private', minW: 3, maxAsp: 4, area: [3, 5], ceil: [2.3, 2.4], tags: ['storage', 'closet', 'walk-in'], label: 'walk-in closet', biomes: ['houseroom'], lone: { pool: 'weird', weight: 0.6 } },
-    linen: { zone: 'private', minW: 2, maxAsp: 8, area: [1, 2], ceil: [2.3, 2.4], tags: ['storage', 'closet'], label: 'linen closet', lone: { pool: 'expected', weight: 0.3, site: { w: [1, 1.5], h: [1, 1.5] } } },
+    linen: { zone: 'private', minW: 2, maxAsp: 8, area: [1, 2], ceil: [2.3, 2.4], tags: ['storage', 'closet'], biomes: ['houseroom'], label: 'linen closet', lone: { pool: 'expected', weight: 0.3, site: { w: [1, 1.5], h: [1, 1.5] } } },
     pantry: { zone: 'service', minW: 2, maxAsp: 4, area: [1.5, 3], ceil: [2.4, 2.5], tags: ['storage', 'food'], biomes: ['houseroom'], lone: { pool: 'weird', weight: 0.6 } },
     storage: { zone: 'service', minW: 4, maxAsp: 3, ceil: [2.4, 3.2], tags: ['storage'], label: 'storage room', lone: { template: 'storage_room' } },
-    utility: { zone: 'service', minW: 3, maxAsp: 4.5, area: [3, 6], ceil: [2.4, 2.5], tags: ['storage', 'mechanical'], label: 'storage', lone: { pool: 'expected', weight: 0.6 } },
+    utility: { zone: 'service', minW: 3, maxAsp: 4.5, area: [3, 6], ceil: [2.4, 2.5], tags: ['storage', 'mechanical'], biomes: ['houseroom'], label: 'storage', lone: { pool: 'expected', weight: 0.6 } },
     unit: { zone: 'private', minW: 3, maxAsp: 3.5, ceil: [2.4, 3], tags: ['storage', 'unit'], label: 'unit', lone: { pool: 'expected', weight: 0.4, site: { w: [2.5, 3.5], h: [2.5, 4] }, door: 'vehicle', doorW: 2.5 } },
     // service
     laundry: { zone: 'service', minW: 4, maxAsp: 3, area: [3.5, 6], ceil: [2.4, 2.5], tags: ['laundry', 'wet', 'utility'], biomes: ['houseroom'], lone: { pool: 'expected', weight: 0.4 } },
@@ -60,7 +60,7 @@
     restroom: { zone: 'public', minW: 3, maxAsp: 4, ceil: [2.4, 2.7], tags: ['bathroom', 'wet', 'public'], lone: { pool: 'expected', weight: 0.4, site: { w: [2.5, 4], h: [2, 3] } } },
     stall: { zone: 'private', minW: 2, maxAsp: 3, ceil: [2.4, 2.7], tags: ['bathroom', 'wet', 'stall'], lone: { pool: 'weird', site: { w: [1, 1.5], h: [1.5, 2] } } },
     // circulation
-    hall: { zone: 'circulation', minW: 2, maxAsp: 99, ceil: [2.4, 2.5], tags: ['circulation'], label: 'hallway', lone: { pool: 'expected', weight: 0.5, site: { w: [1, 1.5], h: [5, 9] } } },
+    hall: { zone: 'circulation', minW: 2, maxAsp: 99, ceil: [2.4, 2.5], tags: ['circulation'], biomes: ['houseroom'], label: 'hallway', lone: { pool: 'expected', weight: 0.5, site: { w: [1, 1.5], h: [5, 9] } } },
     corridor: { zone: 'circulation', minW: 2, maxAsp: 99, ceil: [2.4, 2.7], tags: ['circulation'], lone: { pool: 'expected', weight: 0.5, site: { w: [1.5, 2], h: [6, 12] }, exit: 0.6 } },
     vestibule: { zone: 'circulation', minW: 2, maxAsp: 4, ceil: [2.4, 2.7], tags: ['entry', 'circulation'], lone: { pool: 'expected', weight: 0.4, site: { w: [2, 3], h: [1.5, 2.5] }, exit: 0.8 } },
     // floors at other heights (no lone templates: each exists only beside the floor it changes from)

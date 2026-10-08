@@ -21,7 +21,9 @@ borders, and the journey plots are gone from the world. Step 3b, **denser
 growth** (PR #27): the ground plan plants a growth house in one cell
 of every 2 × 2 block, branches are a little bigger, tall rooms are grown
 round, the landing reserve is only the sites near each house, and the map
-draws every growth without freezing. Step 4 (houseroom variety) is next; the Unreal consumer of the exported
+draws every growth without freezing. Step 4, **house rooms**: branch floors
+are house hallways lined with bedrooms, living rooms, kitchens and the like,
+often with a whole small house standing in them. The Unreal consumer of the exported
 data is milestone 6.
 
 ## Repository state
@@ -31,8 +33,8 @@ data is milestone 6.
   packages. `index.html` is the map, `workbench.html` the template workshop,
   `elevation.html` the elevation lab. Serve the folder statically to inspect
   (`python3 -m http.server 8765`).
-- `main` holds everything up to growth step 3 (PR #26, `4e30119`). Growth
-  step 3b is on `claude/fast-test-runs-l53vww` (the branch name is reused).
+- `main` holds everything up to growth step 3b (PR #27). Growth step 4 is on
+  `claude/fast-test-runs-l53vww` (the branch name is reused).
   The branches `claude/world-journeys`, `claude/kept-stairs`,
   `claude/house-branch` and `claude/recursive-growth` are merged and can be
   deleted.
@@ -57,6 +59,7 @@ data is milestone 6.
 | [#25](https://github.com/Zetic/Backrooms-Prototype-Map/pull/25) | Growth step 2: biomes, a house pillar, and a branch of house rooms grown from it |
 | [#26](https://github.com/Zetic/Backrooms-Prototype-Map/pull/26) | Growth step 3: recursive growth between the bands; journey plots removed from the world |
 | [#27](https://github.com/Zetic/Backrooms-Prototype-Map/pull/27) | Growth step 3b: an origin per 2 × 2 block with its house planted by the ground plan, bigger branches, tall rooms grown round, a smaller landing reserve, every growth on the zoomed-out map |
+| (open) | Growth step 4: house rooms in branches (house hallways, bedrooms, living rooms) and whole houses standing in branch floors |
 
 ## What the user wants
 
@@ -345,6 +348,41 @@ over, every growth on the zoomed-out map, no freeze while planning.
   step 3), about 7 sites a growth. The remaining failures are mostly a site
   past the landing door that is a POI or too small.
 
+**Growth step 4, house rooms** (`src/tpl/fillers/house.js`, `src/biomes.js`,
+`src/growth.js`; [docs/growth.md](docs/growth.md)). The user's ask: "literal
+house themed rooms, so house hallways, living rooms, more houses", not rooms
+that merely read like a house.
+- Three fillers, weight 0 (never on the ground), `biomes: ['houseroom']`,
+  `biomeWeight` for the pool (`fillerWeights` reads it): `house_bedrooms` (3),
+  `house_living` (3), `house_upstairs` (2). They are the whole houseroom
+  filler pool; the seven generic fillers lost their tag.
+- Layout: 1-3 hallway spines (`n = round(CN / (cw + 2D))`, at an edge on a
+  narrow site, joined by a cross hallway), an end room (60%; a master gets an
+  ensuite and walk-in closet via `C.hang`), rooms packed along both sides by
+  a per-filler program (`PROGRAMS`: `[weight, max per 200 m²]`; the `ONE` set,
+  kitchen, dining, foyer, pantry, laundry, mudroom, never scales; `ALONE`
+  types never repeat side by side), each with a required door onto the hall,
+  open-plan pairs (living, dining, kitchen, family) sometimes wall-less, and
+  `infill` turning solid pockets of 3 × 3 cells or more into closets, pantries,
+  utility rooms or offices off their neighbour. Uses the corridor kit, now
+  exported as `FILL.corridor`.
+- Room types are `FILL.TYPES` entries mapped from catalogue rooms (`KINDS`,
+  `FILL.HOUSE_TYPES`): zone, ceiling and name (`label`) from the catalogue,
+  tags `house` + the catalogue's. The engine's added corridors use
+  `P.passage` (`hallway` here; default `passage`).
+- Whole houses: `houseroom.houses` [0.7, 0.5, 0.35] is the chance by hop that
+  `raisedSite` asks `furnish` for one. The pool is the archetypes tagged
+  `houseroom`: ranch, bungalow, split_ranch, suburban and the new `cottage`
+  (`poi: false`). `furnish` biases sizes small (70%), tries both
+  orientations, faces the door to the middle, `margin` 1, `doorClear` 2, and
+  builds flat (`floors: false` through `LOT.build` to `TPL.generate`).
+  Lone catalogue rooms and the closet left the pool; office, linen, utility
+  and hall were tagged for `BIOME.rooms`.
+- A `cabin` archetype was tried and dropped (the house engine failed 49 of
+  60 seeds); the cottage builds 54 of 60.
+- Measured over 8 × 8 cells of three seeds: 40 of 48 grow, 30 arrive (as in
+  step 3b); 271 floors hold 64 whole houses and 17 kinds of house room.
+
 ## Known limits
 
 - Growth goes up only; nothing grows down toward the band below yet.
@@ -365,9 +403,11 @@ over, every growth on the zoomed-out map, no freeze while planning.
   only the one the ground plan plants in an origin cell (or another house
   there that can raise) starts a growth. A growth never covers a lot, a POI,
   a landing site or a tall room it would cut.
-- The houseroom pool is the catalogue's lone house rooms and seven existing
-  fillers, so districts read as hallways with a few rooms in them; new
-  houseroom fillers are step 4.
+- The houseroom pool is three house fillers and five house archetypes:
+  literal houses, nothing strange yet (no attics, crawlspaces or wrong-way
+  stairs).
+- On the map, a ground filler's columns (cross pillars) are drawn over raised
+  floors standing above it at the cut height; this predates step 4.
 - A raised site that cannot be built is dropped with its subtree; a parent
   that fails only because of a child's door is dropped too (rather than the
   child). In practice none fails: over 300 cells, 0 of 51 raised sites.
@@ -501,12 +541,7 @@ about 30%, but the tests run with V8's defaults, as the browser does.)
 
 ## Next
 
-1. **Growth step 4: houseroom variety** ([docs/growth.md](docs/growth.md)).
-   Districts now stack two or three levels and read as hallways with a few
-   rooms. New houseroom fillers: corridors of doors, landings, attic
-   crawlspaces, stairwells that turn the wrong way, rooms of odd sizes; a pool
-   large enough that a district never repeats.
-2. **Growth polish**, in rough order of value:
+1. **Growth polish**, in rough order of value:
    - Take planning off the paint path entirely (a Web Worker), so no frame
      runs long.
    - Line branch floors up with gallery heights so balconies open onto them.
@@ -516,7 +551,7 @@ about 30%, but the tests run with V8's defaults, as the browser does.)
    - Pits from every level (into the floor below, not only the ground), and
      holes rolled on shared walls (step 5).
    - Growths of the same biome that come close join up (step 6).
-3. **Milestone 6: an Unreal consumer proof.** The export is one connected
+2. **Milestone 6: an Unreal consumer proof.** The export is one connected
    multi-band network wherever a growth arrives.
    - First, an engine-neutral reference builder in this repo: read a
      `br.world-elevation` export and emit simple geometry (glTF or OBJ):
@@ -530,6 +565,6 @@ about 30%, but the tests run with V8's defaults, as the browser does.)
      `TPL.CAT.CONNECTIONS`).
    - Freeze what the consumer relies on: version the world export
      (`br.world-elevation/0.3`) once the consumer reads it.
-4. **More vertical variety inside templates**: galleries on jogged walls,
+3. **More vertical variety inside templates**: galleries on jogged walls,
    mezzanines open on several sides, split-level houses, composites with
    storeys, curved stairs or ramps for curved fillers.

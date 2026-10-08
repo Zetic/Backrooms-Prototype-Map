@@ -34,7 +34,7 @@ passage to the lot edge.
 
 ## The pool
 
-34 fillers in five files, most drawn from the hand-drawn and pixel reference
+37 fillers in six files (three of them only in growth branches), most drawn from the hand-drawn and pixel reference
 maps. *Smallest* is the smallest square site (or, for a long one, the
 narrowest 1 : 2 site) the filler takes; *map* is the share of the world's
 filler sites it fits, since most of them are only 8–12 m across.
@@ -107,6 +107,27 @@ except where a connection needs an adapter. No generic spline rounding is
 applied to the other fillers.
 
 ![Architectural curved fillers, seed 17](fillers-architectural.png)
+
+`house.js`, house rooms for growth branches (weight 0: never on the ground):
+
+| filler | branch weight | smallest | what it builds |
+|---|---|---|---|
+| `house_bedrooms` | 3 | 6 m | a bedroom hallway: bedrooms, bathrooms, linen closets, now and then an office, and a master bedroom with its ensuite and walk-in closet at the end |
+| `house_living` | 3 | 7 m | the downstairs of a house: living, dining, kitchen, family room, pantry, laundry, foyer and mudroom off a wide hallway, some joined open plan |
+| `house_upstairs` | 2 | 6 m | an upstairs hall: bedrooms round the landing, a bathroom, a family room or office, a laundry |
+
+They are the whole pool of the `houseroom` biome ([docs/growth.md](growth.md),
+step 4). Each lays one to three hallways (joined by a cross hallway) and packs
+rooms along both sides, each with a door onto the hallway; a hallway may end
+in a room, and leftover solid pockets become closets, pantries, utility rooms
+or offices off the room beside them. Room counts scale with the site's area
+(one kitchen, a bathroom for every two or three bedrooms). Their rooms take
+the catalogue's names, zones and ceilings and are tagged `house` rather than
+`backrooms`, so they draw in the house colours, and a filler's own room
+types can carry a `label` for their names. The engine's joining corridors
+take the filler's `P.passage` type (`hallway` here, `passage` otherwise). A
+filler's `biomeWeight` is its weight in a biome pool when it has none on the
+ground.
 
 Not in the pool: `yard` (weight 0), a house's front yard (a strip across the
 front of the house and a lane out to the lot edge) and the passages from its
@@ -265,6 +286,7 @@ seeds, site shapes (rect, L, U, notched, random) and 0–4 connections:
 * architectural arcs keep a constant radius, paired domes match, radial
   suites remain concentric, and geometry is deterministic in either orientation;
 * the organic layouts are absent and ordinary fillers receive no spline rounding;
+* every room is tagged `backrooms`, or `house` for the house fillers;
 * the average time on 10–24 m sites stays under 5 ms (it is about 2.5 ms).
 
 ## Next

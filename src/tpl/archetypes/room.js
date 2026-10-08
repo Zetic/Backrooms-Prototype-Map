@@ -10,7 +10,7 @@
   TPL.registerArchetype({
     id: 'closet', engine: 'room', name: 'Closet', category: 'room', rarity: 'common', weight: 3,
     blurb: 'One small room with one door. The smallest POI.',
-    layout: 'single', room: 'closet', biomes: ['houseroom'],
+    layout: 'single', room: 'closet',
     site: { w: [1.5, 3], h: [1, 2.5] },
     portals: [{ role: 'both', kind: 'door', side: 'S', w: 1 }],
     vertical: { prefer: ['ladder'] },

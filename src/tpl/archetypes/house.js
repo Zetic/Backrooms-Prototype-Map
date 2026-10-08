@@ -14,6 +14,8 @@
  *   layer, tpl/connections.js); a type that does not fit falls through to the next.
  * floors: floor patterns laid on the finished house (tpl/floors.js), e.g. a
  *   sunken living room with steps down into it.
+ * biomes: the growth biomes a house can stand in, whole, inside a branch
+ *   (biomes.js); grows: the biome a house starts (its stairwell carries on up).
  * storeys: 2 or 3 (or [min, max]): the stack plan, public rooms below,
  *   bedrooms above, a stairwell up one side that the elevation layer fills
  *   with a real switchback stair.
@@ -23,7 +25,7 @@
   const TPL = root.BR.TPL;
 
   TPL.registerArchetype({
-    id: 'ranch', engine: 'house', name: 'Ranch', category: 'house', rarity: 'common', weight: 3,
+    id: 'ranch', engine: 'house', biomes: ['houseroom'], name: 'Ranch', category: 'house', rarity: 'common', weight: 3,
     blurb: 'Single-storey bar or L, attached garage, bedrooms down a hallway.',
     site: { w: [20, 30], h: [11, 20] },
     plans: { bar: 3, L: 2 },
@@ -53,7 +55,7 @@
   });
 
   TPL.registerArchetype({
-    id: 'bungalow', engine: 'house', name: 'Bungalow', category: 'house', rarity: 'common', weight: 2,
+    id: 'bungalow', engine: 'house', biomes: ['houseroom'], name: 'Bungalow', category: 'house', rarity: 'common', weight: 2,
     blurb: 'Small house on a narrow, deep site: living up front, bedrooms behind.',
     site: { w: [8.5, 13], h: [13, 19] },
     plans: { deep: 4, bar: 1 },
@@ -79,8 +81,35 @@
     wrongness: 0.15
   });
 
+  // a small house that stands whole inside a growth's house-room floors (not
+  // placed on the ground: poi false)
   TPL.registerArchetype({
-    id: 'split_ranch', engine: 'house', name: 'Split-bedroom ranch', category: 'house', rarity: 'uncommon', weight: 1.2,
+    id: 'cottage', engine: 'house', biomes: ['houseroom'], poi: false, name: 'Cottage', category: 'house', rarity: 'uncommon', weight: 1,
+    blurb: 'A small house: a living room and kitchen up front, a bedroom or two and a bathroom behind. Stands inside a growth\'s house-room floors.',
+    site: { w: [7, 10], h: [8.5, 11] },
+    plans: { deep: 3, bar: 1 },
+    depth: [8, 10],
+    rooms: {
+      living: { area: [12, 16] },
+      kitchen: { area: [6.5, 9] },
+      dining: { p: 0.3, area: [6, 8] },
+      master: { area: [9, 11], ensuite: 0, wic: 0.1 },
+      bedroom: { n: [0, 1], area: [7.5, 9] },
+      bath: { area: [3.5, 4.5] },
+      linen: { p: 0.3, area: [1, 1.5] }
+    },
+    closets: 0.6,
+    garage: { p: 0 },
+    backDoor: 0.6, sideDoor: 0.1,
+    openPlan: 0.6,
+    hall: { w: [1, 1] },
+    windows: 1,
+    vertical: { prefer: ['stair', 'ladder'] },
+    wrongness: 0.15
+  });
+
+  TPL.registerArchetype({
+    id: 'split_ranch', engine: 'house', biomes: ['houseroom'], name: 'Split-bedroom ranch', category: 'house', rarity: 'uncommon', weight: 1.2,
     blurb: 'Master suite at one end, the other bedrooms at the far end, living in between.',
     site: { w: [26, 34], h: [10, 13] },
     plans: { split: 4, bar: 1 },
@@ -110,7 +139,7 @@
   });
 
   TPL.registerArchetype({
-    id: 'suburban', engine: 'house', name: 'Suburban family house', category: 'house', rarity: 'common', weight: 2,
+    id: 'suburban', engine: 'house', biomes: ['houseroom'], name: 'Suburban family house', category: 'house', rarity: 'common', weight: 2,
     blurb: 'Bigger L or bar with a two-car garage, mudroom, family room and a full master suite.',
     site: { w: [26, 36], h: [12, 24] },
     plans: { L: 3, bar: 2 },

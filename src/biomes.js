@@ -1,28 +1,29 @@
 /*
  * biomes.js - the families of templates a growth draws from (growth design,
- * step 2: one house pillar and its branch).
+ * steps 2 and 4).
  *
  * A growth takes the biome of the POI it starts from: a house that can carry
  * its stairwell on up starts a `houseroom` branch, so what stands over the
- * ground beside it is a district of house rooms, not generic backrooms.
+ * ground beside it is the inside of a house, not generic backrooms.
  *
  *   anchors      an archetype says it can seed growth, and which biome it
  *                starts: `grows: { biome }` (archetypes/house.js)
- *   eligibility  templates and fillers carry `biomes: [...]`, and a branch
+ *   eligibility  fillers and templates carry `biomes: [...]`, and a branch
  *                draws only from its biome's pool; one can be in several.
- *                A lone room takes the tags of its catalogue entry
- *                (catalogue.js), so the house rooms the catalogue already
- *                makes into templates of their own are the first pool.
- *   a district   a branch site is a biome filler (the hallways and rooms
- *                between) with biome templates standing inside it, dense
- *                near the pillar and thinning with distance. No template
- *                repeats within a site; a pool is large enough that a
- *                district never reads as a grid of copies.
+ *                Catalogue rooms carry the tag too: the room types the
+ *                biome's floors are made of (catalogue.js).
+ *   a district   a branch site is a biome filler: for house rooms, a floor
+ *                of a house (fillers/house.js: bedrooms, bathrooms and
+ *                closets down a hallway, the living rooms and kitchen, an
+ *                upstairs hall), every room a house room. Now and then a
+ *                whole house of the biome stands inside it too, likelier
+ *                near the pillar.
  *
- *   BIOME.DEFS[id]                       { label, rooms: [[min, max] rooms per site, by distance] }
+ *   BIOME.DEFS[id]                       { label, houses: [chance of a whole house per site, by distance] }
  *   BIOME.anchorOf(arch)                 the biome an archetype starts, or null
  *   BIOME.templates(id), BIOME.fillers(id)   the pool
- *   BIOME.furnish({ biome, site, conns, count, seed })   where its rooms stand in one site
+ *   BIOME.rooms(id)                      the catalogue's room types of the biome
+ *   BIOME.furnish({ biome, site, conns, count, seed })   where its templates stand in one site
  */
 (function (root) {
   'use strict';
@@ -31,25 +32,29 @@
   const EPS = 1e-7, snap = (v) => Math.round(v * 2) / 2;
 
   BIOME.DEFS = {
-    // rooms per site by its distance from the pillar (0: the site the landing
-    // opens onto): dense beside it, thinning further out
-    houseroom: { label: 'house rooms', rooms: [[2, 3], [1, 2], [0, 1]], margin: 1.5, gap: 1.5, doorClear: 3 }
+    // the chance a site has a whole house standing in it, by its distance
+    // from the pillar (0: the site the landing opens onto)
+    houseroom: { label: 'house rooms', houses: [0.7, 0.5, 0.35], margin: 1, gap: 1.5, doorClear: 2 }
   };
   const tagged = (x, id) => Array.isArray(x.biomes) && x.biomes.includes(id);
   BIOME.anchorOf = (arch) => (arch && arch.grows && BIOME.DEFS[arch.grows.biome] ? arch.grows.biome : null);
-  /** the biome's templates (rooms that stand inside a branch site), in id order */
+  /** the biome's templates (whole buildings that stand inside a branch site), in id order */
   BIOME.templates = (id) => Object.values(TPL.archetypes).filter((a) => tagged(a, id) && !a.grows).sort((a, b) => a.id.localeCompare(b.id));
-  /** the biome's fillers (what fills a branch site round its rooms), in id order */
+  /** the biome's fillers (what a branch site is), in id order */
   BIOME.fillers = (id) => FILL.list().filter((F) => tagged(F, id)).sort((a, b) => a.id.localeCompare(b.id));
-  /** weights for FILL.pick: the biome's fillers only (every other filler at 0) */
-  BIOME.fillerWeights = (id) => Object.fromEntries(FILL.list().map((F) => [F.id, tagged(F, id) ? (F.weight || 1) : 0]));
+  /** the catalogue's room types of the biome */
+  BIOME.rooms = (id) => Object.keys(TPL.CAT.ROOMS).filter((t) => tagged(TPL.CAT.ROOMS[t], id)).sort();
+  /** weights for FILL.pick: the biome's fillers only (every other filler at 0; one kept out of the pool weighs `biomeWeight`) */
+  BIOME.fillerWeights = (id) => Object.fromEntries(FILL.list().map((F) => [F.id, tagged(F, id) ? (F.biomeWeight || F.weight || 1) : 0]));
 
   /**
-   * Where `count` of the biome's rooms stand inside one site (its own frame):
-   * [{ id, archetype, seed, approach, rects }] for LOT.build, at most `count`
-   * (fewer where they do not fit). Each stays `margin` inside one of the
-   * site's rects and `gap` from the others, its door facing into the site, and
-   * keeps clear of the site's own doorways. No room type twice in one site.
+   * Where `count` of the biome's templates stand inside one site (its own
+   * frame): [{ id, archetype, seed, approach, rects, floors: false }] for
+   * LOT.build, at most `count` (fewer where they do not fit). Each stays
+   * `margin` inside one of the site's rects and `gap` from the others, its
+   * front facing into the site (its size taken along that front), and keeps
+   * clear of the site's own doorways. No template twice in one site; no
+   * floors at other heights (a raised floor has none under it).
    */
   BIOME.furnish = function furnish(o) {
     const D = BIOME.DEFS[o.biome], rng = new BR.Rng(BR.hash4(o.seed >>> 0, 0xb10e, o.count, 0)), out = [];
@@ -64,25 +69,31 @@
       if (!left.length) break;
       let got = null;
       for (let t = 0; t < 12 && !got; t++) {
-        // every room of the pool alike: a district's variety is the point
         const arch = left[rng.int(0, left.length - 1)];
-        const w = snap(rng.range(arch.site.w[0], arch.site.w[1])), h = snap(rng.range(arch.site.h[0], arch.site.h[1]));
-        // spots on the whole metre inside a site rect, nearest the middle first
-        const spots = [];
-        for (const q of o.site.rects) {
-          for (let y = Math.ceil(q[1] + D.margin); y + h <= q[3] - D.margin + EPS; y++) for (let x0 = Math.ceil(q[0] + D.margin); x0 + w <= q[2] - D.margin + EPS; x0++) {
-            const r = [x0, y, x0 + w, y + h];
-            if (far(r, placed, D.gap) && clearOf(r)) spots.push(r);
+        // the smaller half of its size range, more often than not: a branch site is small
+        const size = (r) => snap(r[0] + (r[1] - r[0]) * rng.f() * (rng.f() < 0.7 ? 0.5 : 1));
+        const front = size(arch.site.w), back = size(arch.site.h);
+        // its front along x (facing north or south) or along y (east or west): whichever fits, by the seed
+        let ns = rng.f() < 0.5, spots = [];
+        for (let turn = 0; turn < 2 && !spots.length; turn++, ns = !ns) {
+          const w = ns ? front : back, h = ns ? back : front;
+          // spots on the whole metre inside a site rect, nearest the middle first
+          for (const q of o.site.rects) {
+            for (let y = Math.ceil(q[1] + D.margin); y + h <= q[3] - D.margin + EPS; y++) for (let x0 = Math.ceil(q[0] + D.margin); x0 + w <= q[2] - D.margin + EPS; x0++) {
+              const r = [x0, y, x0 + w, y + h];
+              if (far(r, placed, D.gap) && clearOf(r)) spots.push(r);
+            }
           }
         }
+        ns = !ns;
         if (!spots.length) { if (t > 6) left.splice(left.indexOf(arch), 1); if (!left.length) break; continue; }
-        // a little way off the middle, by the seed: not every room in the same place
+        // a little way off the middle, by the seed: not every one in the same place
         spots.sort((p, q) => (Math.hypot((p[0] + p[2]) / 2 - cx, (p[1] + p[3]) / 2 - cy) - Math.hypot((q[0] + q[2]) / 2 - cx, (q[1] + q[3]) / 2 - cy)) || p[1] - q[1] || p[0] - q[0]);
         const r = spots[Math.min(spots.length - 1, rng.int(0, Math.min(spots.length - 1, 6)))];
-        // its door faces into the site: the side towards the middle with the most room
-        const mx = (r[0] + r[2]) / 2, my = (r[1] + r[3]) / 2, dx = cx - mx, dy = cy - my;
-        const approach = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'E' : 'W') : (dy > 0 ? 'S' : 'N');
-        got = { id: 'h' + k, archetype: arch.id, seed: BR.hash4(o.seed >>> 0, k, t, 0xb10f), approach, rects: [r] };
+        // its front faces into the site
+        const mx = (r[0] + r[2]) / 2, my = (r[1] + r[3]) / 2;
+        const approach = ns ? (cy >= my ? 'S' : 'N') : (cx >= mx ? 'E' : 'W');
+        got = { id: 'h' + k, archetype: arch.id, seed: BR.hash4(o.seed >>> 0, k, t, 0xb10f), approach, rects: [r], floors: false };
         used.add(arch.id); placed.push(r);
       }
       if (got) out.push(got);

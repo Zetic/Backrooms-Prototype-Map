@@ -296,20 +296,21 @@
   };
   GROWTH.connView = connView;
   /**
-   * A raised site's floor, of its growth's biome: a biome filler with the
-   * biome's rooms standing inside it (BIOME.furnish, LOT.build), every ceiling
-   * under `rs.clear`, placed at its floor. With `leg`, its filler also takes
-   * the climb to the floor above: { rise, within, next (world rects), conn,
-   * band (the band the landing is in) }. The pool's picks, then every biome
-   * filler in turn; a site too tight for its rooms is a district hallway with
-   * none. Every door it was given is honoured.
+   * A raised site's floor, of its growth's biome: a biome filler (a floor of
+   * a house, fillers/house.js), now and then with a whole house of the biome
+   * standing inside it (BIOME.furnish, LOT.build), every ceiling under
+   * `rs.clear`, placed at its floor. With `leg`, its filler also takes the
+   * climb to the floor above: { rise, within, next (world rects), conn, band
+   * (the band the landing is in) }. The pool's picks, then every biome filler
+   * in turn; a site too tight for its house is the floor alone. Every door it
+   * was given is honoured.
    * { b, fillerOrigin, buildings, leg: { box, L, side, type, rise } (world) } or null.
    */
   GROWTH.raisedSite = function raisedSite(rs, leg) {
     const E = BR.ELEV, D = BR.BIOME.DEFS[rs.biome], room = rs.clear;
     const rects = rs.rects.map((q) => unshift(q, rs.origin));
     const conns = rs.conns.map((cn) => connView(cn, rs.id, rs.origin));
-    const range = D.rooms[Math.min(rs.hop, D.rooms.length - 1)], count = new BR.Rng(BR.hash4(rs.seed, 0xba0a, 0, 0)).int(range[0], range[1]);
+    const count = new BR.Rng(BR.hash4(rs.seed, 0xba0a, 0, 0)).f() < D.houses[Math.min(rs.hop, D.houses.length - 1)] ? 1 : 0;
     const rooms = BR.BIOME.furnish({ biome: rs.biome, site: { rects }, conns, count, seed: rs.seed });
     const weights = BR.BIOME.fillerWeights(rs.biome), pool = BR.BIOME.fillers(rs.biome).map((F) => F.id);
     // (FILL.pick falls back to a passage when nothing weighted fits: only the biome's own are tried)

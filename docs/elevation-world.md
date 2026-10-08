@@ -72,7 +72,7 @@ outline in both directions. Clicking the footprint reveals its other landing.
 | Growth origins | One cell per block of 2 × 2 cells, by the seed; its ground plan places a growth house (two-storey or townhouse) whose stair carries on up | At most one growth per cell, and every pillar a house |
 | Growth cells | Every cell belongs to the nearest origin among its own and the neighbouring blocks' (ties by the seed) | Needs no cell plan; cells and the old regions are no border to a district |
 | Levels | First floor one flight over the house's top storey (+6.5 m two-storey, +9.5 m townhouse); then legs of 3-6.5 m on the half metre, the top floor at most +11.75 m | Every level keeps 2.75 m under the one above or the band's ceiling |
-| Floors per level | 2-6 sites, 2,000 m² at most, over plain ground or the level below | A district of its biome (houseroom) |
+| Floors per level | 2-6 sites, 2,000 m² at most, over plain ground or the level below | A district of its biome (houseroom: house hallways and rooms, sometimes a whole house) |
 | Ground under a floor | A plain site with nothing over its slab: a filler tagged `tall` is built and checked, an untagged one needs 4.5 m | Tall rooms are grown round, never cut down |
 | Steering | Three growths in four always climb on and try to arrive; the rest climb each level by chance (50%) | Ways up spread over the world |
 | Landing sites | The next band's plain sites within 36 m of a growth house below, less the next band's own growth houses' sites | Kept for arrivals from below: no growth of their own band stands over them |

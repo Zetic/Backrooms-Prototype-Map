@@ -40,8 +40,7 @@
       blurb: (pool === 'weird' ? 'Out of place: ' + an(label) : nice(an(label))) + ' on its own, with a door of its own and nothing a house would put round it.',
       layout: 'single', room: type, roomTags: tagsFor(pool), tight: true,
       circulation: 1,                                   // alone, a corridor is all circulation, and fine
-      site: siteFor(e), portals, windows: 0, wrongness: 0.15,
-      ...(e.biomes ? { biomes: e.biomes.slice() } : {})          // growth biomes (biomes.js)
+      site: siteFor(e), portals, windows: 0, wrongness: 0.15
     });
   }
   for (const [type, z] of Object.entries(CAT.ZONES)) {
