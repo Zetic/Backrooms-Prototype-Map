@@ -1,9 +1,9 @@
 // Floors at their own heights (milestone 3): houses of two and three storeys
 // joined by a real stair, sunken floors with steps down into them, galleries
 // over an undercroft, and the template's own stairs (`verticals`) built by the
-// elevation layer in place of abstract links. run: node tests/floors.test.js
+// elevation layer in place of abstract links. run: node tests/floors.test.js [--full]
 const assert = require('node:assert/strict');
-const { BR } = require('./helpers');
+const { BR, MODE } = require('./helpers');
 require('../src/tpl/render2d'); require('../src/tpl/elevation-view');
 const E = BR.ELEV, T = BR.TPL, F = BR.FILL, EPS = 1e-6;
 const ok = (name) => console.log('ok   ' + name);
@@ -20,7 +20,8 @@ const surf = (p, id) => p.surfaces.find((s) => s.id === id);
 // ---- 1. storeys: a stairwell up one side, a real stair in it, every floor reached on foot
 {
   let houses = 0, links = 0, smaller = 0;
-  for (const [id, n] of [['two_storey', 2], ['townhouse', 3]]) for (let s = 1; s <= 24; s++) {
+  const S1 = MODE.size(8, 24);
+  for (const [id, n] of [['two_storey', 2], ['townhouse', 3]]) for (let s = 1; s <= S1; s++) {
     const b = T.generate({ archetype: id, seed: s * 31, approach: SIDES[s % 4] });
     assert(!b.error, id + '#' + s + ' builds');
     assert.equal(b.levels.length, n, id + ' has ' + n + ' storeys');
@@ -52,14 +53,14 @@ const surf = (p, id) => p.surfaces.find((s) => s.id === id);
     for (const r of p.rooms) for (const q of p.rooms) if (q.floorZ > r.floorZ + EPS && r.rects.some((x) => q.rects.some((y) => E.overlap(x, y)))) assert(r.ceilingZ <= q.floorZ - E.SLAB + EPS, r.id + ' under ' + q.id);
     houses++; links += st.length;
   }
-  assert(smaller >= 18, 'a townhouse\'s top floor is smaller than the one below (' + smaller + ' of 24)');
+  assert(smaller >= S1 * 0.75, 'a townhouse\'s top floor is smaller than the one below (' + smaller + ' of ' + S1 + ')');
   ok(houses + ' houses of two and three storeys: one stacked stairwell, ' + links + ' real switchbacks, every floor reached, slabs kept, top floors smaller');
 }
 
 // ---- 2. exits up leave from the top storey, away from where the stair arrives
 {
   let away = 0, n = 0;
-  for (let s = 1; s <= 12; s++) {
+  for (let s = 1; s <= MODE.size(6, 12); s++) {
     const b = T.generate({ archetype: 'two_storey', seed: s * 7 }), p = E.prepare(b);
     const top = Math.max(...p.surfaces.map((x) => x.floorZ)), arrive = internal(p).find((c) => c.shape === 'switchback').landings[1];
     const lad = p.capabilities.up.candidates[0];
@@ -99,15 +100,16 @@ const surf = (p, id) => p.surfaces.find((s) => s.id === id);
       found[what.split('#')[0]] = (found[what.split('#')[0]] || 0) + 1;
     }
   };
-  for (let s = 1; s <= 60; s++) {
+  const S3 = MODE.size(20, 60), P3 = S3 / 2;
+  for (let s = 1; s <= S3; s++) {
     for (const id of ['suburban', 'two_storey']) check(T.generate({ archetype: id, seed: s }), id + '#' + s);
-    if (s <= 30) check(T.generate({ archetype: 'park', seed: s, wrongness: 1 }), 'park#' + s);
-    if (s <= 30) for (const id of ['ragged_hall', 'scattered_pillars', 'office', 'pillar_hall']) check(filler(id, s), id + '#' + s);
+    if (s <= P3) check(T.generate({ archetype: 'park', seed: s, wrongness: 1 }), 'park#' + s);
+    if (s <= P3) for (const id of ['ragged_hall', 'scattered_pillars', 'office', 'pillar_hall']) check(filler(id, s), id + '#' + s);
   }
-  assert(found.suburban && found.two_storey && found.ragged_hall && found.park >= 20, JSON.stringify(found));
+  assert(found.suburban && found.two_storey && found.ragged_hall && found.park >= P3 * 2 / 3, JSON.stringify(found));
   // the park's pit is the real thing: its zone moves to the sunken room, and every pit gets one
   let pits = 0;
-  for (let s = 1; s <= 30; s++) {
+  for (let s = 1; s <= P3; s++) {
     const b = T.generate({ archetype: 'park', seed: s, wrongness: 1 }), z = (b.zones || []).find((x) => x.type === 'pit');
     if (!z) continue;
     pits++;
@@ -120,7 +122,8 @@ const surf = (p, id) => p.surfaces.find((s) => s.id === id);
 // ---- 4. galleries: a raised floor along a wall, an undercroft beneath, a stair up a side wall
 {
   let n = 0;
-  for (const id of ['pillar_hall', 'loop_hall', 'ragged_hall', 'office']) for (let s = 1; s <= 30; s++) {
+  const S4 = MODE.size(10, 30);
+  for (const id of ['pillar_hall', 'loop_hall', 'ragged_hall', 'office']) for (let s = 1; s <= S4; s++) {
     const b = filler(id, s), f = (b.meta.floors || []).find((x) => x.pattern === 'gallery');
     if (!f) continue;
     n++;
@@ -143,14 +146,14 @@ const surf = (p, id) => p.surfaces.find((s) => s.id === id);
     // the top floor here is the gallery: exits up leave from it
     assert.equal(surf(p, p.capabilities.up.candidates[0].surface).room, gal.id);
   }
-  assert(n >= 25, 'galleries built: ' + n);
+  assert(n >= Math.floor(S4 * 4 * 25 / 120), 'galleries built: ' + n + ' of ' + S4 * 4);
   ok(n + ' galleries: their own floor over an undercroft with headroom, a double-height hall, a rail on the open edge with a gap for the stair up a side wall, exits up from the gallery');
 }
 
 // ---- 5. every applied pattern is buildable; children built inside a composite keep their floor
 {
   let n = 0;
-  for (const id of ['suburban', 'two_storey', 'townhouse']) for (let s = 1; s <= 20; s++) {
+  for (const id of ['suburban', 'two_storey', 'townhouse']) for (let s = 1; s <= MODE.size(8, 20); s++) {
     const b = T.generate({ archetype: id, seed: s * 13 }), p = E.prepare(b);
     const need = b.verticals.filter((v) => !v.dead).reduce((t, v) => t + v.rooms.length - 1, 0);
     assert.equal(internal(p).length, need, id + '#' + s + ': every stair of the template is built');
@@ -215,12 +218,30 @@ const surf = (p, id) => p.surfaces.find((s) => s.id === id);
 
 // ---- 7. in the world and on screen
 {
-  // the world places houses of several storeys; their floors stay inside the band envelope
-  const w = new BR.BandWorld(31337), seen = new Set();
-  for (let i = -4; i <= 4; i++) for (let j = -4; j <= 4; j++) for (const s of w.cell(i, j, 0).sites) for (const p of (s.pois || []).concat(...(s.lots || []).map((l) => l.pois || []))) seen.add(p.archetype);
+  // the world places houses of several storeys; their floors stay inside the band envelope.
+  // A known place first (seed 31337, cell -1, -2 holds both kinds); the search
+  // over 9 x 9 cells runs only if the generator has moved them, and says so
+  let at = null;
+  const w = new BR.BandWorld(31337), seen = new Set(), look = (i, j) => {
+    for (const s of w.cell(i, j, 0).sites) for (const p of (s.pois || []).concat(...(s.lots || []).map((l) => l.pois || []))) {
+      seen.add(p.archetype);
+      if (!at && (p.archetype === 'two_storey' || p.archetype === 'townhouse')) at = { i, j };
+    }
+    return !!at;
+  };
+  if (!look(-1, -2)) {
+    for (let i = -4; i <= 4; i++) for (let j = -4; j <= 4; j++) look(i, j);
+    if (at) console.log('     houses of several storeys are no longer at seed 31337, cell -1, -2: update the known place in floors.test.js');
+  }
   assert(seen.has('two_storey') || seen.has('townhouse'), 'the world builds houses of several storeys: ' + [...seen].join(', '));
-  const x = w.exportRegion(-1, -1, 1, 1, [0]);
-  assert(x.layouts.every((l) => l.blueprint.surfaces.every((s) => s.floorZ >= BR.BAND_CFG.floorLimit - EPS && s.ceilingZ <= BR.BAND_CFG.ceilingLimit + EPS)));
+  // export the cell that holds them: the houses are in it, and every floor keeps to
+  // its band's envelope (a journey's, to the envelope of its two bands)
+  const x = w.exportRegion(at.i, at.j, at.i, at.j, [0]);
+  assert(x.layouts.some((l) => ['two_storey', 'townhouse'].includes(l.blueprint.archetype) && l.blueprint.levels.length > 1), 'the export holds a house of several storeys');
+  assert(x.layouts.every((l) => {
+    const m = /^journey:(-?\d+):/.exec(l.owner), lo = m ? +m[1] * 16 : 0, hi = m ? lo + 16 : 0;
+    return l.blueprint.surfaces.every((s) => s.floorZ >= lo + BR.BAND_CFG.floorLimit - EPS && s.ceilingZ <= hi + BR.BAND_CFG.ceilingLimit + EPS);
+  }));
   // the workbench draws the real stair: solid where it starts, an outline where it arrives
   const log = [], g = new Proxy({ measureText: (s) => ({ width: String(s).length * 6 }) }, { get: (o, k) => (k in o ? o[k] : (...a) => log.push([k, ...a])), set: (o, k, v) => { o[k] = v; log.push(['set', k, v]); return true; } });
   const b = T.generate({ archetype: 'two_storey', seed: 3 });
@@ -245,7 +266,8 @@ const surf = (p, id) => p.surfaces.find((s) => s.id === id);
 {
   let n = 0, links = 0;
   const cases = [['two_storey', 'T'], ['townhouse', 'T'], ['park', 'T'], ['pillar_hall', 'F'], ['ragged_hall', 'F'], ['office', 'F'], ['loop_hall', 'F']];
-  for (const [id, kind] of cases) for (let s = 1; s <= 8; s++) {
+  const S8 = MODE.size(4, 8);
+  for (const [id, kind] of cases) for (let s = 1; s <= S8; s++) {
     const b = kind === 'T' ? T.generate({ archetype: id, seed: s * 7, wrongness: id === 'park' ? 0.6 : undefined }) : filler(id, s * 7);
     if (b.error || !(b.verticals || []).some((v) => !v.dead && (v.rooms || []).length > 1)) continue;
     n++;
@@ -265,7 +287,7 @@ const surf = (p, id) => p.surfaces.find((s) => s.id === id);
     const hit = E.connectionAt(b, mid[0], mid[1], 16 + c.landings[1][2], false, 16);
     assert(hit && Math.abs(hit.landings[1][2] - 16 - c.landings[1][2]) < EPS, id + '#' + s + ': the map finds the stair on the template');
   }
-  assert(n >= 20 && links >= n, n + ' templates, ' + links + ' stairs');
+  assert(n >= S8 * 20 / 8 && links >= n, n + ' templates, ' + links + ' stairs');
   // a template changed after it was generated: its kept stairs no longer stand, and are laid out again
   const b = T.generate({ archetype: 'two_storey', seed: 3 }), moved = JSON.parse(JSON.stringify(b));
   moved.rooms[0].rects[0][0] += 0.5;

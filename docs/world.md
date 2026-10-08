@@ -296,7 +296,7 @@ W.biomeAt(x, y);           // { openness, name }
   the ids `LOT.build` gave them, and on a flush lot to the world's own
   connection ids. `W.graph` joins blueprints through those ids.
 
-## Tests (`tests/world.test.js`, five seeds)
+## Tests (`tests/world.test.js`, five seeds; two in quick mode)
 
 * Sites tile every cell exactly, with no gaps or overlaps, in whole metres.
   Ids are unique. Filler sites are room-cluster sized, and some are irregular.

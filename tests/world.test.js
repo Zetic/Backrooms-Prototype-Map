@@ -1,9 +1,9 @@
 // The template-first world: cell plans, the connection graph, every site
 // built by a template, and the rules that make an infinite map work.
-// run: node tests/world.test.js [seed]
-const { BR, components, harness } = require('./helpers');
+// run: node tests/world.test.js [seed] [--full]
+const { BR, components, harness, MODE } = require('./helpers');
 const { walk1m } = require('./walk');
-const { check, finish } = harness(), seed = +(process.argv[2] || 31337), C = BR.WORLD_CFG.cell, TPL = BR.TPL, TG = BR.TG;
+const { check, timed, finish } = harness(), seed = +(process.argv[2] || 31337), C = BR.WORLD_CFG.cell, TPL = BR.TPL, TG = BR.TG;
 const strip = (x) => JSON.stringify(x, (k, v) => (k === 'ms' || k === '_filler' ? undefined : v));
 const planPrint = (W, i0, j0, i1, j1) => {
   const out = [];
@@ -227,11 +227,16 @@ const B = [-1, -1, 1, 1];
   // streaming cost is what a running map pays: time a second pass over the same
   // cells in a fresh world, once the code is warm (the first pass above also
   // pays for compiling it, and swings with the machine)
-  const cold = ms / n, Wt = new BR.World(seed);
-  let warm = 0, m = 0;
-  for (let i = B[0]; i <= B[2]; i++) for (let j = B[1]; j <= B[3]; j++) for (const s of Wt.cell(i, j).sites) { warm += Wt.build(s).ms; m++; }
-  const avg = warm / m;
-  check('sites build fast enough to stream (under 5 ms on average)', avg < 5, `${avg.toFixed(2)} ms per site (first pass ${cold.toFixed(2)})`);
+  // (tests/mode.js: a busy machine gets another pass before it counts; quick
+  // mode times the middle row of cells, full mode all nine)
+  const cold = ms / n, J = MODE.full ? [B[1], B[3]] : [0, 0], stream = MODE.timing(5, () => {
+    const Wt = new BR.World(seed);
+    let warm = 0, m = 0;
+    for (let i = B[0]; i <= B[2]; i++) for (let j = J[0]; j <= J[1]; j++) for (const s of Wt.cell(i, j).sites) { warm += Wt.build(s).ms; m++; }
+    return warm / m;
+  });
+  stream.detail = stream.detail.replace(' ms', ' ms per site') + `; first pass ${cold.toFixed(2)}`;
+  timed('sites build fast enough to stream (under 5 ms on average)', stream);
 }
 
 // ---- 6. one connected world
@@ -302,10 +307,14 @@ const B = [-1, -1, 1, 1];
 
 // ---- 9. cost
 {
-  const W2 = new BR.World(seed + 9), t0 = Date.now();
-  for (let i = 0; i < 12; i++) for (let j = 0; j < 12; j++) W2.cell(i, j);
-  const per = (Date.now() - t0) / 144;
-  // a house is built when its cell is planned (its lot is sized round it)
-  check('planning a cell is cheap (under 60 ms, its houses included)', per < 60, `${per.toFixed(2)} ms per cell`);
+  // a house is built when its cell is planned (its lot is sized round it);
+  // 12 x 12 fresh cells in full mode, 6 x 6 in quick mode
+  const n = MODE.size(6, 12), plan = MODE.timing(60, () => {
+    const W2 = new BR.World(seed + 9), t0 = Date.now();
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) W2.cell(i, j);
+    return (Date.now() - t0) / (n * n);
+  });
+  plan.detail = plan.detail.replace(' ms', ' ms per cell') + `; ${n * n} cells`;
+  timed('planning a cell is cheap (under 60 ms, its houses included)', plan);
 }
 finish();

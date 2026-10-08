@@ -1,5 +1,5 @@
 /*
- * Template checks (run: node tests/templates.test.js [seedsPerArchetype])
+ * Template checks (run: node tests/templates.test.js [seedsPerArchetype] [--full])
  *
  *   - every archetype builds on many seeds, main sides and site shapes
  *   - every building passes validation and keeps the br.building/0.2
@@ -13,9 +13,9 @@
 const path = require('path');
 for (const f of ['core', 'tpl/grid', 'tpl/framework', 'tpl/catalogue', 'tpl/house', 'tpl/room', 'tpl/composite', 'tpl/neighborhood', 'tpl/park', 'tpl/zone', 'tpl/archetypes/house', 'tpl/archetypes/room', 'tpl/archetypes/neighborhood', 'tpl/archetypes/park', 'tpl/archetypes/lone'])
   require(path.join(__dirname, '..', 'src', f + '.js'));
-const BR = globalThis.BR, TPL = BR.TPL, TG = BR.TG;
+const BR = globalThis.BR, TPL = BR.TPL, TG = BR.TG, MODE = require('./mode');
 
-const N = +(process.argv[2] || 40);
+const N = +(process.argv[2] || MODE.size(16, 40));
 let failures = 0;
 function check(name, ok, detail) {
   console.log((ok ? 'ok   ' : 'FAIL ') + name + (detail ? '  (' + detail + ')' : ''));

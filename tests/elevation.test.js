@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { BR } = require('./helpers');
+const { BR, MODE } = require('./helpers');
 require('../src/tpl/elevation'); require('../src/band-world');
 const E = BR.ELEV, copy = (b) => JSON.parse(JSON.stringify(b));
 let builds = 0;
@@ -57,7 +57,7 @@ let potentials = 0, variants = 0;
 // still gets its compact fallback in both directions.
 for (const a of BR.TPL.listArchetypes()) {
   let tested = 0;
-  for (let seed = 1; seed <= 6; seed++) {
+  for (let seed = 1; seed <= MODE.size(2, 6); seed++) {
     const source = BR.TPL.generate({ archetype: a.id, seed: seed * 7919, approach: 'SENW'[seed % 4] });
     if (source.error) continue;
     const before = JSON.stringify(source), b = E.prepare(source);
@@ -73,7 +73,7 @@ for (const a of BR.TPL.listArchetypes()) {
 {
   // the houses that broke the fallback before: wings reached through a second door
   let multi = 0;
-  for (const id of ['ranch', 'bungalow', 'suburban']) for (let seed = 1; seed <= 40; seed++) {
+  for (const id of ['ranch', 'bungalow', 'suburban']) for (let seed = 1; seed <= MODE.size(16, 40); seed++) {
     const source = BR.TPL.generate({ archetype: id, seed: seed * 31, approach: 'SENW'[seed % 4] });
     const main = source.portals.find((p) => p.main), adj = new Map(source.rooms.map((r) => [r.id, []]));
     for (const [x, y, k] of source.graph.edges) if (adj.has(x) && adj.has(y) && !['window', 'false'].includes(k)) { adj.get(x).push(y); adj.get(y).push(x); }
@@ -103,7 +103,7 @@ for (const f of BR.FILL.list()) {
   for (const direction of ['up','down']) { good(E.ladderVariant(source, { direction })); variants++; }
   potentials++;
 }
-for (const direction of ['up','down']) for (const approach of ['S','E','N','W']) for (let seed = 1; seed <= 12; seed++) {
+for (const direction of ['up','down']) for (const approach of ['S','E','N','W']) for (let seed = 1; seed <= MODE.size(4, 12); seed++) {
   const source = BR.TPL.generate({ archetype:'closet', seed, approach, wrongness:0, site: approach === 'E' || approach === 'W' ? {w:1,h:1.5} : {w:1.5,h:1} });
   const b = E.ladderVariant(source,{direction}); good(b); variants++;
   assert.equal(b.connectors[0].state, 'connected');

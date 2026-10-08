@@ -157,8 +157,28 @@ W.cell(0, 0).conns;           // the connection graph of a cell
 ## Verification
 
 ```sh
-node tests/run-all.js
+node tests/run-all.js           # quick: while working, after each change
+node tests/run-all.js --full    # full: before pushing or opening a PR (CI runs this)
 ```
+
+Run the **quick** mode while you work: it runs every check, on 2 world seeds
+and smaller samples where a check samples many seeds or sizes. Run the
+**full** mode before a PR: all 5 world seeds and the full samples, every check
+the suite has (375). GitHub Actions runs the full mode on every pull request to
+`main` (`.github/workflows/tests.yml`) and shows the result on the PR.
+
+Test files run in parallel, one per core and slowest first (`--jobs N` to
+change that); each file's output is printed in one block when it finishes,
+then a table of times. `node tests/run-all.js world floors` runs only those
+files. A single file runs on its own too (`node tests/floors.test.js
+[--full]`); the mode is read in one place, `tests/mode.js`. Timing checks take
+the best of up to three passes: in quick mode they only report a slow pass
+(`WARN`), in full mode they fail when even the best is over budget by more than
+25%.
+
+Measured on 2026-10-08 on a 4-core cloud machine: quick 46 s, full 76 s; held
+to 2 cores, quick 85 s and full 141 s. The old one-file-at-a-time run of the
+full suite took 149 s and 176 s there.
 
 The runner checks:
 
@@ -202,7 +222,7 @@ The runner checks:
   filler behind the same doors.
 - **Fillers.** Every filler keeps the contract on any site shape and honours
   every connection. The pool leans enclosed, and fillers are fast.
-- **The world, on five seeds.** Sites tile every cell exactly. Connections are
+- **The world, on five seeds (two in quick mode).** Sites tile every cell exactly. Connections are
   exact openings on shared lines, and the cells agree on their borders. The
   plan is the same in any order and with a tiny cache. Every site builds with
   no problems, every connection is cut on both sides, and every room in a

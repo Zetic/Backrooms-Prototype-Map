@@ -1,8 +1,8 @@
 // Vertical journeys (journeys.js): a stack of different templates climbing
 // from one band's floor to the next band's, 16 m up.
-// run: node tests/journeys.test.js
+// run: node tests/journeys.test.js [--full]
 const assert = require('node:assert/strict');
-const { BR } = require('./helpers');
+const { BR, MODE } = require('./helpers');
 const E = BR.ELEV, J = BR.JOURNEY, TG = BR.TG, EPS = 1e-7;
 const ok = (name) => console.log('ok   ' + name);
 const gen = (spec) => J.generate(Object.assign({ id: 'journey:test' }, spec));
@@ -22,7 +22,7 @@ function reach(b, start) {
 
 // ---- 1. a batch over every style and the world's territory sizes
 const batch = [];
-for (const style of Object.keys(J.STYLES)) for (let k = 0; k < 6; k++) {
+for (const style of Object.keys(J.STYLES)) for (let k = 0; k < MODE.size(4, 6); k++) {
   const spec = { seed: 1000 + k * 7919 + style.length, w: 40 + (k * 5) % 17, h: 32 + (k * 7) % 17, lower: k % 3 - 1, style };
   batch.push({ spec, b: gen(spec) });
 }
