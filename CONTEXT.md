@@ -18,7 +18,7 @@ carries its stairwell on up, and a branch of its biome (`houseroom`) grows at
 that floor. Step 3, **recursive growth** (PR #26, `src/growth.js`): growths
 climb through floors of their biome to the next band, districts cross cell
 borders, and the journey plots are gone from the world. Step 3b, **denser
-growth**, is this branch: the ground plan plants a growth house in one cell
+growth** (PR #27): the ground plan plants a growth house in one cell
 of every 2 × 2 block, branches are a little bigger, tall rooms are grown
 round, the landing reserve is only the sites near each house, and the map
 draws every growth without freezing. Step 4 (houseroom variety) is next; the Unreal consumer of the exported
@@ -56,7 +56,7 @@ data is milestone 6.
 | [#24](https://github.com/Zetic/Backrooms-Prototype-Map/pull/24) | Milestone 5 (growth step 1): layered ownership, a hand-placed raised branch over the ground and a pit drilled back down |
 | [#25](https://github.com/Zetic/Backrooms-Prototype-Map/pull/25) | Growth step 2: biomes, a house pillar, and a branch of house rooms grown from it |
 | [#26](https://github.com/Zetic/Backrooms-Prototype-Map/pull/26) | Growth step 3: recursive growth between the bands; journey plots removed from the world |
-| (this branch) | Growth step 3b: an origin per 2 × 2 block with its house planted by the ground plan, bigger branches, tall rooms grown round, a smaller landing reserve, every growth on the zoomed-out map |
+| [#27](https://github.com/Zetic/Backrooms-Prototype-Map/pull/27) | Growth step 3b: an origin per 2 × 2 block with its house planted by the ground plan, bigger branches, tall rooms grown round, a smaller landing reserve, every growth on the zoomed-out map |
 
 ## What the user wants
 
