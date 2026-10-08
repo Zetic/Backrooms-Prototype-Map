@@ -18,8 +18,8 @@ milestone is milestone 5, an Unreal consumer of the exported data.
   packages. `index.html` is the map, `workbench.html` the template workshop,
   `elevation.html` the elevation lab. Serve the folder statically to inspect
   (`python3 -m http.server 8765`).
-- `main` holds everything below; the last merge is PR #22 (`aa7450b`). There
-  are no open PRs. The branches `claude/world-journeys` and
+- `main` holds everything below up to PR #22 (`aa7450b`); fast test runs are
+  [#23](https://github.com/Zetic/Backrooms-Prototype-Map/pull/23). The branches `claude/world-journeys` and
   `claude/kept-stairs` are merged and can be deleted.
 - Lesson from #21: it was stacked on `claude/world-journeys` and merged into
   that branch after #20 had already merged, so it missed `main` until #22
@@ -37,6 +37,7 @@ milestone is milestone 5, an Unreal consumer of the exported data.
 | [#19](https://github.com/Zetic/Backrooms-Prototype-Map/pull/19) | Milestone 3: houses of several storeys, sunken floors, galleries, a template's own stairs built for real |
 | [#20](https://github.com/Zetic/Backrooms-Prototype-Map/pull/20) | Milestone 4: journeys between bands, stacks of different fillers joined by stairs, ramps and ladders |
 | [#21](https://github.com/Zetic/Backrooms-Prototype-Map/pull/21), [#22](https://github.com/Zetic/Backrooms-Prototype-Map/pull/22) | Kept stairs: a template's stairs laid out once at generation and drawn on the map (#22 brought #21 to `main`) |
+| [#23](https://github.com/Zetic/Backrooms-Prototype-Map/pull/23) | Fast test runs: parallel runner, quick and full modes, CI on every PR |
 
 ## What the user wants
 
