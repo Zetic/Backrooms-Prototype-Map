@@ -65,7 +65,8 @@
     <div><i style="background:#3b3934"></i>Solid</div>
     <div><i style="background:#c4a068"></i>POI site (far)</div>
     <div><i style="background:#988462"></i>Site (far)</div>
-    <div><i style="background:#7e9c9a"></i>Journey (far)</div>
+    <div><i style="background:#b5a4c5"></i>Raised floor (plan)</div>
+    <div><i style="background:#7ebab4"></i>Climb up from below (plan)</div>
   </div>
   <div class="note">Every site is built by a template from its connections: a filler from the Backrooms pool, a house behind its front yard, or a block-sized template on its own lot. Smaller templates sit inside fillers. Zoom in past 1 px/m to see blueprints.</div>
   <div class="sec">Elevation</div>
@@ -77,8 +78,8 @@
   <label class="tg" for="height">Cutaway height</label>
   <input id="height" type="range" step="0.01" style="width:100%" aria-label="Cutaway height">
   <div class="row"><input id="height-value" type="number" step="any" aria-label="Cutaway height in metres"><span>m</span><button id="height-reset">Band height</button></div>
-  <div class="note">Shows the highest floor below the cut at each location. Darker floors are farther below it. Stairs, ramps and ladders show how each floor is reached: click one to move the cut to where it arrives, or click a template to inspect its floors. Journeys join the bands: in every 512 m region one climbs to the band above and one to the band below, through floors of different templates.</div>
-  <div class="row"><button id="journey-down" title="Centre the view on the nearest journey down">Journey ↓</button><button id="journey-up" title="Centre the view on the nearest journey up">Journey ↑</button></div>
+  <div class="note">Shows the highest floor below the cut at each location. Darker floors are farther below it. Stairs, ramps and ladders show how each floor is reached: click one to move the cut to where it arrives, or click a template to inspect its floors. Growths join the bands: from a house's stairwell or a block's stair, districts of house rooms climb floor by floor, and some reach the band above.</div>
+  <div class="row"><button id="way-down" title="Centre the view on the nearest climb arriving from the band below">Way ↓</button><button id="way-up" title="Centre the view on where the nearest climb to the band above starts">Way ↑</button></div>
   <div id="selection" hidden>
     <div class="sec" id="selection-name"></div>
     <select id="floor" aria-label="Selected template floor"></select>
@@ -127,7 +128,6 @@
 <script src="src/tpl/render2d.js"></script>
 <script src="src/tpl/elevation.js"></script>
 <script src="src/tpl/connections.js"></script>
-<script src="src/journeys.js"></script>
 <script src="src/claims.js"></script>
 <script src="src/biomes.js"></script>
 <script src="src/tpl/elevation-view.js"></script>
@@ -135,6 +135,7 @@
 <script src="src/world.js"></script>
 <script src="src/seams.js"></script>
 <script src="src/band-world.js"></script>
+<script src="src/growth.js"></script>
 <script src="src/render.js"></script>
 <script>
 (function () {
@@ -220,24 +221,28 @@
     if (id !== hoverSite) { hoverSite = id; dirty = true; }
     const bio = world.biomeAt(x, y);
     if (!s) { $('info').innerHTML = '<b>' + bio.name + '</b> · openness ' + bio.openness.toFixed(2); return; }
-    const F = BR.FILL.fillers[world.fillerOf(s)], b = s.bbox, T = s.transition;
-    const what = T ? '<b>Journey</b> · band ' + T.lower + ' ↔ band ' + T.upper + (s.band === T.lower ? ' · climbs up from here' : ' · climbs down from here') : s.kind === 'flush' ? '<b>' + esc(s.pois[0].name) + '</b> · its own lot, doors on the edge' : s.kind === 'lot' ? '<b>' + esc(s.pois[0].name) + '</b> · its own lot, in a yard' : '<b>' + esc(F.name) + '</b> · ' + F.feel + ' filler';
+    const F = BR.FILL.fillers[world.fillerOf(s)], b = s.bbox;
+    const what = s.kind === 'flush' ? '<b>' + esc(s.pois[0].name) + '</b> · its own lot, doors on the edge' : s.kind === 'lot' ? '<b>' + esc(s.pois[0].name) + '</b> · its own lot, in a yard' : '<b>' + esc(F.name) + '</b> · ' + F.feel + ' filler';
     let html = what + '<br>site ' + s.id + ' · ' + (b[2] - b[0]) + '×' + (b[3] - b[1]) + ' m · ' + s.area + ' m²' +
       (s.rects.length > 1 ? ' · ' + s.rects.length + ' blocks' : '') + '<br>' + s.conns.length + (s.conns.length === 1 ? ' connection · ' : ' connections · ') + bio.name + ' (openness ' + s.openness.toFixed(2) + ')';
     if (world.hasBuild(s)) {
       const r = world.build(s), f = r.filler;
-      if (T) html += '<br>' + (f.kind === 'journey' ? esc(f.source.style) + ' · ' + f.source.stages.map((st) => esc(st.filler) + ' ' + BR.ELEV.zLabel(T.lower * BR.BAND_CFG.spacing + st.z) + (st.leg ? ' → ' + st.leg : '')).join(' → ')
-        : 'no journey fits this territory: ' + esc(f.name) + ' stands in, behind the same doors');
       html += '<br>' + (f ? f.rooms.length + ' rooms · ' + (Number.isFinite(f.meta.built) ? 'built ' + Math.round(f.meta.built * 100) + '% · ' : '') : '') + r.ms.toFixed(1) + ' ms' + (r.issues.length ? '<br><span style="color:#e0503f">' + esc(r.issues[0]) + '</span>' : '');
       const hit = hitTemplate(s, x, y, false);
       if (hit && hit.room) {
         const z = hit.room.floorZ, room = hit.room.room;
-        html += '<br>' + (hit.raised ? '<b>raised branch</b> · ' + (hit.raised.biome ? esc((BR.BIOME.DEFS[hit.raised.biome] || {}).label || hit.raised.biome) + ', ' + (hit.raised.hop ? hit.raised.hop + (hit.raised.hop === 1 ? ' site' : ' sites') + ' from its pillar' : 'beside its pillar') + ' · ' : '') : '') + esc(room.name) + ' · floor ' + BR.ELEV.zLabel(z) + ' · clear height ' + room.ceiling + ' m · ' + Math.max(0, state.cutZ - z).toFixed(2) + ' m below cut';
+        const rs = hit.raised;
+        html += '<br>' + (rs ? '<b>' + (hit.arrival ? 'climb from band ' + rs.band : 'raised floor, level ' + rs.level) + '</b> · ' + (rs.biome ? esc((BR.BIOME.DEFS[rs.biome] || {}).label || rs.biome) + ', ' + (rs.hop ? rs.hop + (rs.hop === 1 ? ' site' : ' sites') + ' from where its level is entered' : 'where its level is entered') + ' · ' : '') : '') + esc(room.name) + ' · floor ' + BR.ELEV.zLabel(z) + ' · clear height ' + room.ceiling + ' m · ' + Math.max(0, state.cutZ - z).toFixed(2) + ' m below cut';
         const pit = (hit.b.drops || []).find((d) => d.role === 'top' && x - hit.origin[0] >= d.rect[0] && x - hit.origin[0] < d.rect[2] && y - hit.origin[1] >= d.rect[1] && y - hit.origin[1] < d.rect[3]);
         if (pit) html += '<br><b>pit</b> · drops ' + pit.fall.toFixed(2) + ' m into what is below, no way back up';
       } else html += '<br>No walkable floor below this cut here';
       const over = world.raisedAt && world.raisedAt(x, y);
-      if (over && (!hit || !hit.raised)) html += '<br>a claim stands over this ground: its floor is at ' + BR.ELEV.zLabel(over.floorZ) + ', this site keeps its own below ' + BR.ELEV.zLabel(world.ceilingOf(s));
+      if (over && (!hit || !hit.raised)) html += '<br>a growth stands over this ground: its floor is at ' + BR.ELEV.zLabel(over.floorZ) + ', this site keeps its own below ' + BR.ELEV.zLabel(world.ceilingOf(s));
+      // where a growth climbs from, or a climb from the band below arrives
+      const G = world.growthAt && world.growthAt(s.band, s.i, s.j);
+      if (G && G.anchor === s.id) html += '<br><b>' + (G.pillar === 'stair' ? 'stair pillar' : 'house pillar') + '</b> · a growth climbs from here: floors at ' + G.levels.map((l) => BR.ELEV.zLabel(l.floorZ)).join(', ') + (G.arrival ? ' · reaches band ' + G.arrival.band : '');
+      const A = world.arrivalInto && world.arrivalInto(s);
+      if (A) html += '<br><b>landing site</b> · a ' + A.type + ' climbs ' + A.rise + ' m up into it from band ' + (A.band - 1);
     }
     const P = world.poiAt(x, y);
     if (P) {
@@ -357,12 +362,20 @@
     const candidates = [];
     // a claim stacked over this ground comes first: at a cut below its floor
     // it simply has nothing here, and the ground site answers instead
-    const rs = world.raisedAt && world.raisedAt(x, y);
-    if (rs) {
+    // (floors stacked over floors: the highest first)
+    const stacked = world.raisedIn ? world.raisedIn(x, y, x + 1e-6, y + 1e-6).filter((q) => q.rects.some((r) => x >= r[0] && x < r[2] && y >= r[1] && y < r[3])).sort((a, b) => b.floorZ - a.floorZ) : [];
+    for (const rs of stacked) {
       // its rooms first (they stand inside its filler), then the filler round them
       const rr = world.raisedBuild(rs), biome = rs.biome ? (BR.BIOME.DEFS[rs.biome] || {}).label || rs.biome : '';
-      for (const B of rr.buildings) candidates.push({ b: B.b, origin: B.origin, key: rs.id + '/' + B.poi.id, name: 'raised branch · ' + B.poi.name + (biome ? ' (' + biome + ')' : ''), raised: rs });
-      candidates.push({ b: rr.filler, origin: rr.fillerOrigin, key: rs.id, name: 'raised branch · ' + rr.filler.name + (biome ? ' (' + biome + ')' : ''), raised: rs });
+      for (const B of rr.buildings) candidates.push({ b: B.b, origin: B.origin, key: rs.id + '/' + B.poi.id, name: 'raised floor · ' + B.poi.name + (biome ? ' (' + biome + ')' : ''), raised: rs });
+      candidates.push({ b: rr.filler, origin: rr.fillerOrigin, key: rs.id, name: 'raised floor · ' + rr.filler.name + (biome ? ' (' + biome + ')' : ''), raised: rs });
+    }
+    // a climb arriving from the band below: its landing and flight, inside the opening it comes up through
+    for (const A of world.arrivalsIn ? world.arrivalsIn(x, y, x + 1e-6, y + 1e-6) : []) {
+      const q = A.arrival.box;
+      if (x < q[0] || x >= q[2] || y < q[1] || y >= q[3]) continue;
+      const rr = world.raisedBuild(A.site);
+      candidates.push({ b: rr.filler, origin: rr.fillerOrigin, key: A.site.id, name: 'climb from band ' + A.site.band + ' · ' + rr.filler.name, raised: A.site, arrival: A.arrival });
     }
     if (!world.hasBuild(s) && !build) { if (!candidates.length) return null; }
     else {
@@ -431,17 +444,17 @@
     $('seed').value = state.seed; newWorld();
   });
   $('home').addEventListener('click', () => { state.x = 0; state.y = 0; changed(); });
-  // the nearest journey up or down: centre on it, close enough to see its floors
-  function findJourney(direction) {
-    const p = world.nearestJourney(direction, state.x, state.y);
-    if (!p) { $('export-status').textContent = 'No journey ' + direction + ' nearby.'; return; }
-    state.x = (p.rect[0] + p.rect[2]) / 2; state.y = (p.rect[1] + p.rect[3]) / 2;
-    state.zoom = Math.max(state.zoom, Math.min(ZMAX, Math.min(W, H) * 0.6 / Math.max(p.rect[2] - p.rect[0], p.rect[3] - p.rect[1])));
-    $('export-status').textContent = 'Journey ' + direction + ' to band ' + (direction === 'up' ? p.upper : p.lower) + ' at ' + Math.round(state.x) + ', ' + Math.round(state.y) + '.';
+  // the nearest way up (where a growth that reaches the band above starts) or
+  // down (where a climb from the band below arrives): centre on it, close in
+  function findWay(direction) {
+    const p = world.nearestWay(direction, state.x, state.y);
+    if (!p) { $('export-status').textContent = 'No way ' + direction + ' found nearby.'; return; }
+    state.x = p.at[0]; state.y = p.at[1]; state.zoom = Math.max(state.zoom, 6);
+    $('export-status').textContent = 'Way ' + direction + ' to band ' + p.band + ' at ' + Math.round(state.x) + ', ' + Math.round(state.y) + ' (' + p.growth.pillar + ' pillar, floors at ' + p.growth.levels.map((l) => BR.ELEV.zLabel(l.floorZ)).join(', ') + ').';
     clearSelection(); changed();
   }
-  $('journey-up').addEventListener('click', () => findJourney('up'));
-  $('journey-down').addEventListener('click', () => findJourney('down'));
+  $('way-up').addEventListener('click', () => findWay('up'));
+  $('way-down').addEventListener('click', () => findWay('down'));
   $('goto').addEventListener('change', () => {
     const m = $('goto').value.split(/[ ,]+/).map(Number);
     if (m.length >= 2 && m.every(Number.isFinite)) { state.x = m[0]; state.y = m[1]; changed(); }

@@ -1,7 +1,9 @@
 # Elevation implementation plan
 
-Updated 2026-10-08 with growth step 2, one house pillar and its branch (the
-growth design and its build order: [growth.md](growth.md)). Milestone 5
+Updated 2026-10-08 with growth step 3, recursive growth between the bands,
+which replaces the journey plots in the world (the growth design and its build
+order: [growth.md](growth.md)). Growth step 2 (one house pillar and its branch)
+was merged in [PR #25](https://github.com/Zetic/Backrooms-Prototype-Map/pull/25). Milestone 5
 (layered ownership, growth step 1) was merged in
 [PR #24](https://github.com/Zetic/Backrooms-Prototype-Map/pull/24), milestone 4 (world
 journeys) in [PR #20](https://github.com/Zetic/Backrooms-Prototype-Map/pull/20),
@@ -194,9 +196,9 @@ the atrium generator, world placement policy and associated previews are removed
 | Generated local vertical connections | Ladder, straight/switchback stair and ramp variants, chosen by template preference and fit; selected in the elevation lab |
 | Slope-following reservations | Implemented: one prism per 0.5 m of flight; space under the high end stays free |
 | Template floors | Milestone 3: two- and three-storey houses, sunken floors, galleries over an undercroft; the template's own stairs are real connectors |
-| World connections between reference bands | Milestone 4: one journey per pair of neighbouring bands per 512 m region, a stack of different fillers joined by stairs, ramps and ladders; neighbouring bands are one network. Other templates' zones stay unselected in exports |
+| World connections between reference bands | Growth step 3: growths climb from house and stair pillars through floors of their biome, by legs with exact rises, and some land in the next band's landing sites; at least one steered growth is tried per block of 4 × 4 cells. Milestone 4's journey plots are gone from the world (the generator stays in the lab). Other templates' zones stay unselected in exports |
 | Several owners in one column | Milestone 5: claims with height ranges, the ground below a raised claim capped but otherwise unchanged, and a pit drilled one way down into it |
-| Growth | Step 2: a house that seeds growth carries its stairwell on up (its pillar) and a branch of its biome grows at that floor over 1-4 plain ground sites: houseroom fillers with house rooms standing in them, densest beside the pillar. Recursive growth and steering are next ([growth.md](growth.md)) |
+| Growth | Steps 2-3: a house that seeds growth carries its stairwell on up (its pillar), or a block's stair cell takes a stair up from a plain ground site; floors of its biome grow at each level over 1-4 sites (houseroom fillers with house rooms in them), each level reached by a leg from the one below, the last reaching the next band. Districts cross cell and region borders. Houseroom variety is next ([growth.md](growth.md)) |
 
 Old abstract stair annotations in source templates are not proof of a physical
 vertical connection. The adapter reports differing-floor legacy links as
@@ -391,7 +393,11 @@ storey half a level up), pits without steps (a drop you cannot climb out of),
 stairs that leave a room through a doorway, and composites with storeys of
 their own.
 
-### Milestone 4 — World journeys composed from templates (implemented)
+### Milestone 4 — World journeys composed from templates (implemented, then retired from the world)
+
+*Since growth step 3 the world no longer places journeys: growth joins the
+bands. The generator (`src/journeys.js`) and its tests stay, and the elevation
+lab still builds journeys. What follows describes milestone 4 as built.*
 
 The world's bands are joined again, by journeys made of templates
 (`src/journeys.js`, placed by `src/band-world.js`).
@@ -612,15 +618,77 @@ its raised site's claim, and `policy.raisedBranches: "house-pillars"` with
 seeds, 20 houses could have seeded a branch and 14 branches grew, 7 with a
 pit.
 
-Not yet: pillars rising from branches, a budget per region and steering toward
-the next band (step 3), new houseroom fillers (step 4), and seeds other than
-houses. Planning a branch builds its ground sites and its district once
+Not yet (at step 2): pillars rising from branches, a budget per region and
+steering toward the next band (now step 3, below), new houseroom fillers
+(step 4), and seeds other than houses. Planning a branch builds its ground sites and its district once
 (about 0.1-0.4 s, up to about a second on a busy machine): when its cell
 first comes into detail view on the map, or a site of it is built, graphed or
 exported. The plan view never plans one: it tints only branches already
 planned. The export keeps the schema `br.world-elevation/0.2`; its `policy`
 changed (`raisedBranches`, `growth`; milestone 5's `branchFloor` is gone,
 each raised site carries its own `floorZ`).
+
+### Growth step 3 — Recursive growth (implemented)
+
+The climb between bands is grown, not plotted (`src/growth.js`, used by
+`src/band-world.js`; the design and the owner's answers: [growth.md](growth.md)).
+The journey plots are gone from the world.
+
+- **Origins and ownership.** A cell is an origin when a house in it seeds
+  growth, or when it is its block's stair cell (one cell per block of 4 × 4,
+  by the seed). Each origin has a priority; a cell with no origin goes to its
+  top-priority origin neighbour. A growth uses its own cell and the cells it is
+  given, across any border, and two growths never share a cell.
+- **Pillars.** A house pillar as in step 2. A stair pillar: a plain ground site
+  of the stair cell whose own filler takes a stair (or ramp, or ladder) up to
+  +4.5-6.5 m (`E.connectionVariant`, exact rise); its landing's doorway opens
+  onto the growth's first floor, standing over the rest of the site.
+- **Levels and legs.** `GROWTH.schedule` sets the floors from the first: legs
+  of 3-6.5 m on the half metre, the top floor a storey under the band's ceiling
+  and one leg under the next band's floor (a townhouse at +9.5 m climbs
+  straight on; +4.5-6.5 m starts climb once more, to +9.5-11.75 m). Each level
+  grows breadth first over plain ground and the level below's floors, 1-4 sites;
+  every floor's ceilings are capped under the next level's slab. A leg leaves
+  from the level's floor furthest from where it was entered, its filler taking
+  a stair or ramp (anywhere they fit before a ladder anywhere) with the exact
+  rise, and the next level's first floor stands over that site less the
+  climb's footprint, entered from the landing's doorway. No climb stands over
+  another. `connectionVariant` and `ladderVariant` take a `within` option for
+  this: the whole route and its landing inside given rects.
+- **Arrival.** The last leg climbs to the next band's floor inside a landing
+  site of that band (40% of its plain sites, which its own growth never uses)
+  in the same cell, a metre in from its edge. The landing site is rebuilt round
+  the climb with its own doors and one onto the landing, matched portal to
+  portal at the band's floor. Planning band n reads band n + 1's cell plans and
+  raw builds only, never its growth.
+- **Steering.** Every block's stair cell and half the house growths always
+  climb on and try to arrive, their top level growing toward landing sites; the
+  rest climb each level, and arrive, by chance (50%). Over the test window of
+  three seeds about three steered growths in four arrive and 11 of 12 blocks have a
+  way up. A steered growth that cannot arrive just ends.
+- **Claims.** Ground to the slab of the floor on it; a raised floor from its
+  slab to the next level's slab or the band's ceiling, plus the climb it
+  carries; a landing site's claim leaves the climb out. Three owners can share
+  a column (the ground, the top floor, the landing site above).
+
+On the map, floors of every level are painted at their own heights; in the band
+above, a climb from below shows through its landing site's opening; *Way ↑* and
+*Way ↓* centre the view on the nearest growth that reaches the band above
+(where it starts) or the nearest arrival from below. The export is
+`br.world-elevation/0.3`: `journeys` is gone, `policy.verticalJourneys` is
+`"grown"`, `policy.growth` describes the rules, `growths[]` lists each growth
+(pillar, levels, legs, arrival, pit), raised entries carry their `growth`,
+`level` and claim top, and slices list the growth's connections with an end in
+the cell.
+
+Planning a growth reads up to 25 cell plans (who owns what), raw builds of its
+sites and a few district builds per level: about 0.2-2 s per growth. The map
+plans the growths of the cells it shows in detail, and of the band below (for
+arrivals); the plan view never plans one.
+
+Not yet: houseroom variety (step 4), emergent connections beyond the first
+level's pit (step 5), growths joining each other (step 6), growth downward
+toward the band below, and seeds other than houses.
 
 ### Milestone 6 — Unreal consumer proof
 
@@ -639,8 +707,9 @@ a type (auto, ladder, stair, ramp) and optionally an exact rise. “Potential on
 · show zones” draws every available zone without connecting any. The reports
 list the types that fit each direction, the template's preference, each link's
 shape, run, slope and reserved prisms, and the zones table. A connected local
-variant does not connect world bands; the lab's journeys (one per style, or
-the style from the seed) are what the world places between them.
+variant does not connect world bands: growth does that (step 3). The lab's
+journeys (one per style, or the style from the seed) are milestone 4's stacks,
+kept for comparison.
 
 ```js
 const source = BR.TPL.generate({ archetype: 'ranch', seed: 7 });
@@ -664,17 +733,17 @@ const hall = BR.FILL.generate({ filler: 'pillar_hall', seed: 3, site: { w: 26, h
 hall.meta.floors;                              // [{ pattern: 'gallery', at: 3.65, side: 'N', ... }]
 ```
 
-Journeys, alone or as the world places them:
+Growth in the world, and a journey alone:
 
 ```js
-const plan = BR.JOURNEY.plan({ seed: 3, w: 48, h: 40 });   // its doors onto each band, before building
-const j = BR.JOURNEY.generate({ id: 'j', seed: 3, w: 48, h: 40, lower: 0, doors: plan, style: 'ramps' });
-j.source;                         // { style, rises: [3.15, ...], stages: [{ filler, z, rect, leg }, ...] }
-BR.JOURNEY.doorsAt(j, 16);        // the doors it built onto band 1
 const world = new BR.BandWorld(7);
-const p = world.journeyPlan(0, 0, 0);          // band 0 to 1 in region (0, 0): cell, rectangle, seed
-world.journey(p);                              // its blueprint (cached), or null
-world.nearestJourney('up', 0, 0);              // from the active band
+const G = world.growth(0, 2, -2);              // origin cell (2, -2) of band 0: pillar, levels, legs, arrival, pit
+G.levels;                                      // [{ level: 1, z: 9.5, floorZ: 9.5, sites: [...] }]
+G.arrival;                                     // { band: 1, site, ground (band 1's landing site), box, type, rise, conn, ... }
+world.growthAt(0, 1, -3);                      // the growth that may use a cell (its owner's)
+world.nearestWay('up', 0, 0);                  // { growth, at: [x, y], band }
+BR.GROWTH.schedule(6.5, new BR.Rng(1), true);  // { zs: [6.5, 11.5], arrive: true }
+const j = BR.JOURNEY.generate({ id: 'j', seed: 3, w: 48, h: 40, lower: 0, style: 'ramps' });   // milestone 4, lab only
 ```
 
 `BR.ELEV.ladderVariant` remains for the compact fallback. Blueprints exported
@@ -707,10 +776,11 @@ a solid surface.
 ## Open tuning decisions
 
 - Reference-band spacing and variation between districts.
-- Frequency of local elevation changes and major journeys.
-- Minimum horizontal exploration between consecutive vertical departures
-  (now max(6 m, 0.35 × the floor's longer side)), journey density (one per
-  band pair per region) and the style weights.
+- Frequency of local elevation changes and ways up: the block size (4 × 4
+  cells), the steered share (50% of house growths), the chance an unsteered
+  growth climbs on (50%), and the landing-site share (40%).
+- How far apart consecutive legs of a growth must be (today: the furthest floor
+  of the level first), and how big a level may grow (1-4 sites, 1,200 m²).
 - How often templates should have floors of their own, and which halls might
   take a gallery on a jogged wall.
 - Whether more zones should allow routes (today only lawns), and preferences

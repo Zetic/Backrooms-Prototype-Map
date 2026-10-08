@@ -235,13 +235,13 @@ const surf = (p, id) => p.surfaces.find((s) => s.id === id);
   }
   assert(seen.has('two_storey') || seen.has('townhouse'), 'the world builds houses of several storeys: ' + [...seen].join(', '));
   // export the cell that holds them: the houses are in it, and every floor keeps to
-  // its band's envelope (a journey's, to the envelope of its two bands)
+  // the envelope of the band it is in (a climb to the band above lands in that band's)
   const x = w.exportRegion(at.i, at.j, at.i, at.j, [0]);
   assert(x.layouts.some((l) => ['two_storey', 'townhouse'].includes(l.blueprint.archetype) && l.blueprint.levels.length > 1), 'the export holds a house of several storeys');
-  assert(x.layouts.every((l) => {
-    const m = /^journey:(-?\d+):/.exec(l.owner), lo = m ? +m[1] * 16 : 0, hi = m ? lo + 16 : 0;
-    return l.blueprint.surfaces.every((s) => s.floorZ >= lo + BR.BAND_CFG.floorLimit - EPS && s.ceilingZ <= hi + BR.BAND_CFG.ceilingLimit + EPS);
-  }));
+  assert(x.layouts.every((l) => l.blueprint.surfaces.every((s) => {
+    const z = +String(s.band).split(':')[1] * 16;
+    return s.floorZ >= z + BR.BAND_CFG.floorLimit - EPS && s.ceilingZ <= z + BR.BAND_CFG.ceilingLimit + EPS;
+  })));
   // the workbench draws the real stair: solid where it starts, an outline where it arrives
   const log = [], g = new Proxy({ measureText: (s) => ({ width: String(s).length * 6 }) }, { get: (o, k) => (k in o ? o[k] : (...a) => log.push([k, ...a])), set: (o, k, v) => { o[k] = v; log.push(['set', k, v]); return true; } });
   const b = T.generate({ archetype: 'two_storey', seed: 3 });

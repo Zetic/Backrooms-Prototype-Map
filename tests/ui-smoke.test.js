@@ -86,7 +86,7 @@ check('selection clears ghost focus', !window.__cutaway.selected && !last.opts.f
 elements.get('band-up').dispatch('click'); flush();
 check('band selection resets cut to its reference height', window.__world().band === 1 && last.opts.cutZ === 16 && new URLSearchParams(location.hash.slice(1)).get('band') === '1');
 elements.get('export-world').dispatch('click'); flush();
-check('world JSON export keeps spatial geometry and matched connections', exported?.schema === 'br.world-elevation/0.2' && exported.bands.length === 3 && exported.portalMatches.length > 0 && exported.issues.length === 0 && exported.policy.verticalJourneys === 'composed' && exported.policy.layeredOwnership === 'stacked-claims' && exported.slices.every((s) => s.sites.every((q) => Number.isFinite(q.ceilingZ)) && Array.isArray(s.raised)));
+check('world JSON export keeps spatial geometry and matched connections', exported?.schema === 'br.world-elevation/0.3' && exported.bands.length === 3 && exported.portalMatches.length > 0 && exported.issues.length === 0 && exported.policy.verticalJourneys === 'grown' && Array.isArray(exported.growths) && exported.policy.layeredOwnership === 'stacked-claims' && exported.slices.every((s) => s.sites.every((q) => Number.isFinite(q.ceilingZ)) && Array.isArray(s.raised)));
 elements.get('band-down').dispatch('click'); flush();
 check('ground band resets to ground zero', window.__world().band === 0 && last.opts.cutZ === 0);
 check('retired atrium controls are absent', !elements.has('find-up') && !elements.has('find-down'));
@@ -95,7 +95,7 @@ check('retired atrium controls are absent', !elements.has('find-up') && !element
   const w = window.__world(), C = BR.WORLD_CFG.cell;
   let found = null;
   for (let i = -1; i <= 1 && !found; i++) for (let j = -1; j <= 1 && !found; j++) for (const s of w.cell(i, j).sites) {
-    if (found || s.kind === 'transition') continue;
+    if (found) continue;
     const r = w.build(s);
     for (const [b, origin] of (r.filler ? [[r.filler, r.fillerOrigin]] : []).concat(r.buildings.map((B) => [B.b, B.origin]))) {
       const kept = BR.ELEV.keptStairs(b);
@@ -109,12 +109,17 @@ check('retired atrium controls are absent', !elements.has('find-up') && !element
   elements.get('clear-selection').click(); elements.get('height-reset').dispatch('click'); flush();
 }
 const from = [last.view.cx, last.view.cy];
-elements.get('journey-up').dispatch('click'); flush();
+elements.get('way-up').dispatch('click'); flush();
 {
-  const p = window.__world().nearestJourney('up', from[0], from[1]);
-  check('the journey button centres the view on the nearest journey up', p && last.view.cx === (p.rect[0] + p.rect[2]) / 2 && last.view.cy === (p.rect[1] + p.rect[3]) / 2 && /Journey up to band 1/.test(elements.get('export-status').textContent));
+  const p = window.__world().nearestWay('up', from[0], from[1]);
+  check('the way-up button centres the view on where the nearest climb to band 1 starts', p && last.view.cx === p.at[0] && last.view.cy === p.at[1] && /Way up to band 1/.test(elements.get('export-status').textContent));
   elements.get('c').dispatch('pointermove', { clientX: 450, clientY: 300 }); flush();
-  check('hovering a journey names its bands, style and stages', /Journey<\/b> · band 0 ↔ band 1/.test(elements.get('info').innerHTML) && / → /.test(elements.get('info').innerHTML));
+  check('hovering its pillar says a growth climbs from there and where it reaches', /pillar<\/b> · a growth climbs from here/.test(elements.get('info').innerHTML) && /reaches band 1/.test(elements.get('info').innerHTML));
+  elements.get('band-up').dispatch('click'); flush();
+  elements.get('way-down').dispatch('click'); flush();
+  const d = window.__world().nearestWay('down', last.view.cx, last.view.cy);
+  check('the way-down button finds where a climb from the band below arrives', d && last.view.cx === d.at[0] && /Way down to band 0/.test(elements.get('export-status').textContent));
+  elements.get('band-down').dispatch('click'); flush();
 }
 for (const m of html.matchAll(/<script src="([^"]+)"/g)) check('map script exists: ' + m[1], fs.existsSync(path.join(__dirname, '..', m[1])));
 finish();

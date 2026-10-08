@@ -1,58 +1,33 @@
-/* Deterministic horizontal bands, joined by vertical journeys (journeys.js).
+/* Deterministic horizontal bands, joined by what grows between them
+ * (growth.js).
  *
- * Every 512 x 512 m region holds one journey per pair of neighbouring bands:
- * a territory reserved in both bands' cell plans (the same rectangle, a site
- * of kind 'transition' in each), owned by the journey and filled by it. The
- * plan, doors included, comes from (seed, region, band pair) alone, so
- * whichever band or cell is asked for first, every band agrees where it is,
- * and planning a cell never waits for a journey to be built. Even and odd
- * pairs use opposite halves of a region, so a band's journey down and its
- * journey up never claim the same ground. Each band's slice of a journey binds
- * only the doors at its own floor to that band's network; the blueprint, and
- * the climb between them, is one. A journey that cannot be built (no seed of
- * four fits) leaves an ordinary filler on its territory in each band, behind
- * the same doors. See docs/elevation-world.md. */
+ * Every band is its own world (world.js): the same 128 m cells, planned from
+ * the band's own seed, at its own floor 16 m apart. Nothing is reserved
+ * between bands any more. A column of the world holds several owners stacked
+ * (claims.js): a ground site keeps its floor and has its ceiling capped where
+ * a growth's floor stands over it. A growth starts at a pillar (a house's
+ * stairwell carried on up, or a block's stair cell), spreads branches of its
+ * biome and climbs on by short legs; where it reaches the next band's floor
+ * it lands in one of that band's landing sites, rebuilt round the climb. The
+ * plan of every growth is a pure function of (seed, band, origin cell), so
+ * whichever band or cell is asked for first, every band agrees.
+ * See docs/elevation-world.md and docs/growth.md. */
 (function (root) {
   'use strict';
   const BR = root.BR, E = BR.ELEV, C = BR.WORLD_CFG.cell;
   // a site's envelope: from its lowest allowed floor (a sunken floor, floorLimit)
   // less its slab, to ceilingLimit - one band spacing in all, so bands never overlap
-  const CFG = { spacing: 16, floorLimit: -1.25, ceilingLimit: 14.5, regionCells: 4, journey: { w: [40, 56], h: [32, 48], tries: 4 },
-    // a raised branch (growth step 2): a house that seeds growth carries its
+  const CFG = { spacing: 16, floorLimit: -1.25, ceilingLimit: 14.5,
+    // a branch (growth steps 2-3): a house that seeds growth carries its
     // stairwell one flight on up (its pillar, `rise` at least), and a district
-    // of its biome (biomes.js) grows at that floor over 1-4 plain ground sites
-    // beside it, `area` m² at most. A `share` of the houses that could seed do.
+    // of its biome (biomes.js) grows at each of its floors over 1-4 sites,
+    // `area` m² at most a level. A `share` of the houses that could seed do.
     branch: { rise: 3.3, headroom: 3, share: 0.75, sites: [1, 4], area: 1200, reach: [1, 8], door: 2, minArea: 70, minShared: 5, pit: { size: 2, fall: 3 } },
-    limits: { bands: 4, journeys: 64, claims: 256, branches: 64, raised: 64 } };
+    limits: { bands: 4, claims: 256, branches: 64, raised: 64 } };
   const clone = (x) => JSON.parse(JSON.stringify(x));
   const EPS = 1e-7;
   const bandId = (n) => 'band:' + n;
-  /** a connection as the site on one side of it sees it (that site's frame), as every site's build gives them */
-  const connView = (cn, siteId, origin) => {
-    const low = cn.a === siteId;
-    return { id: cn.id, side: cn.o === 'v' ? (low ? 'E' : 'W') : (low ? 'S' : 'N'),
-      at: cn.s0 - (cn.o === 'h' ? origin[0] : origin[1]), width: cn.s1 - cn.s0, line: cn.c - (cn.o === 'h' ? origin[1] : origin[0]), kind: 'opening', route: cn.route };
-  };
-  /**
-   * The longest edge two rect lists share, at least `min` metres long:
-   * { o, c, s0, s1, lowFirst (the first list is the west / north side) }, or
-   * null. Rects are whole metres, so this is exact.
-   */
-  function sharedEdge(a, b, min) {
-    let best = null;
-    for (const p of a) for (const q of b) {
-      for (const [o, lowFirst, c] of [['v', true, p[2]], ['v', false, q[2]], ['h', true, p[3]], ['h', false, q[3]]]) {
-        const [lo, hi] = o === 'v' ? [lowFirst ? q[0] : p[0], c] : [lowFirst ? q[1] : p[1], c];
-        if (Math.abs(lo - hi) > EPS) continue;
-        const s0 = o === 'v' ? Math.max(p[1], q[1]) : Math.max(p[0], q[0]), s1 = o === 'v' ? Math.min(p[3], q[3]) : Math.min(p[2], q[2]);
-        if (s1 - s0 < (min || 0) - EPS) continue;
-        if (!best || s1 - s0 > best.s1 - best.s0) best = { o, c, s0, s1, lowFirst };
-      }
-    }
-    return best;
-  }
   const assertBand = (n) => { if (!Number.isInteger(n) || Math.abs(n) > 10000) throw new Error('band must be an integer between -10000 and 10000'); return n; };
-  const shiftRect = (r, x, y) => [r[0] + x, r[1] + y, r[2] + x, r[3] + y];
   const clock = () => (typeof performance !== 'undefined' ? performance : Date).now();
 
   /** Translate all authoritative and derived Z data without changing XY,
@@ -79,6 +54,11 @@
     for (const d of ['up', 'down']) for (const c of b.capabilities[d].candidates) c.at[2] += base;
     for (const t of b.bandTerritories) { t.band = map(t.band); t.elevation += base; }
     for (const a of b.bands) { a.id = map(a.id); a.elevation += base; }
+    // (a climb that stays in its home band: its landing's band is the home band, listed once)
+    b.bands = b.bands.filter((a, k) => b.bands.findIndex((x) => x.id === a.id) === k);
+    const terr = new Map();
+    for (const t of b.bandTerritories) { if (terr.has(t.band)) terr.get(t.band).rects.push(...t.rects); else terr.set(t.band, t); }
+    b.bandTerritories = [...terr.values()];
     return b;
   }
 
@@ -87,7 +67,7 @@
       this.seed = seed >>> 0; this.options = options || {}; this.band = 0;
       this.limits = Object.assign({}, CFG.limits, this.options.elevationLimits);
       if (Object.values(this.limits).some((n) => !Number.isInteger(n) || n < 1)) throw new Error('elevation cache limits must be positive integers');
-      this.worlds = new Map(); this.journeys = new Map(); this.claims = new Map(); this.branches = new Map(); this.raisedBuilds = new Map();
+      this.worlds = new Map(); this.candidates = new Map(); this.growths = new Map(); this.raisedBuilds = new Map();
       this.totals = { cellsPlanned: 0, sitesBuilt: 0, buildMs: 0, poisBuilt: 0, issues: 0 };
       this.setBand(this.options.band === undefined ? 0 : this.options.band);
     }
@@ -105,8 +85,7 @@
       assertBand(n);
       if (this.worlds.has(n)) { const w = this.worlds.get(n); this.worlds.delete(n); this.worlds.set(n, w); return w; }
       const seed = n === 0 ? this.seed : BR.hash4(this.seed, n, 0, 0xba01);
-      const w = new BR.World(seed, { band: n, floorZ: n * CFG.spacing, limits: this.options.limits,
-        plannedLots: (i, j) => this.plannedLots(n, i, j), buildTransition: (s) => this.buildTransition(s), afterBuild: (s, r) => this.afterBuild(s, r) });
+      const w = new BR.World(seed, { band: n, floorZ: n * CFG.spacing, limits: this.options.limits, afterBuild: (s, r) => this.afterBuild(s, r) });
       this.worlds.set(n, w);
       while (this.worlds.size > this.limits.bands) {
         const first = this.worlds.keys().next().value, old = this.worlds.get(first);
@@ -115,334 +94,158 @@
       }
       return w;
     }
+    // --------------------------------------------------------- growth
     /**
-     * Where the journey between bands `lower` and lower + 1 lies in region
-     * (ri, rj): a territory in one cell of the region's half for that pair,
-     * placed so the strips the cell planner cuts round it miss both bands'
-     * border openings. null if no cell of the half has room.
+     * The growth from origin cell (i, j) of band n, or null (growth.js): its
+     * pillar, its levels of raised sites, the legs between them, its arrival on
+     * the next band's floor, the ground caps under it and its pit. Cached and
+     * pure: the same for any seed, band and cell, in any order.
      */
-    journeyPlan(lower, ri, rj) {
-      assertBand(lower);
-      const R = CFG.regionCells, J = CFG.journey, rng = new BR.Rng(BR.hash4(this.seed, ri, rj, 0xba02 ^ Math.imul(lower, 0x9e3779b1)));
-      const half = ((lower % 2) + 2) % 2, w = rng.int(J.w[0], J.w[1]), h = rng.int(J.h[0], J.h[1]);
-      const cells = [], startX = rng.int(0, 1), startY = rng.int(0, R - 1);
-      for (let a = 0; a < 2; a++) for (let b = 0; b < R; b++) cells.push([ri * R + half * 2 + (startX + a) % 2, rj * R + (startY + b) % R]);
-      const seeds = [lower, lower + 1].map((n) => n === 0 ? this.seed : BR.hash4(this.seed, n, 0, 0xba01));
-      for (const [i, j] of cells) for (const split of ['h', 'v']) {
-        const span = split === 'h' ? h : w, candidates = [];
-        const openings = seeds.flatMap((s) => [BR.borderOpenings(s, split === 'h' ? 'v' : 'h', i, j),
-          BR.borderOpenings(s, split === 'h' ? 'v' : 'h', split === 'h' ? i + 1 : i, split === 'h' ? j : j + 1)]).flat();
-        for (let q = 8; q <= C - span - 8; q++) if ([q, q + span].every((cut) => openings.every(([a, b]) => cut <= a - 1 || cut >= b + 1))) candidates.push(q);
-        if (!candidates.length) continue;
-        const q = candidates[rng.int(0, candidates.length - 1)];
-        const x = i * C + (split === 'v' ? q : rng.int(8, C - w - 8)), y = j * C + (split === 'h' ? q : rng.int(8, C - h - 8));
-        return { id: 'journey:' + lower + ':' + ri + ',' + rj, lower, upper: lower + 1, ri, rj, i, j, split,
-          seed: BR.hash4(this.seed, ri, rj, 0xba03 ^ Math.imul(lower, 0x9e3779b1)), rect: [x, y, x + w, y + h] };
-      }
-      return null;
-    }
-    /** a journey's doors (its plan's, decided before it is built), from its territory and seed */
-    journeyDoors(p) { return BR.JOURNEY.plan({ seed: p.seed, w: p.rect[2] - p.rect[0], h: p.rect[3] - p.rect[1] }); }
-    /** the journey's blueprint (absolute heights), or null if none could be built there; cached */
-    journey(p) {
-      if (!p) return null;
-      const v = BR.World.lru(this.journeys, p.id, this.limits.journeys, () => {
-        const doors = this.journeyDoors(p);
-        for (let t = 0; t < CFG.journey.tries; t++) {
-          try { return BR.JOURNEY.generate({ id: p.id, seed: t ? BR.hash4(p.seed, t, 0xba04, 0) : p.seed, w: p.rect[2] - p.rect[0], h: p.rect[3] - p.rect[1], lower: p.lower, doors }); } catch (err) { /* another seed */ }
-        }
-        return false;
-      });
-      return v || null;
-    }
-    /** the journeys reserved in cell (i, j) of band n: one arriving from below, one leaving above, at most.
-     * Planning needs only their plans: nothing is built here. */
-    plannedLots(n, i, j) {
-      if (!BR.JOURNEY) return [];
-      const key = n + '|' + i + ',' + j;
-      return BR.World.lru(this.claims, key, this.limits.claims, () => {
-        const out = [], ri = Math.floor(i / CFG.regionCells), rj = Math.floor(j / CFG.regionCells);
-        for (const lower of [n - 1, n]) {
-          const p = this.journeyPlan(lower, ri, rj);
-          if (!p || p.i !== i || p.j !== j) continue;
-          const plan = this.journeyDoors(p), doors = BR.JOURNEY.doors(n === p.lower ? plan.low : plan.high).map((d) => d.o === 'h'
-            ? { ...d, c: d.c + p.rect[1], s0: d.s0 + p.rect[0], s1: d.s1 + p.rect[0] } : { ...d, c: d.c + p.rect[0], s0: d.s0 + p.rect[1], s1: d.s1 + p.rect[1] });
-          out.push({ id: p.id, kind: 'reserved', rect: p.rect.slice(), doors, pois: [], transition: p });
-        }
-        return out;
-      }).map((l) => clone(l)); // the world sets portalConns: cached plans are never mutated
-    }
-    /** an ordinary filler on a journey's territory in band n, behind that band's planned doors, for a journey that could not be built */
-    standIn(p, n) {
-      const plan = this.journeyDoors(p), site = { w: p.rect[2] - p.rect[0], h: p.rect[3] - p.rect[1] };
-      // a few picks from the pool, then every filler in turn: one of them fits a plain rectangle
-      const ids = [0, 1, 2, 3, 4, 5, 6, 7].map((t) => BR.FILL.pick({ seed: BR.hash4(p.seed, n, t, 0xba05), site })).concat(BR.FILL.list().map((F) => F.id).sort());
-      for (const [t, filler] of ids.entries()) {
-        const seed = BR.hash4(p.seed, n, t, 0xba05), f = BR.FILL.generate({ filler, seed, site, connections: clone(n === p.lower ? plan.low : plan.high) });
-        if (!f.error) return placeBlueprint(E.prepare(f, { fillId: p.id + '@' + bandId(n), deferCapabilities: true }), n * CFG.spacing, n, n);
-      }
-      throw new Error(p.id + ': no filler fits its territory');
-    }
-    /** a band's slice of a journey: the shared blueprint, with only that band's doors bound to its network */
-    buildTransition(site) {
-      const t0 = clock(), p = site.transition, j = this.journey(p), b = j ? clone(j) : this.standIn(p, site.band), L = site.lots[0];
-      // portals are keyed by their planned connection (low0.., high0..): each band planned only its own
-      for (const portal of b.portals) { const id = L.portalConns && L.portalConns[portal.connection]; if (id) portal.connection = id; else delete portal.connection; }
-      // its connections in the territory's frame, as every other site's build gives them
-      const conns = site.conns.map((id) => { const cn = this.worldFor(site.band).connection(site, id), lowSide = cn.a === site.id;
-        return { id: cn.id, side: cn.o === 'v' ? (lowSide ? 'E' : 'W') : (lowSide ? 'S' : 'N'), at: cn.s0 - (cn.o === 'h' ? p.rect[0] : p.rect[1]), width: cn.s1 - cn.s0,
-          line: cn.c - (cn.o === 'h' ? p.rect[1] : p.rect[0]), kind: 'opening', route: cn.route }; });
-      return { site, owner: p.id, origin: p.rect.slice(0, 2), fillerOrigin: p.rect.slice(0, 2), filler: b, buildings: [], conns, issues: [], ms: clock() - t0 };
-    }
-    // --------------------------------------------------------- raised claims
-    /**
-     * The raised branch over cell (i, j) of band n, or null (growth design,
-     * step 2: one house pillar and its branch). A house whose archetype seeds
-     * growth (`grows`, biomes.js) carries its stairwell one flight on up, to a
-     * landing with a door at its lot edge; that is the pillar. Its branch
-     * grows at the landing's floor: the plain ground site the door opens onto,
-     * then plain neighbours sharing an edge, 1-4 sites in all, each a district
-     * site of the house's biome (a biome filler with the biome's rooms inside
-     * it, densest beside the pillar). A pit is drilled from it into a ground
-     * site below where one lines up. Only a share of the houses that could
-     * seed growth do, and at most one per cell: the first in the cell plan's
-     * order. The ground plan is untouched; the ground sites under the branch
-     * keep their floors and have their ceilings capped under its slab.
-     * Cached and pure: the same for any seed, band and cell, in any order.
-     */
-    branch(n, i, j) {
+    growth(n, i, j) {
       assertBand(n);
-      if (!BR.CLAIM || !BR.BIOME) return null;
-      const v = BR.World.lru(this.branches, n + '|' + i + ',' + j, this.limits.branches, () => this.planBranch(n, i, j) || false);
+      if (!BR.CLAIM || !BR.BIOME || !BR.GROWTH) return null;
+      const v = BR.World.lru(this.growths, n + '|' + i + ',' + j, this.limits.branches, () => BR.GROWTH.plan(this, n, i, j) || false);
       return v || null;
     }
-    /** the branch's raised sites in cell (i, j) of band n (its own cell only) */
-    raisedSites(n, i, j) { const B = this.branch(n, i, j); return B ? B.sites : []; }
-    /** every raised site whose rects meet [x0, y0, x1, y1] in the active band (`planned`: only of branches already planned, so nothing is planned for it) */
+    /** the growth that may use cell (i, j) of band n (its owner's), or null */
+    growthAt(n, i, j) {
+      if (!BR.CLAIM || !BR.BIOME || !BR.GROWTH || Math.abs(n) > 10000) return null;
+      const o = BR.GROWTH.owner(this, n, i, j);
+      return o ? this.growth(n, o[0], o[1]) : null;
+    }
+    /** a raised site's growth */
+    growthOf(rs) { const m = /^growth:(-?\d+):(-?\d+),(-?\d+)$/.exec(rs.growth); return m ? this.growth(+m[1], +m[2], +m[3]) : null; }
+    /** the raised sites standing in cell (i, j) of band n (of whichever growth owns it) */
+    raisedSites(n, i, j) { const G = this.growthAt(n, i, j); return G ? G.sites.filter((rs) => rs.i === i && rs.j === j) : []; }
+    /** the growths already planned (none is planned for this): what the plan view draws */
+    plannedGrowths(n) { return [...this.growths.values()].filter((G) => G && G.band === n); }
+    /** every raised site whose rects meet [x0, y0, x1, y1] in the active band (`planned`: only of growths already planned) */
     raisedIn(x0, y0, x1, y1, planned) {
+      const meets = (rs) => rs.rects.some((q) => q[0] < x1 && q[2] > x0 && q[1] < y1 && q[3] > y0);
+      if (planned) return this.plannedGrowths(this.band).flatMap((G) => G.sites).filter(meets);
       const out = [];
-      for (let i = Math.floor(x0 / C); i <= Math.floor(x1 / C); i++) for (let j = Math.floor(y0 / C); j <= Math.floor(y1 / C); j++) {
-        if (planned && !this.branches.has(this.band + '|' + i + ',' + j)) continue;
-        for (const rs of this.raisedSites(this.band, i, j)) if (rs.rects.some((q) => q[0] < x1 && q[2] > x0 && q[1] < y1 && q[3] > y0)) out.push(rs);
-      }
+      for (let i = Math.floor(x0 / C); i <= Math.floor(x1 / C); i++) for (let j = Math.floor(y0 / C); j <= Math.floor(y1 / C); j++)
+        for (const rs of this.raisedSites(this.band, i, j)) if (meets(rs)) out.push(rs);
       return out;
     }
-    /** the raised site at (x, y) in the active band, or null */
+    /** the raised site at (x, y) in the active band, or null (the highest, where floors stand over floors) */
     raisedAt(x, y) {
-      for (const rs of this.raisedSites(this.band, Math.floor(x / C), Math.floor(y / C)))
-        for (const q of rs.rects) if (x >= q[0] && x < q[2] && y >= q[1] && y < q[3]) return rs;
-      return null;
+      const hit = this.raisedSites(this.band, Math.floor(x / C), Math.floor(y / C)).filter((rs) => rs.rects.some((q) => x >= q[0] && x < q[2] && y >= q[1] && y < q[3]));
+      return hit.sort((a, b) => b.floorZ - a.floorZ)[0] || null;
+    }
+    /** the climbs arriving in the active band from the band below whose landing meets [x0, y0, x1, y1]: [{ growth, arrival, site }] */
+    arrivalsIn(x0, y0, x1, y1, planned) {
+      const n = this.band - 1, out = [], meets = (A) => A.box[0] < x1 && A.box[2] > x0 && A.box[1] < y1 && A.box[3] > y0;
+      if (n < -10000) return out;
+      const list = planned ? this.plannedGrowths(n) : [];
+      if (!planned) for (let i = Math.floor(x0 / C); i <= Math.floor(x1 / C); i++) for (let j = Math.floor(y0 / C); j <= Math.floor(y1 / C); j++) {
+        const G = this.growthAt(n, i, j);
+        if (G && !list.includes(G)) list.push(G);
+      }
+      for (const G of list) if (G.arrival && meets(G.arrival)) out.push({ growth: G, arrival: G.arrival, site: G.sites.find((rs) => rs.id === G.arrival.site) });
+      return out;
     }
     /** a raised site's blueprints, in the shape of any other site's build (spatial already): its biome filler and the rooms inside it */
     raisedBuild(rs) {
       return BR.World.lru(this.raisedBuilds, rs.id, this.limits.raised, () => {
-        const t0 = clock(), B = this.branch(rs.band, rs.i, rs.j), b = clone(rs.b);
+        const t0 = clock(), G = this.growthOf(rs), b = clone(rs.b);
         // the pit's own floor cutout: the ground site below cuts its ceiling (`spatial`)
-        if (B && B.pit && B.pit.top.site === rs.id) BR.CLAIM.drill(b, null, B.pit, B.pit.id);
+        if (G && G.pit && G.pit.top.site === rs.id) BR.CLAIM.drill(b, null, G.pit, G.pit.id);
         return { site: rs, owner: rs.owner, origin: rs.origin.slice(), fillerOrigin: rs.fillerOrigin.slice(), filler: b,
           buildings: rs.buildings.map((x) => ({ poi: { ...x.poi }, origin: x.origin.slice(), b: clone(x.b), conns: { ...x.conns } })),
-          conns: rs.conns.map((cn) => connView(cn, rs.id, rs.origin)), issues: [], ms: clock() - t0 };
+          conns: rs.conns.map((cn) => BR.GROWTH.connView(cn, rs.id, rs.origin)), issues: [], ms: clock() - t0 };
       });
     }
-    /** the absolute height a ground site's claim stops at: a branch's floor slab, or its band's ceiling */
+    /** the arrival from the band below that lands in this ground site, or null */
+    arrivalInto(site) {
+      if (!BR.GROWTH || !BR.GROWTH.landingSite(this, site.band, site)) return null;
+      const G = this.growthAt(site.band - 1, site.i, site.j);
+      return G && G.arrival && G.arrival.ground === site.id ? G.arrival : null;
+    }
+    /** the absolute height a ground site's claim stops at: a growth's floor slab, or its band's ceiling */
     ceilingOf(site) {
-      const B = this.branch(site.band, site.i, site.j), cap = B && B.caps.find((c) => c.site === site.id);
+      const G = this.growthAt(site.band, site.i, site.j), cap = G && G.caps.find((c) => c.site === site.id);
       return cap ? cap.cap : site.band * CFG.spacing + CFG.ceilingLimit;
     }
-    /** the last word on a ground build: ceilings capped under a claim above, a stairwell carried up into one */
+    /** a ground site's claim: its column from under its floor to its ceiling (less a climb from below that lands in it), and a stair pillar's climb */
+    claimOf(site) {
+      const owner = site.owner || site.id, z0 = site.band * CFG.spacing + CFG.floorLimit - E.SLAB, A = this.arrivalInto(site);
+      const rects = A ? site.rects.flatMap((q) => BR.TG.rsub(q, A.box)) : clone(site.rects);
+      const out = [{ id: owner + ':envelope', kind: 'site-envelope', rects, z0, z1: this.ceilingOf(site) }];
+      const G = this.growthAt(site.band, site.i, site.j);
+      if (G && G.stair && G.stair.site === site.id) out.push({ id: owner + ':climb', kind: 'pillar-climb', rects: [G.stair.box.slice()], z0, z1: G.stair.top });
+      return out;
+    }
+    /** a raised site's claim: from its own floor slab to its top (the next floor's slab, or the band's ceiling), and the climb it carries */
+    raisedClaim(rs) {
+      const out = [{ id: rs.owner + ':envelope', kind: 'branch-envelope', rects: clone(rs.rects), z0: rs.floorZ - E.SLAB, z1: rs.top }];
+      if (rs.leg) out.push({ id: rs.owner + ':climb', kind: 'leg-climb', rects: [rs.leg.box.slice()], z0: rs.floorZ - E.SLAB, z1: rs.leg.top });
+      return out;
+    }
+    /** the last word on a ground build: ceilings capped under a floor above, a stair carried up, a climb from below landing in it */
     afterBuild(site, r) {
-      if (!BR.CLAIM || site.kind === 'transition') return;
-      const B = this.branch(site.band, site.i, site.j);
-      if (!B) return;
-      const cap = B.caps.find((c) => c.site === site.id);
-      if (cap) for (const b of [r.filler].concat(r.buildings.map((x) => x.b))) {
-        if (b && !E.capCeilings(b, cap.cap - site.band * CFG.spacing)) r.issues.push(site.id + ' cannot keep under ' + B.id);
+      if (!BR.CLAIM || !BR.GROWTH) return;
+      const G = this.growthAt(site.band, site.i, site.j);
+      if (G) {
+        if (G.stair && G.stair.site === site.id) {
+          // the stair pillar: its own filler, taking the stair up (already spatial)
+          r.filler = clone(G.stair.b); r.fillerOrigin = G.stair.fillerOrigin.slice();
+        } else {
+          const cap = G.caps.find((c) => c.site === site.id);
+          if (cap) for (const b of [r.filler].concat(r.buildings.map((x) => x.b))) {
+            if (b && !E.capCeilings(b, cap.cap - site.band * CFG.spacing)) r.issues.push(site.id + ' cannot keep under ' + G.id);
+          }
+        }
+        // the lower half of the pit, named on the ground build so the map
+        // draws it; its cutout and shaft come with spatial adaptation
+        if (G.pit && G.pit.bottom.site === site.id && r.filler) BR.CLAIM.markDrop(r.filler, G.pit, G.pit.id, 'bottom');
+        if (G.landing && site.id === G.anchor) {
+          const host = r.buildings.find((x) => x.poi.id === G.poi);
+          if (host) { host.b = G.landing.b; host.conns[G.landing.portal] = G.landing.connection; }
+        }
       }
-      // the lower half of the cell's pit, named on the ground build so the map
-      // draws it; its cutout and shaft come with spatial adaptation
-      if (B.pit && B.pit.bottom.site === site.id && r.filler) BR.CLAIM.markDrop(r.filler, B.pit, B.pit.id, 'bottom');
-      if (site.id === B.anchor) {
-        const host = r.buildings.find((x) => x.poi.id === B.poi);
-        if (host) { host.b = B.landing.b; host.conns[B.landing.portal] = B.landing.connection; }
-      }
+      const A = this.arrivalInto(site);
+      if (A) { r.filler = clone(A.b); r.fillerOrigin = A.origin.slice(); r.conns = clone(A.conns); r.buildings = []; }
     }
     /** does this POI of cell (i, j) of band n seed growth? A share of those that could (`branch.share`), by the seed alone */
     seedsGrowth(n, i, j, P) {
       if (!BR.BIOME || !BR.BIOME.anchorOf(BR.TPL.archetypes[P.archetype])) return false;
-      return BR.hash4(this.worldFor(n).seed, i, j, 0xba08 ^ BR.TG.hashStr(P.id)) / 4294967296 < CFG.branch.share;
+      const seed = n === 0 ? this.seed : BR.hash4(this.seed, n, 0, 0xba01);
+      return BR.hash4(seed, i, j, 0xba08 ^ BR.TG.hashStr(P.id)) / 4294967296 < CFG.branch.share;
     }
     /** can a ground site keep everything it builds under a cap `rel` metres over its band (a raw build)? */
     keepsUnder(site, rel) {
       const r = this.worldFor(site.band).buildRaw(site);
       return !r.issues.length && [r.filler].concat(r.buildings.map((x) => x.b)).every((b) => !b || E.capCeilings(b, rel));
     }
-    /** work out the cell's branch: see `branch`. Raw builds only, so planning never waits on a cached one. */
-    planBranch(n, i, j) {
-      const BN = CFG.branch, cell = this.cell(i, j, n), w = this.worldFor(n), base = n * CFG.spacing;
-      const id = 'branch:' + n + ':' + i + ',' + j;
-      const plain = (s) => s.kind === 'filler' && !s.pois.length && !s.lots.length && s.area >= BN.minArea;
-      for (const L of cell.lots.filter((x) => x.kind === 'yard' && x.b && !x.b.error).sort((a, b) => a.id.localeCompare(b.id))) {
-        const P = L.pois[0], biome = BR.BIOME.anchorOf(BR.TPL.archetypes[P.archetype]);
-        if (!biome || !this.seedsGrowth(n, i, j, P)) continue;
-        const key = BR.TG.hashStr(P.id);
-        const host = cell.sites.find((s) => s.kind === 'lot' && s.lots.includes(L)), stair = BR.CLAIM.stairTop(L.b);
-        if (!host || !stair) continue;
-        // the pillar: one flight up from the top storey, to a floor on the half
-        // metre clear of that storey's ceiling, with headroom left in the band
-        const z = BR.CLAIM.pillarFloor(L.b, BN.rise);
-        if (z > CFG.ceilingLimit - BN.headroom + EPS) continue;
-        const floorZ = base + z, cap = floorZ - E.SLAB;
-        const o = P.origin;
-        for (const side of stair.sides) {
-          const reach = side === 'E' ? L.rect[2] - (o[0] + stair.rect[2]) : side === 'W' ? (o[0] + stair.rect[0]) - L.rect[0]
-            : side === 'S' ? L.rect[3] - (o[1] + stair.rect[3]) : (o[1] + stair.rect[1]) - L.rect[1];
-          if (!(reach >= BN.reach[0] - EPS && reach <= BN.reach[1] + EPS)) continue;
-          const raise = BR.CLAIM.raiseStair(L.b, { z, side, reach, width: BN.door });
-          if (!raise) continue;
-          // the door it opens, in world metres, and the ground sites it leads onto
-          const d = raise.door, horiz = d.o === 'h', line = d.c + (horiz ? o[1] : o[0]);
-          const s0 = d.s0 + (horiz ? o[0] : o[1]), s1 = d.s1 + (horiz ? o[0] : o[1]);
-          // a floor is built on the half metre: a door off the grid could never be met exactly
-          if ([line, s0, s1].some((v) => Math.abs(v * 2 - Math.round(v * 2)) > EPS)) continue;
-          const onEdge = (s) => s.rects.some((q) => horiz ? Math.abs(q[side === 'S' ? 1 : 3] - line) < EPS && q[0] <= s0 + EPS && q[2] >= s1 - EPS
-            : Math.abs(q[side === 'E' ? 0 : 2] - line) < EPS && q[1] <= s0 + EPS && q[3] >= s1 - EPS);
-          const first = cell.sites.find((s) => plain(s) && onEdge(s));
-          if (!first || !this.keepsUnder(first, cap - base)) continue;
-          // the branch grows from the site the landing opens onto, over plain
-          // neighbours sharing an edge, to a size drawn from the seed
-          const rng = new BR.Rng(BR.hash4(w.seed, i, j, 0xba09 ^ key)), want = rng.int(BN.sites[0], BN.sites[1]);
-          const ground = [first], parent = [-1], hop = [0];
-          let area = first.area;
-          for (let k = 0; k < ground.length && ground.length < want; k++) {
-            const next = cell.sites.filter((s) => plain(s) && !ground.includes(s) && sharedEdge(ground[k].rects, s.rects, BN.minShared)).sort((a, b) => a.id.localeCompare(b.id));
-            for (let q = next.length - 1; q > 0; q--) { const r = rng.int(0, q); [next[q], next[r]] = [next[r], next[q]]; }
-            for (const s of next) {
-              if (ground.length >= want || ground.includes(s) || area + s.area > BN.area || !this.keepsUnder(s, cap - base)) continue;
-              ground.push(s); parent.push(k); hop.push(hop[k] + 1); area += s.area;
-            }
-          }
-          const all = ground.map((g, k) => {
-            const rs = { id: 'b' + n + '|' + i + ',' + j + ':raised' + k, owner: id + ':' + k, kind: 'branch', band: n, i, j, k, hop: hop[k], parent: parent[k], biome,
-              over: g.id, rects: clone(g.rects), bbox: g.bbox.slice(), area: g.area, floorZ, openness: g.openness,
-              seed: BR.hash4(w.seed, i, j, 0xba06 ^ Math.imul(k + 1, 0x9e3779b1)), conns: [] };
-            rs.origin = [rs.bbox[0], rs.bbox[1]];
-            return rs;
-          });
-          // the landing's door, from the lot to the first raised floor; then a
-          // door from each raised floor to the one it grew from
-          const far = side === 'E' || side === 'S';
-          const landingDoor = { id: 'b' + n + '|' + i + ',' + j + ':x0', o: d.o, c: line, s0, s1, floorZ,
-            a: far ? host.id : all[0].id, b: far ? all[0].id : host.id, route: true, cross: false };
-          const wire = (live) => {
-            const conns = [landingDoor];
-            for (const rs of live) {
-              rs.conns = [];
-              if (rs.parent < 0) continue;
-              const up = live.find((x) => x.k === rs.parent), e = sharedEdge(up.rects, rs.rects, BN.minShared);
-              const width = Math.min(BN.door, e.s1 - e.s0 - 2), at = Math.round(((e.s0 + e.s1 - width) / 2) * 2) / 2;
-              conns.push({ id: 'b' + n + '|' + i + ',' + j + ':x' + (rs.k + 1), o: e.o, c: e.c, s0: at, s1: at + width, floorZ,
-                a: e.lowFirst ? up.id : rs.id, b: e.lowFirst ? rs.id : up.id, route: true, cross: false });
-            }
-            for (const cn of conns) for (const rs of live) if (cn.a === rs.id || cn.b === rs.id) rs.conns.push(cn);
-            return conns;
-          };
-          // build every raised floor; one that cannot be built is dropped with
-          // everything grown from it, and the rest wired and built again
-          let live = all.slice(), conns = null, failed = true;
-          while (live.length) {
-            conns = wire(live);
-            const bad = live.find((rs) => { const got = this.raisedSite(rs); if (got) Object.assign(rs, got); return !got; });
-            if (!bad) { failed = false; break; }
-            if (bad.k === 0) break;
-            const gone = new Set([bad.k]);
-            for (const rs of live) if (gone.has(rs.parent)) gone.add(rs.k);
-            live = live.filter((rs) => !gone.has(rs.k));
-          }
-          if (failed) continue;
-          // the door the landing opens must be a real opening on the first floor
-          if (!live[0].b.portals.find((p) => p.connection === landingDoor.id)) continue;
-          const kept = new Set(live.map((rs) => rs.over));
-          const B = { id, band: n, i, j, z, floorZ, biome, anchor: host.id, poi: P.id, archetype: P.archetype, side, reach,
-            landing: { b: raise.b, room: raise.room, portal: raise.portal, connection: landingDoor.id, rect: raise.rect.slice(), z: raise.z },
-            caps: ground.filter((g) => kept.has(g.id)).map((g) => ({ site: g.id, cap })), over: ground.filter((g) => kept.has(g.id)).map((g) => g.id), sites: live, conns, pit: null };
-          B.pit = this.planPit(B);
-          return B;
-        }
-      }
-      return null;
-    }
     /**
-     * A raised site's floor, of its branch's biome: a biome filler with the
-     * biome's rooms standing inside it (BIOME.furnish, LOT.build), placed at
-     * its floor. The pool's picks, then every biome filler in turn; a site too
-     * tight for its rooms is a district hallway with none. Every door it was
-     * given is honoured. { b, fillerOrigin, buildings } or null.
+     * The nearest way up (a growth from the active band that reaches the next
+     * one: where it starts) or down (a climb from the band below that arrives
+     * in the active band: where it lands) from (x, y), searched outward ring
+     * by ring of cells. { growth, at: [x, y], band (the band it leads to) } or null.
      */
-    raisedSite(rs) {
-      const D = BR.BIOME.DEFS[rs.biome], base = rs.band * CFG.spacing, room = CFG.ceilingLimit - (rs.floorZ - base);
-      const rects = rs.rects.map((q) => [q[0] - rs.origin[0], q[1] - rs.origin[1], q[2] - rs.origin[0], q[3] - rs.origin[1]]);
-      const conns = rs.conns.map((cn) => connView(cn, rs.id, rs.origin));
-      const range = D.rooms[Math.min(rs.hop, D.rooms.length - 1)], count = new BR.Rng(BR.hash4(rs.seed, 0xba0a, 0, 0)).int(range[0], range[1]);
-      const rooms = BR.BIOME.furnish({ biome: rs.biome, site: { rects }, conns, count, seed: rs.seed });
-      const weights = BR.BIOME.fillerWeights(rs.biome);
-      const pool = BR.BIOME.fillers(rs.biome).map((F) => F.id);
-      // (FILL.pick falls back to a passage when nothing weighted fits: only the biome's own are tried)
-      const ids = [...new Set([0, 1, 2, 3].map((t) => BR.FILL.pick({ seed: BR.hash4(rs.seed, t, 0, 0xba07), site: { rects }, weights })).concat(pool))].filter((f) => pool.includes(f));
-      const fits = (a) => a.surfaces.every((v) => v.floorZ >= -EPS && v.ceilingZ <= room + EPS);
-      for (const list of rooms.length ? [rooms, []] : [[]]) for (const [t, filler] of ids.entries()) {
-        const r = BR.LOT.build({ seed: BR.hash4(rs.seed, t, list.length, 0xba07), site: { rects }, filler, connections: clone(conns), buildings: list, floors: false });
-        // (LOT falls back to a warren when a filler fails: not this biome's)
-        if (!r.setting || r.setting.error || r.setting.filler !== filler || r.conns.length !== conns.length) continue;
-        const a = E.prepare(r.setting, { fillId: rs.owner, deferCapabilities: true });
-        if (!fits(a) || conns.some((c) => !a.portals.some((p) => p.connection === c.id))) continue;
-        // every room's own doors open onto the filler round it
-        if (r.buildings.some((x) => Object.values(x.conns).some((id) => !a.portals.some((p) => p.connection === id)))) continue;
-        const buildings = r.buildings.map((x) => ({ x, a: E.prepare(x.b, { fillId: rs.owner + '/' + x.id, deferCapabilities: true }) }));
-        if (!buildings.every((y) => fits(y.a))) continue;
-        return { b: placeBlueprint(a, rs.floorZ, rs.band, rs.band), fillerOrigin: [rs.origin[0] + r.at[0], rs.origin[1] + r.at[1]],
-          buildings: buildings.map(({ x, a: pb }) => ({ poi: { id: x.id, archetype: x.b.archetype, name: String(x.b.name).replace(/, alone$/, ''), biome: rs.biome },
-            origin: [rs.origin[0] + x.origin[0], rs.origin[1] + x.origin[1]], b: placeBlueprint(pb, rs.floorZ, rs.band, rs.band), conns: { ...x.conns } })) };
-      }
-      return null;
-    }
-    /**
-     * Where the branch's pit drills down: from the first raised floor into the
-     * ground site under it, both as they are built (a raw ground build, so
-     * planning never waits on a cached one). null if nothing lines up.
-     */
-    planPit(B) {
-      const w = this.worldFor(B.band), P = CFG.branch.pit;
-      for (const rs of B.sites) {
-        const ground = w.site(rs.over);
-        if (!ground) continue;
-        const r = w.buildRaw(ground);
-        if (!r.filler || r.buildings.length) continue;
-        if (!E.capCeilings(r.filler, B.z - E.SLAB)) continue;
-        const under = placeBlueprint(E.prepare(r.filler, { fillId: ground.id, deferCapabilities: true }), ground.band * CFG.spacing, ground.band, ground.band);
-        const spot = BR.CLAIM.pitSpot(rs.b, under, { size: P.size, fall: P.fall, topOrigin: rs.fillerOrigin, bottomOrigin: r.fillerOrigin });
-        if (!spot) continue;
-        return { id: 'pit:' + B.id + ':' + rs.k, ...spot, top: { site: rs.id, owner: rs.owner, ...spot.top },
-          bottom: { site: ground.id, owner: ground.id, origin: r.fillerOrigin.slice(), ...spot.bottom } };
-      }
-      return null;
-    }
-
-    /** the nearest journey up or down from (x, y) in the active band (among the 3 x 3 regions round it): its plan, or null */
-    nearestJourney(direction, x, y) {
+    nearestWay(direction, x, y, rings) {
       if (!['up', 'down'].includes(direction)) throw new Error('direction must be up or down');
-      const lower = direction === 'up' ? this.band : this.band - 1, R = C * CFG.regionCells;
-      const ri = Math.floor(x / R), rj = Math.floor(y / R), list = [];
-      for (let i = ri - 1; i <= ri + 1; i++) for (let j = rj - 1; j <= rj + 1; j++) { const p = this.journeyPlan(lower, i, j); if (p) list.push(p); }
-      const d = (p) => ((p.rect[0] + p.rect[2]) / 2 - x) ** 2 + ((p.rect[1] + p.rect[3]) / 2 - y) ** 2;
-      list.sort((a, b) => d(a) - d(b) || a.id.localeCompare(b.id));
-      // (a journey that could not be built is not one: only the nearest are built to find out)
-      return list.find((p) => this.journey(p)) || null;
+      const n = direction === 'up' ? this.band : this.band - 1, ci = Math.floor(x / C), cj = Math.floor(y / C), seen = new Set();
+      for (let r = 0; r <= (rings === undefined ? 3 : rings); r++) {
+        const found = [];
+        for (let i = ci - r; i <= ci + r; i++) for (let j = cj - r; j <= cj + r; j++) {
+          if (Math.max(Math.abs(i - ci), Math.abs(j - cj)) !== r) continue;
+          const G = this.growthAt(n, i, j);
+          if (!G || !G.arrival || seen.has(G.id)) continue;
+          seen.add(G.id);
+          const box = direction === 'down' ? G.arrival.box : G.stair ? G.stair.box : this.site(G.anchor).bbox;
+          found.push({ growth: G, at: [(box[0] + box[2]) / 2, (box[1] + box[3]) / 2], band: direction === 'up' ? n + 1 : n });
+        }
+        if (found.length) return found.sort((a, b) => Math.hypot(a.at[0] - x, a.at[1] - y) - Math.hypot(b.at[0] - x, b.at[1] - y) || a.growth.id.localeCompare(b.growth.id))[0];
+      }
+      return null;
     }
     bandOf(siteOrId) { const id = typeof siteOrId === 'string' ? siteOrId : siteOrId.id; const m = /^b(-?\d+)\|/.exec(id); if (!m) throw new Error('missing band in site id'); return +m[1]; }
     cell(i, j, band) { return this.worldFor(band === undefined ? this.band : band).cell(i, j); }
     cellAt(x, y) { return this.active.cellAt(x, y); }
     site(id) {
-      const m = /^b(-?\d+)\|(-?\d+),(-?\d+):raised\d+$/.exec(id);
+      const m = /^b(-?\d+)\|(-?\d+),(-?\d+):raised\d+\.\d+$/.exec(id);
       if (m) return this.raisedSites(+m[1], +m[2], +m[3]).find((rs) => rs.id === id) || null;
       return this.worldFor(this.bandOf(id)).site(id);
     }
@@ -458,11 +261,11 @@
     spatial(s) {
       if (s.kind === 'branch') return this.raisedBuild(s);
       const w = this.worldFor(s.band), r = w.build(s);
-      // a journey's blueprint is already spatial: absolute heights, both bands
-      if (s.kind === 'transition') return r;
       if (!r.spatial) {
         const top = this.ceilingOf(s) - s.band * CFG.spacing;
         const adapt = (b, id) => {
+          // (a stair pillar's filler is spatial already: it takes its stair up out of the claim)
+          if (b.schema === E.SCHEMA) return b;
           const a = E.prepare(b, { fillId: id, deferCapabilities: true });
           if (a.surfaces.some((v) => v.floorZ < CFG.floorLimit - 1e-9 || v.ceilingZ > top + 1e-9)) throw new Error(id + ' exceeds its planned claim');
           return placeBlueprint(a, s.band * CFG.spacing, s.band, s.band);
@@ -470,23 +273,30 @@
         const t = clock();
         r.spatial = { ...r, filler: r.filler && adapt(r.filler, s.id),
           buildings: r.buildings.map((B) => ({ ...B, b: adapt(B.b, s.id + '/' + B.poi.id) })) };
-        // the lower half of a pit: its own ceiling cutout, where the claim above drilled down
-        const B = BR.CLAIM && this.branch(s.band, s.i, s.j), pit = B && B.pit;
+        // the lower half of a pit: its own ceiling cutout, where the floor above drilled down
+        const G = BR.CLAIM && this.growthAt(s.band, s.i, s.j), pit = G && G.pit;
         if (pit && pit.bottom.site === s.id && r.spatial.filler) BR.CLAIM.drill(null, r.spatial.filler, pit, pit.id);
         w.stats.buildMs += clock() - t;
       }
       return r.spatial;
     }
     connection(s, id) {
-      if (s.kind === 'branch') return s.conns.find((cn) => cn.id === id) || null;
-      const B = BR.CLAIM && this.branch(s.band, s.i, s.j), own = B && B.conns.find((cn) => cn.id === id);
-      return own || this.worldFor(s.band).connection(s, id);
+      if (s.kind === 'branch') {
+        const own = s.conns.find((cn) => cn.id === id), G = !own && this.growthOf(s);
+        return own || (G && G.conns.find((cn) => cn.id === id)) || null;
+      }
+      const G = this.growthAt(s.band, s.i, s.j), own = G && G.conns.find((cn) => cn.id === id);
+      if (own) return own;
+      const A = /:up$/.test(id) && this.arrivalInto(s);
+      if (A && A.conn.id === id) return A.conn;
+      return this.worldFor(s.band).connection(s, id);
     }
     peer(s, cn) { return this.worldFor(s.band).peer(s, cn); }
     neighbours(s) { return this.worldFor(s.band).neighbours(s); }
     seamsBetween(a, b) {
-      if (a.band !== b.band || a.kind === 'transition' || b.kind === 'transition') return [];
-      this.build(a); this.build(b);
+      if (a.band !== b.band) return [];
+      // (a stair pillar's filler is spatial already: no seam is rolled on it)
+      if ([this.build(a), this.build(b)].some((r) => r.filler && r.filler.schema === E.SCHEMA)) return [];
       return this.worldFor(a.band).seamsBetween(a, b);
     }
     biomeAt(x, y) { return this.active.biomeAt(x, y); }
@@ -496,24 +306,17 @@
       assertBand(bandMin); assertBand(bandMax);
       if (bandMax < bandMin) throw new Error('reservation band range is reversed');
       const index = new E.ReservationIndex(), owners = new Set();
-      const claim = (owner, v) => {
+      const claim = (owner, vs) => {
         if (owners.has(owner)) return; owners.add(owner);
-        const r = index.reserve(owner, [v]);
+        const r = index.reserve(owner, vs);
         if (!r.ok) throw new Error(owner + ' reservation overlaps ' + r.conflicts[0].owner);
       };
       for (let n = bandMin; n <= bandMax; n++) {
-        for (const s of this.cell(i, j, n).sites) {
-          const owner = s.owner || s.id;
-          // a journey owns its territory through both bands' envelopes; a
-          // ground site owns its column up to its claim's ceiling, which a
-          // raised branch over it caps at the branch's own floor slab
-          const p = s.transition;
-          claim(owner, p ? { id: owner + ':envelope', kind: 'journey-envelope', rects: [p.rect], z0: p.lower * CFG.spacing + CFG.floorLimit - E.SLAB, z1: p.upper * CFG.spacing + CFG.ceilingLimit }
-            : { id: owner + ':envelope', kind: 'site-envelope', rects: s.rects, z0: n * CFG.spacing + CFG.floorLimit - E.SLAB, z1: this.ceilingOf(s) });
-        }
-        // the claims stacked over them: from their own floor slab to the band's ceiling
-        for (const rs of this.raisedSites(n, i, j))
-          claim(rs.owner, { id: rs.owner + ':envelope', kind: 'branch-envelope', rects: clone(rs.rects), z0: rs.floorZ - E.SLAB, z1: n * CFG.spacing + CFG.ceilingLimit });
+        // a ground site owns its column up to its claim's ceiling, which a
+        // floor standing over it caps at that floor's own slab
+        for (const s of this.cell(i, j, n).sites) claim(s.owner || s.id, this.claimOf(s));
+        // the floors stacked over them: from their own floor slab up
+        for (const rs of this.raisedSites(n, i, j)) claim(rs.owner, this.raisedClaim(rs));
       }
       return index.snapshot();
     }
@@ -522,6 +325,9 @@
     graph(i0, j0, i1, j1, bands) {
       bands = bands || [this.band];
       const nodes = new Set(), edges = [], directed = [], ends = new Map(), records = new Map(), issues = [], unresolved = [], verticalFrontier = new Map(), expected = new Set(), falls = new Map();
+      const inR = (q) => q[0] >= i0 && q[0] <= i1 && q[1] >= j0 && q[1] <= j1;
+      // a climb between bands is matched only when both its bands are asked for
+      const crossing = (raw) => { const m = /^b(-?\d+)\|-?\d+,-?\d+:up$/.exec(raw || ''); return m ? [+m[1], +m[1] + 1] : null; };
       const add = (site, b, origin, pre, bindings) => {
         for (const s of b.surfaces) { const id = pre + '/' + s.id; nodes.add(id); records.set(id, { id, owner: b.fillId, band: s.band, floorZ: s.floorZ, ceilingZ: s.ceilingZ }); }
         // a pit: half of it on each side (claims.js). The world reads the pair.
@@ -537,16 +343,16 @@
           if (e.direction === 'both') edges.push([from, to]);
         }
         for (const p of b.portals) {
-          const raw = bindings ? bindings[p.id] : p.connection;
+          const raw = bindings ? bindings[p.id] : p.connection, across = crossing(raw);
           const opening = b.openings.find((o) => o.id === p.opening);
-          if (!raw) {
-            if (!bands.includes(Number(p.band.split(':')[1]))) verticalFrontier.set(pre + '/' + p.id,
+          if (!raw || (across && !across.every((n) => bands.includes(n)))) {
+            if (raw || !bands.includes(Number(p.band.split(':')[1]))) verticalFrontier.set(pre + '/' + p.id,
               { owner: pre, portal: p.id, band: p.band, state: 'outside-region', at: [p.at[0] + origin[0], p.at[1] + origin[1], p.floorZ], width: p.width });
             continue;
           }
-          // LOT's POI-door IDs are site-local; only planned cell/border IDs
-          // already carry their globally unique band prefix.
-          const id = raw.startsWith('b' + site.band + '|') ? raw : site.id + '#' + raw;
+          // LOT's POI-door IDs are site-local; only planned cell/border and
+          // growth IDs already carry their globally unique band prefix.
+          const id = /^b-?\d+\|/.test(raw) ? raw : site.id + '#' + raw;
           if (!ends.has(id)) ends.set(id, []);
           const surface = b.surfaces.find((s) => s.room === p.room);
           const height = Math.min(opening.height || 2.2, surface.ceilingZ - surface.floorZ);
@@ -556,13 +362,16 @@
       for (const n of [...new Set(bands)].sort((a, b) => a - b)) {
         assertBand(n);
         for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
-          const cell = this.cell(i, j, n), raised = this.raisedSites(n, i, j);
-          for (const cn of cell.conns) if (!cn.cross || (cn.peerCell[0] >= i0 && cn.peerCell[0] <= i1 && cn.peerCell[1] >= j0 && cn.peerCell[1] <= j1)) expected.add(cn.id);
-          for (const cn of (this.branch(n, i, j) || { conns: [] }).conns) expected.add(cn.id);
+          const cell = this.cell(i, j, n), raised = this.raisedSites(n, i, j), G = this.growthAt(n, i, j);
+          for (const cn of cell.conns) if (!cn.cross || inR(cn.peerCell)) expected.add(cn.id);
+          // a growth's own doors and climbs, both ends asked for
+          for (const cn of G ? G.conns : []) {
+            const across = crossing(cn.id);
+            if (cn.cells.every(inR) && cn.cells.some((q) => q[0] === i && q[1] === j) && (!across || across.every((m) => bands.includes(m)))) expected.add(cn.id);
+          }
           for (const s of cell.sites.concat(raised)) {
             const r = this.spatial(s);
-            // (a journey's one blueprint is shared by both its bands; a stand-in is one per band)
-            if (r.filler) add(s, r.filler, r.fillerOrigin, s.kind === 'transition' ? r.filler.fillId : s.owner || s.id);
+            if (r.filler) add(s, r.filler, r.fillerOrigin, s.owner || s.id);
             for (const B of r.buildings) add(s, B.b, B.origin, s.id + '/' + B.poi.id, B.conns);
           }
         }
@@ -573,7 +382,8 @@
         if (list.length === 1) {
           dangling.push(id);
           const site = this.site(list[0].site), cn = site && this.connection(site, id);
-          if (!cn || !cn.cross || (cn.peerCell[0] >= i0 && cn.peerCell[0] <= i1 && cn.peerCell[1] >= j0 && cn.peerCell[1] <= j1)) issues.push(id + ' is missing an internal portal endpoint');
+          const leaves = cn && (cn.cells ? !cn.cells.every(inR) : cn.cross && !inR(cn.peerCell));
+          if (!leaves) issues.push(id + ' is missing an internal portal endpoint');
           continue;
         }
         if (list.length !== 2) { issues.push(id + ' has ' + list.length + ' portal endpoints'); continue; }
@@ -601,18 +411,31 @@
         dangling: dangling.sort(), verticalFrontier: [...verticalFrontier.values()].sort((a, b) => (a.owner + a.portal).localeCompare(b.owner + b.portal)),
         matches: matches.sort((a, b) => a.id.localeCompare(b.id)), issues, unresolved: unique(unresolved, (e) => JSON.stringify(e)) };
     }
+    /** a growth as the export lists it */
+    growthSummary(G) {
+      return { id: G.id, band: bandId(G.band), origin: [G.i, G.j], pillar: G.pillar, biome: G.biome, steered: G.steered, cells: clone(G.cells),
+        levels: G.levels.map((l) => ({ level: l.level, floorZ: l.floorZ, sites: l.sites.slice() })),
+        legs: G.legs.map((l) => ({ level: l.level, site: l.site, type: l.type, rise: l.rise, connection: l.conn })),
+        arrival: G.arrival ? { band: bandId(G.arrival.band), site: G.arrival.site, ground: G.arrival.ground, type: G.arrival.type, rise: G.arrival.rise, connection: G.arrival.conn.id } : null,
+        pit: G.pit ? G.pit.id : null };
+    }
     exportRegion(i0, j0, i1, j1, bands) {
       bands = [...new Set(bands || [this.band])].sort((a, b) => a - b);
       if (!bands.length) throw new Error('export needs at least one band');
       if (![i0, j0, i1, j1].every(Number.isInteger) || i1 < i0 || j1 < j0 || (i1 - i0 + 1) * (j1 - j0 + 1) * bands.length > 64) throw new Error('export needs an integer region of at most 64 band cells');
-      const layouts = new Map(), slices = [], reservations = new Map();
+      const layouts = new Map(), slices = [], reservations = new Map(), growths = new Map();
       for (const n of bands) for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
-        const c = this.cell(i, j, n), B = this.branch(n, i, j), raised = this.raisedSites(n, i, j);
+        const c = this.cell(i, j, n), G = this.growthAt(n, i, j), below = n > -10000 ? this.growthAt(n - 1, i, j) : null, raised = this.raisedSites(n, i, j);
+        if (G) growths.set(G.id, this.growthSummary(G));
+        // the growth connections with an end in this cell of this band
+        const here = (id) => id && id.startsWith('b' + n + '|' + i + ',' + j + ':');
+        const extra = (G ? G.conns : []).concat(below && below.arrival ? [below.arrival.conn] : []).filter((cn) => here(cn.a) || here(cn.b));
         slices.push({ band: bandId(n), i, j,
           sites: c.sites.map((s) => ({ id: s.id, owner: s.owner || s.id, kind: s.kind, rects: clone(s.rects), connections: s.conns.slice(), floorZ: n * CFG.spacing, ceilingZ: this.ceilingOf(s) })),
-          // the claims stacked over this cell's ground, each with its own floor
-          raised: raised.map((rs) => ({ id: rs.id, owner: rs.owner, kind: rs.kind, biome: rs.biome, hop: rs.hop, over: rs.over, rects: clone(rs.rects), connections: rs.conns.map((cn) => cn.id), floorZ: rs.floorZ, ceilingZ: n * CFG.spacing + CFG.ceilingLimit })),
-          connections: c.conns.map((v) => ({ ...clone(v), floorZ: n * CFG.spacing })).concat((B ? B.conns : []).map((v) => clone(v))) });
+          // the floors stacked over this cell's ground, each with its own floor and top
+          raised: raised.map((rs) => ({ id: rs.id, owner: rs.owner, kind: rs.kind, growth: rs.growth, biome: rs.biome, level: rs.level, hop: rs.hop, over: rs.over, rects: clone(rs.rects),
+            connections: rs.conns.map((cn) => cn.id).concat(rs.leg ? [rs.leg.conn] : []), floorZ: rs.floorZ, ceilingZ: rs.top })),
+          connections: c.conns.map((v) => ({ ...clone(v), floorZ: n * CFG.spacing })).concat([...new Map(extra.map((v) => [v.id, clone(v)])).values()]) });
         for (const s of c.sites.concat(raised)) {
           const r = this.spatial(s), add = (b, origin) => {
             if (!layouts.has(b.fillId)) {
@@ -631,10 +454,12 @@
       }
       const g = this.graph(i0, j0, i1, j1, bands);
       if (g.issues.length) throw new Error('invalid spatial connections: ' + g.issues[0]);
-      const journeys = [...layouts.values()].filter((l) => l.blueprint.kind === 'journey').map((l) => ({ id: l.owner, origin: l.origin.slice(), bands: l.blueprint.bands.map((x) => x.id), style: l.blueprint.source.style,
-        stages: l.blueprint.source.stages.map((st) => ({ filler: st.filler, z: st.z, leg: st.leg })) }));
-      return { schema: 'br.world-elevation/0.2', units: 'metres', axes: 'XY horizontal, Z up', seed: this.seed,
-        policy: { spacing: CFG.spacing, verticalJourneys: 'composed', journeysPerRegion: 1, regionCells: CFG.regionCells, layeredOwnership: 'stacked-claims', raisedBranches: 'house-pillars', growth: { share: CFG.branch.share, sites: CFG.branch.sites.slice(), biomes: Object.keys((BR.BIOME && BR.BIOME.DEFS) || {}) } }, journeys,
+      const GC = BR.GROWTH ? BR.GROWTH.CFG : {};
+      return { schema: 'br.world-elevation/0.3', units: 'metres', axes: 'XY horizontal, Z up', seed: this.seed,
+        policy: { spacing: CFG.spacing, verticalJourneys: 'grown', layeredOwnership: 'stacked-claims',
+          growth: { pillars: ['house', 'stair'], block: GC.block, steer: GC.steer, carry: GC.carry, landings: GC.landings, rise: (GC.rise || []).slice(),
+            share: CFG.branch.share, sites: CFG.branch.sites.slice(), biomes: Object.keys((BR.BIOME && BR.BIOME.DEFS) || {}) } },
+        growths: [...growths.values()].sort((a, b) => a.id.localeCompare(b.id)),
         region: [i0, j0, i1, j1], bands: bands.map((n) => ({ id: bandId(n), elevation: n * CFG.spacing })), slices,
         layouts: [...layouts.values()].sort((a, b) => a.owner.localeCompare(b.owner)), reservations: [...reservations.values()].sort((a, b) => a.owner.localeCompare(b.owner)),
         navigation: g.navigation, portalMatches: g.matches, pits: g.pits, frontier: g.dangling, verticalFrontier: g.verticalFrontier, issues: g.issues, unresolved: g.unresolved };

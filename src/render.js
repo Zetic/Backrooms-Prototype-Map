@@ -18,14 +18,14 @@
 
   const BG = '#3b3934';
   const LOD = { detail: 1, plan: 0.12, labels: 7 };
-  const PLAN = { site: [138, 128, 104], lot: [152, 132, 96], poi: [196, 160, 104], journey: [126, 156, 154], raised: 'rgba(181,164,197,0.45)', line: 'rgba(30,27,24,0.55)' };
+  const PLAN = { site: [138, 128, 104], lot: [152, 132, 96], poi: [196, 160, 104], raised: 'rgba(181,164,197,0.45)', arrival: 'rgba(126,186,180,0.8)', line: 'rgba(30,27,24,0.55)' };
   const COL = { route: '#e8913a', loop: '#3fb6bf', cross: '#e0609a', portal: '#3fbf6f', hover: 'rgba(255,255,255,0.95)', outline: 'rgba(255,255,255,0.35)' };
   const now = () => (typeof performance !== 'undefined' ? performance : Date).now();
   const css = (c) => 'rgb(' + c.map((v) => Math.round(v)).join(',') + ')';
 
   /** a plan-view tone for a site: a little darker the more enclosed its biome, a touch of noise per site */
   function planTone(s) {
-    const base = s.kind === 'transition' ? PLAN.journey : s.kind !== 'filler' ? PLAN.lot : PLAN.site, k = 0.86 + 0.18 * s.openness + ((s.seed & 255) / 255 - 0.5) * 0.06;
+    const base = s.kind !== 'filler' ? PLAN.lot : PLAN.site, k = 0.86 + 0.18 * s.openness + ((s.seed & 255) / 255 - 0.5) * 0.06;
     return css(base.map((v) => Math.min(255, v * k)));
   }
 
@@ -35,7 +35,10 @@
     const sites = W.sitesIn(x0 - 0.5, y0 - 0.5, x0 + S + 0.5, y0 + S + 0.5), ready = [];
     // claims stacked over the ground (band-world.js): drawn with the rest, at
     // their own heights, so the cut height alone decides what you see
-    const raised = W.raisedIn ? W.raisedIn(x0 - 0.5, y0 - 0.5, x0 + S + 0.5, y0 + S + 0.5).map((rs) => W.raisedBuild(rs)) : [];
+    const raised = W.raisedIn ? W.raisedIn(x0 - 0.5, y0 - 0.5, x0 + S + 0.5, y0 + S + 0.5).sort((a, b) => a.floorZ - b.floorZ).map((rs) => W.raisedBuild(rs)) : [];
+    // a climb from the band below arriving here: the floor it climbs from,
+    // seen only through the opening its landing site leaves round it
+    const arrivals = W.arrivalsIn ? W.arrivalsIn(x0 - 0.5, y0 - 0.5, x0 + S + 0.5, y0 + S + 0.5).map((A) => ({ r: W.raisedBuild(A.site), box: A.arrival.box })) : [];
     let complete = true;
     g.fillStyle = BG; g.fillRect(0, 0, S * tz, S * tz);
     for (const s of sites) {
@@ -68,10 +71,17 @@
     };
     // floors, then walls, then the tags of stairs, ramps and ladders over both
     // (a raised floor last within each pass: it stands over the ground's)
-    for (const layer of W.floorZ !== undefined ? ['floors', 'walls', 'labels'] : ['floors', 'walls']) for (const r of ready.concat(raised)) {
-      // (a filler's floors are labelled when it has more than one height: a gallery, a sunken floor)
-      if (r.filler) blueprint(r.filler, r.fillerOrigin, layer, lab && (opts.focus === r.site.id || r.filler.levels.length > 1 || !!r.filler.stairs), r.site.id);
-      for (const B of r.buildings) blueprint(B.b, B.origin, layer, lab, r.site.id + '/' + B.poi.id);
+    for (const layer of W.floorZ !== undefined ? ['floors', 'walls', 'labels'] : ['floors', 'walls']) {
+      for (const r of ready.concat(raised)) {
+        // (a filler's floors are labelled when it has more than one height: a gallery, a sunken floor)
+        if (r.filler) blueprint(r.filler, r.fillerOrigin, layer, lab && (opts.focus === r.site.id || r.filler.levels.length > 1 || !!r.filler.stairs), r.site.id);
+        for (const B of r.buildings) blueprint(B.b, B.origin, layer, lab, r.site.id + '/' + B.poi.id);
+      }
+      for (const { r, box } of arrivals) {
+        g.save(); g.beginPath(); g.rect((box[0] - x0) * tz, (box[1] - y0) * tz, (box[2] - box[0]) * tz, (box[3] - box[1]) * tz); g.clip();
+        blueprint(r.filler, r.fillerOrigin, layer, lab, r.site.id);
+        g.restore();
+      }
     }
     if (seams.size) TPL.drawSeamOpenings(g, [...seams.values()], { scale: tz, ox: -x0 * tz, oy: -y0 * tz });
     return complete;
@@ -102,6 +112,12 @@
       // (only branches already planned: the plan view never plans one)
       for (const rs of W.raisedIn(x0, y0, x0 + S, y0 + S, true)) for (const q of rs.rects)
         g.fillRect((q[0] - x0) * tz, (q[1] - y0) * tz, (q[2] - q[0]) * tz, (q[3] - q[1]) * tz);
+      // where a climb from the band below comes up (only those already planned)
+      g.fillStyle = PLAN.arrival;
+      if (W.arrivalsIn) for (const A of W.arrivalsIn(x0, y0, x0 + S, y0 + S, true)) {
+        const q = A.arrival.box;
+        g.fillRect((q[0] - x0) * tz, (q[1] - y0) * tz, Math.max(2, (q[2] - q[0]) * tz), Math.max(2, (q[3] - q[1]) * tz));
+      }
     }
     if (tz >= 0.3) {
       g.strokeStyle = PLAN.line; g.lineWidth = 1;
