@@ -5,7 +5,7 @@ require('../src/tpl/render2d'); require('../src/tpl/elevation-view'); require('.
 const g = () => new Proxy({ globalAlpha: 1, measureText: (s) => ({ width: s.length * 6 }) }, { get: (o,k) => k in o ? o[k] : () => {}, set: (o,k,v) => { o[k]=v; return true; } });
 globalThis.OffscreenCanvas = class { constructor() { this.context = g(); } getContext() { return this.context; } };
 const original = BR.ELEV.drawCutaway, calls = [];
-BR.ELEV.drawCutaway = (ctx,b,opts) => { calls.push({b,opts}); return original(ctx,b,opts); };
+BR.ELEV.drawCutaway = (ctx,b,opts) => { calls.push({b,opts,ctx}); return original(ctx,b,opts); };
 const w = new BR.BandWorld(7), ctx=g(), view={cx:0,cy:0,zoom:3,dpr:1,w:300,h:260};
 function draw(band, cutZ, ghost=false, focus=null, at=null) {
   w.setBand(band); calls.length=0;
@@ -33,9 +33,21 @@ assert(w._tiles.map.size<=260,'continuous height retains bounded tile memory');
   const shot = (cutZ, p=mid) => { calls.length=0; let done=false; for (let k=0;k<4&&!done;k++) done=BR.draw(ctx,v,{cx:p[0],cy:p[1],zoom:3,dpr:1,w:300,h:260},{labels:true,cutZ},Infinity).done; assert(done); return calls.map((c)=>c.b); };
   const raisedPainted = (list, id) => list.some((b)=>String(b.fillId).startsWith(id));
   const groundFiller = v.build(v.site(B.over[0])).filler;
-  const low = shot(0), high = shot(B.floorZ);
+  const low = shot(0), high = shot(B.floorZ), drawn = calls.slice();
   assert(raisedPainted(low,B.id)&&raisedPainted(high,B.id),'a raised floor is painted whatever the cut: its own floors decide what shows');
   assert(high.includes(groundFiller)&&low.includes(groundFiller),'and the ground under it is painted in the same tile');
+  // the ground is painted whole (floors, walls, tags) before any raised floor at
+  // or under the cut, which blanks its claim first: nothing of the ground shows over it
+  {
+    const isRaised = (c) => String(c.b.fillId).startsWith(B.id) || v.raisedIn(mid[0]-60,mid[1]-60,mid[0]+60,mid[1]+60).some((rs)=>v.raisedBuild(rs).filler===c.b);
+    const tiles = new Set(drawn.map((c)=>c.ctx)); let seen = 0;
+    for (const t of tiles) {
+      const list = drawn.filter((c)=>c.ctx===t), first = list.findIndex(isRaised);
+      if (first < 0) continue; seen++;
+      assert(list.slice(first).every(isRaised), 'no ground wall or tag is drawn over a raised floor');
+    }
+    assert(seen, 'a tile with a raised floor');
+  }
   // the cut at its floor: the pit is a hole in it, so the floor below shows through
   const top = v.raisedBuild(rs).filler, plan = BR.ELEV.cutawayPlan(top, B.floorZ, 0);
   assert(plan.visible.some((r)=>r.floorZ===B.floorZ),'the raised floor is visible at its own cut');
@@ -81,4 +93,4 @@ assert(w._tiles.map.size<=260,'continuous height retains bounded tile memory');
   globalThis.OffscreenCanvas = keep;
 }
 BR.ELEV.drawCutaway=original;
-console.log('ok   cut heights, band offsets, selected-only ghosts, raised floors at their own heights, climbs arriving from below, growths planned a few a frame (and every one in the plan view) and bounded tile caches');
+console.log('ok   cut heights, band offsets, selected-only ghosts, raised floors at their own heights, climbs arriving from below, growths planned a few a frame (and every one in the plan view), the ground never drawn over a raised floor and bounded tile caches');

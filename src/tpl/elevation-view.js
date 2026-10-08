@@ -269,7 +269,7 @@
       g.save(); exclude(g, b, group.occluders, X, Y, S);
       const opts = { ...o, labels: false, level: group.level, site: false, portals: o.portals !== false };
       if (o.layer !== 'walls') {
-        g.save(); g.globalAlpha *= o.exact ? 1 : 1 - Math.min(0.28, Math.max(0, height - group.floorZ) * 0.025);
+        g.save(); g.globalAlpha *= o.exact ? 1 : 1 - Math.min(0.45, Math.max(0, height - group.floorZ) * 0.05);
         BR.TPL.drawBuilding(g, b, { ...opts, layer: 'floors' }); g.restore();
       }
       if (o.layer !== 'floors') BR.TPL.drawBuilding(g, b, { ...opts, layer: 'walls' });

@@ -348,6 +348,15 @@ over, every growth on the zoomed-out map, no freeze while planning.
   step 3), about 7 sites a growth. The remaining failures are mostly a site
   past the landing door that is a POI or too small.
 
+**Map layering across claims** (`src/render.js`). A map tile paints its
+claims one layer at a time from the ground up: the ground's floors, walls,
+seams and tags, then each raised floor at or under the cut, which first blanks
+its whole claim (solid where its filler leaves cells unbuilt, open only at a
+pit). Before, every claim's floors were painted, then every claim's walls, so
+the ground's walls and columns were drawn over the floors above it, and a dimmed
+raised floor let the ground show through. Floors further under the cut are
+darker (5% a metre, at most 45%; it was 2.5%, at most 28%).
+
 **Growth step 4, house rooms** (`src/tpl/fillers/house.js`, `src/biomes.js`,
 `src/growth.js`; [docs/growth.md](docs/growth.md)). The user's ask: "literal
 house themed rooms, so house hallways, living rooms, more houses", not rooms
@@ -406,8 +415,6 @@ that merely read like a house.
 - The houseroom pool is three house fillers and five house archetypes:
   literal houses, nothing strange yet (no attics, crawlspaces or wrong-way
   stairs).
-- On the map, a ground filler's columns (cross pillars) are drawn over raised
-  floors standing above it at the cut height; this predates step 4.
 - A raised site that cannot be built is dropped with its subtree; a parent
   that fails only because of a child's door is dropped too (rather than the
   child). In practice none fails: over 300 cells, 0 of 51 raised sites.
