@@ -22,9 +22,11 @@ the work after it; the Unreal consumer of the exported data is milestone 6.
   packages. `index.html` is the map, `workbench.html` the template workshop,
   `elevation.html` the elevation lab. Serve the folder statically to inspect
   (`python3 -m http.server 8765`).
-- `main` holds everything below up to PR #22 (`aa7450b`); fast test runs are
-  [#23](https://github.com/Zetic/Backrooms-Prototype-Map/pull/23). The branches `claude/world-journeys` and
-  `claude/kept-stairs` are merged and can be deleted.
+- `main` holds everything below up to PR #23 (`cc5733b`); layered ownership is
+  [#24](https://github.com/Zetic/Backrooms-Prototype-Map/pull/24), open on
+  `claude/fast-test-runs-l53vww` (the branch kept its name from #23). The
+  branches `claude/world-journeys` and `claude/kept-stairs` are merged and can
+  be deleted.
 - Lesson from #21: it was stacked on `claude/world-journeys` and merged into
   that branch after #20 had already merged, so it missed `main` until #22
   carried it over. Retarget a stacked PR to `main` before merging it.
@@ -42,6 +44,7 @@ the work after it; the Unreal consumer of the exported data is milestone 6.
 | [#20](https://github.com/Zetic/Backrooms-Prototype-Map/pull/20) | Milestone 4: journeys between bands, stacks of different fillers joined by stairs, ramps and ladders |
 | [#21](https://github.com/Zetic/Backrooms-Prototype-Map/pull/21), [#22](https://github.com/Zetic/Backrooms-Prototype-Map/pull/22) | Kept stairs: a template's stairs laid out once at generation and drawn on the map (#22 brought #21 to `main`) |
 | [#23](https://github.com/Zetic/Backrooms-Prototype-Map/pull/23) | Fast test runs: parallel runner, quick and full modes, CI on every PR |
+| [#24](https://github.com/Zetic/Backrooms-Prototype-Map/pull/24) | Milestone 5: layered ownership, a hand-placed raised branch over the ground and a pit drilled back down |
 
 ## What the user wants
 
