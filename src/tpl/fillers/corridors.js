@@ -440,7 +440,7 @@
   }
 
   FILL.register({
-    id: 'corridor_rooms', name: 'Corridor with rooms', feel: 'enclosed', weight: 4,
+    id: 'corridor_rooms', biomes: ['houseroom'], name: 'Corridor with rooms', feel: 'enclosed', weight: 4,
     blurb: 'One or two long 1-1.5 m corridors with small rooms and closets packed along both sides, like an empty office or hotel floor.',
     doors: { door: 0.8, opening: 0.2 }, loops: 0.04,
     fits: (S) => Math.min(...dims(S)) >= 14 && Math.max(...dims(S)) >= 20,
@@ -514,7 +514,7 @@
 
   // ============================================================ doors to nowhere
   FILL.register({
-    id: 'doors_nowhere', name: 'Doors to nowhere', feel: 'enclosed', weight: 2,
+    id: 'doors_nowhere', biomes: ['houseroom'], name: 'Doors to nowhere', feel: 'enclosed', weight: 2,
     blurb: 'A 1.5-2.5 m hall lined with doors on both sides; most open onto 1 m closets or tiny dead ends, one or two onto a real room.',
     doors: { door: 1 }, loops: 0,
     fits: (S) => Math.min(...dims(S)) >= 12 && Math.max(...dims(S)) >= 20,
@@ -652,7 +652,7 @@
   }
 
   FILL.register({
-    id: 'beads', name: 'Beads on a string', feel: 'enclosed', weight: 4,
+    id: 'beads', biomes: ['houseroom'], name: 'Beads on a string', feel: 'enclosed', weight: 4,
     blurb: 'A 1-1.5 m corridor wandering across the site with small 2-4 m rooms hung on it like beads: it runs in one side of each and out the other.',
     doors: { opening: 0.8, door: 0.2 }, loops: 0,
     fits: (S) => Math.min(...dims(S)) >= 10 && Math.max(...dims(S)) >= 20,

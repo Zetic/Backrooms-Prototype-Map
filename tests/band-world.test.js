@@ -207,32 +207,38 @@ assert.throws(() => new BR.BandWorld(7).exportRegion(0, 0, 8, 8, [0]), /64/);
 assert.equal(E.generate,undefined);
 console.log('ok   invalid portal matching, region sizes and band indices rejected');
 
-// Layered ownership (milestone 5): a column of the world holds several
-// claims, stacked. A raised branch stands over whole ground sites beside a
-// two-storey house, entered from its stairwell carried on up, with a pit
-// drilled from it into the ground site below.
+// Layered ownership (milestone 5) and the first growth (step 2): a column of
+// the world holds several claims, stacked. A branch of house rooms stands over
+// whole ground sites beside a two-storey house, entered from its stairwell
+// carried on up (its pillar), with a pit drilled from it into the ground below.
+const KNOWN = { seed: 7, i: 3, j: -2 };            // band 0: a two-storey house, a branch of 4 sites and a pit
 {
-  // the known place: seed 31337, band 0, cell (-3, 2)
-  const w = new BR.BandWorld(31337), i = -3, j = 2, B = w.branch(0, i, j);
+  const w = new BR.BandWorld(KNOWN.seed), i = KNOWN.i, j = KNOWN.j, B = w.branch(0, i, j);
   assert(B, 'the known cell has a branch');
-  assert.equal(B.floorZ, 6.5); assert.equal(B.sites.length, 2);
+  assert.equal(B.floorZ, 6.5); assert(B.sites.length >= 2 && B.sites.length <= 4);
+  assert.equal(B.archetype, 'two_storey'); assert.equal(B.biome, 'houseroom');
   assert.equal(w.cell(i, j, 0).sites.find((s) => s.id === B.anchor).kind, 'lot', 'its anchor is a house on its own lot');
   // the ground plan is identical with and without it
-  const plain = new BR.BandWorld(31337), CLAIM = BR.CLAIM;
+  // (the world without claims is built with claims switched off; the world with
+  // them after they are back on, so its builds really have the branch over them)
+  const groundPlan = (W) => JSON.stringify(W.cell(i, j, 0).sites.map((s) => [s.id, s.kind, s.rects, s.conns, s.pois.map((P) => P.id)]));
+  const built = (W, s) => { const r = W.build(s), f = r.filler; return JSON.stringify([f && f.filler, f && f.rooms.map((q) => [q.id, q.rects, q.level || 0, q.floor || 0]), r.buildings.map((x) => [x.poi.id, x.b.footprint[0].rects])]); };
+  const CLAIM = BR.CLAIM, without = {};
+  let bareGround;
   BR.CLAIM = null;
   try {
-    const bare = new BR.BandWorld(31337);
+    const bare = new BR.BandWorld(KNOWN.seed);
     assert.equal(bare.branch(0, i, j), null, 'without claims there is no branch');
-    const ground = (W) => JSON.stringify(W.cell(i, j, 0).sites.map((s) => [s.id, s.kind, s.rects, s.conns, s.pois.map((P) => P.id)]));
-    same(ground(bare), ground(plain));
-    const built = (W, s) => { const r = W.build(s), f = r.filler; return JSON.stringify([f && f.filler, f && f.rooms.map((q) => [q.id, q.rects, q.level || 0]), r.buildings.map((x) => [x.poi.id, x.b.footprint[0].rects])]); };
-    for (const s of bare.cell(i, j, 0).sites) same(built(bare, s), built(plain, bare.cell(i, j, 0).sites.find((q) => q.id === s.id) && s), s.id + ' plan');
-    for (const s of plain.cell(i, j, 0).sites) {
-      const mine = built(plain, s), theirs = built(bare, bare.site(s.id));
-      assert.equal(mine, theirs, s.id + ': the floors below a claim are the same with and without it');
-    }
+    bareGround = groundPlan(bare);
+    for (const s of bare.cell(i, j, 0).sites) without[s.id] = built(bare, s);
   } finally { BR.CLAIM = CLAIM; }
   assert(BR.CLAIM && BR.CLAIM.raiseStair, 'claims are back');
+  const plain = new BR.BandWorld(KNOWN.seed);
+  assert(plain.branch(0, i, j), 'and with them the branch');
+  same(groundPlan(plain), bareGround);
+  for (const s of plain.cell(i, j, 0).sites) assert.equal(built(plain, s), without[s.id], s.id + ': the floors below a claim are the same with and without it');
+  // only the ceilings under the branch change: capped under its slab
+  for (const id of B.over) assert(plain.build(plain.site(id)).filler.rooms.every((r) => (r.ceiling || 2.5) <= B.z - E.SLAB + 1e-7), id + ' is capped');
 
   // no two claims in the column overlap in 3D, and the slab between them is the branch's floor
   const res = w.reservationPlan(i, j, 0, 0), index = new E.ReservationIndex();
@@ -258,17 +264,18 @@ console.log('ok   invalid portal matching, region sizes and band indices rejecte
   // the landing: the house's own stair carried on up, and a door into the branch
   const host = w.spatial(w.site(B.anchor)), house = host.buildings.find((x) => x.poi.id === B.poi);
   const landing = house.b.rooms.find((r) => r.id === B.landing.room);
-  assert(landing && landing.floorZ === 6.5, 'the landing stands at the branch floor');
+  assert(landing && landing.floorZ === B.floorZ, 'the landing stands at the branch floor');
   assert(house.b.connectors.some((c) => c.to === 's:' + landing.id), 'the house own stair climbs to it');
   assert.equal(house.conns[B.landing.portal], B.landing.connection, 'its door is the branch connection');
   const g = w.graph(i, j, i, j, [0]);
   same(g.issues, []); same(g.unresolved, []);
   assert.equal(components(g.nodes, g.edges).sizes.length, 1, 'the branch is part of the cell network, not a second one');
   const at = (z) => g.navigation.nodes.filter((s) => s.floorZ === z);
-  assert(at(6.5).length > 4 && at(0).length > 4, 'floors at both heights');
-  // you can walk from the ground up into the branch and back down again
-  const ground = at(0).find((s) => !s.owner.startsWith('journey:')), raised = at(6.5).find((s) => s.owner.startsWith(B.id));
-  assert(walk(g, ground.id).has(raised.id) && walk(g, raised.id).has(ground.id), 'up into the branch and back');
+  assert(at(B.floorZ).length > 4 && at(0).length > 4, 'floors at both heights');
+  // you can walk from the ground up into the branch and back down again, to every raised floor and every room in it
+  const ground = at(0).find((s) => !s.owner.startsWith('journey:')), raised = at(B.floorZ).filter((s) => s.owner.startsWith(B.id + ':'));
+  assert(raised.length && raised.every((r) => walk(g, ground.id).has(r.id) && walk(g, r.id).has(ground.id)), 'up into every room of the branch and back');
+  assert(raised.some((r) => r.owner.includes('/')), 'house rooms stand in it');
 
   // the pit: one way down, from the branch into the ground site below
   assert(B.pit, 'the branch has a pit');
@@ -294,16 +301,17 @@ console.log('ok   a column holds stacked claims: a raised branch over capped gro
 // The branch is a function of (seed, band, cell): fresh worlds agree, caches
 // may be evicted, and the export says the same thing in any order.
 {
-  const i = -3, j = 2, a = new BR.BandWorld(31337);
+  const i = KNOWN.i, j = KNOWN.j, a = new BR.BandWorld(KNOWN.seed), B = a.branch(0, i, j);
   const expected = a.exportRegion(i, j, i, j, [0]);
   assert.equal(expected.schema, 'br.world-elevation/0.2');
   assert.equal(expected.policy.layeredOwnership, 'stacked-claims');
-  assert.equal(expected.policy.raisedBranches, 'hand-placed');
+  assert.equal(expected.policy.raisedBranches, 'house-pillars');
+  same(expected.policy.growth.biomes, ['houseroom']);
   assert.equal(expected.pits.length, 1);
   const slice = expected.slices[0];
-  assert.equal(slice.raised.length, 2);
+  assert.equal(slice.raised.length, B.sites.length);
   for (const rs of slice.raised) {
-    assert.equal(rs.floorZ, 6.5);
+    assert.equal(rs.floorZ, B.floorZ); assert.equal(rs.biome, 'houseroom');
     const under = slice.sites.find((s) => s.id === rs.over);
     assert(under && under.ceilingZ === rs.floorZ - E.SLAB, 'every slice says where one claim stops and the next begins');
     assert(expected.layouts.some((l) => l.reservationOwner === rs.owner && l.owner === rs.owner), 'a raised floor is a layout of its own');
@@ -321,7 +329,9 @@ console.log('ok   a column holds stacked claims: a raised branch over capped gro
       }), item.owner + ': ' + v.id + ' fits its claim');
     }
   }
-  const b = new BR.BandWorld(31337, { limits: { cells: 2, builds: 2 }, elevationLimits: { bands: 1, journeys: 1, claims: 1, branches: 1, raised: 1 } });
+  // every room standing in the branch is a layout of its own, owned by its raised floor's claim
+  for (const rs of B.sites) for (const x of rs.buildings) assert(expected.layouts.some((l) => l.owner === rs.owner + '/' + x.poi.id && l.reservationOwner === rs.owner), rs.id + '/' + x.poi.id + ' exported');
+  const b = new BR.BandWorld(KNOWN.seed, { limits: { cells: 2, builds: 2 }, elevationLimits: { bands: 1, journeys: 1, claims: 1, branches: 1, raised: 1 } });
   // asked for in another order, with everything evicted in between
   for (const rs of b.raisedSites(0, i, j)) b.raisedBuild(rs);
   for (const s of b.cell(i, j, 0).sites.slice().reverse()) b.build(s);
@@ -333,24 +343,40 @@ console.log('ok   a column holds stacked claims: a raised branch over capped gro
 }
 console.log('ok   branches, their pits and their exports are the same in fresh and evicting worlds, in any order');
 
-// Every branch anywhere obeys the same rules.
+// Every branch anywhere obeys the same rules: it grows from a house that
+// seeds growth, over whole plain sites joined edge to edge, from its biome's
+// pool only, rooms densest beside the pillar, and only a share of the houses
+// that could seed one do.
 {
-  let seen = 0, pits = 0;
-  for (const seed of MODE.size([31337], [31337, 7, 12345, 4242])) {
+  let seen = 0, pits = 0, eligible = 0, rooms = [0, 0], sites = [0, 0];
+  const pool = new Set(BR.BIOME.templates('houseroom').map((a) => a.id)), fillers = new Set(BR.BIOME.fillers('houseroom').map((F) => F.id));
+  for (const seed of MODE.size([7], [31337, 7, 12345, 4242])) {
     const w = new BR.BandWorld(seed);
     for (let i = -3; i <= 2; i++) for (let j = -3; j <= 2; j++) {
+      const cell = w.cell(i, j, 0);
+      eligible += cell.lots.filter((L) => L.kind === 'yard' && BR.BIOME.anchorOf(BR.TPL.archetypes[L.pois[0].archetype]) && BR.CLAIM.stairTop(L.b)).length;
       const B = w.branch(0, i, j);
       if (!B) continue;
       seen++;
       if (B.pit) pits++;
-      const cell = w.cell(i, j, 0);
+      assert(BR.BIOME.anchorOf(BR.TPL.archetypes[B.archetype]) === B.biome, B.id + ' grows from a house that seeds its biome');
+      assert(B.z >= 3.3 + 3 - 1e-7 && B.z <= BR.BAND_CFG.ceilingLimit - 3 + 1e-7 && Math.abs(B.z * 2 - Math.round(B.z * 2)) < 1e-7, B.id + ': its pillar climbs a flight, on the half metre');
+      assert(B.sites.length >= 1 && B.sites.length <= 4 && B.sites.reduce((a, rs) => a + rs.area, 0) <= BR.BAND_CFG.branch.area);
       tile(cell);                                  // the ground still tiles its cell exactly
       for (const rs of B.sites) {
         const under = cell.sites.find((s) => s.id === rs.over);
         assert(under && under.kind === 'filler' && !under.pois.length, rs.id + ' stands over a plain filler site');
         same(rs.rects, under.rects);                // whole sites, never part of one
-        const b = w.raisedBuild(rs).filler;
-        assert(b.surfaces.every((s) => s.floorZ >= rs.floorZ - 1e-7 && s.ceilingZ <= BR.BAND_CFG.ceilingLimit + 1e-7), rs.id + ' keeps inside its claim');
+        // grown edge to edge from the site the landing opens onto
+        if (rs.parent >= 0) { const up = B.sites.find((x) => x.k === rs.parent); assert(up && up.hop === rs.hop - 1 && rs.conns.some((cn) => cn.a === up.id || cn.b === up.id), rs.id + ' joins the site it grew from'); }
+        else assert(rs.k === 0 && rs.hop === 0);
+        const r = w.raisedBuild(rs), b = r.filler;
+        assert(fillers.has(b.filler), rs.id + ': a ' + b.filler + ' is not a houseroom filler');
+        const kinds = r.buildings.map((x) => x.poi.archetype);
+        assert(kinds.every((a) => pool.has(a)) && new Set(kinds).size === kinds.length, rs.id + ': rooms from the pool, none twice: ' + kinds);
+        rooms[rs.hop ? 1 : 0] += kinds.length; sites[rs.hop ? 1 : 0]++;
+        for (const x of [b].concat(r.buildings.map((y) => y.b)))
+          assert(x.surfaces.every((s) => s.floorZ >= rs.floorZ - 1e-7 && s.ceilingZ <= BR.BAND_CFG.ceilingLimit + 1e-7), rs.id + ' keeps inside its claim');
         assert(rs.conns.length && rs.conns.every((cn) => b.portals.some((p) => p.connection === cn.id)), rs.id + ' built every connection it was given');
       }
       const g = w.graph(i, j, i, j, [0]);
@@ -360,8 +386,43 @@ console.log('ok   branches, their pits and their exports are the same in fresh a
       w.exportRegion(i, j, i, j, [0]);             // throws on any invalid connection
     }
   }
-  assert(seen >= MODE.size(1, 4), 'branches were found: ' + seen);
+  assert(seen >= MODE.size(3, 8), 'branches were found: ' + seen);
   assert(pits >= 1, 'and pits drilled: ' + pits);
-  console.log('ok   every branch stands over whole plain sites, keeps inside its claim and leaves its cell one network (' + seen + ' branches, ' + pits + ' with a pit)');
+  assert(seen < eligible, 'not every house that could seed growth grew a branch: ' + seen + ' of ' + eligible);
+  assert(rooms[0] / sites[0] > rooms[1] / Math.max(1, sites[1]), 'rooms are densest beside the pillar: ' + (rooms[0] / sites[0]).toFixed(1) + ' against ' + (rooms[1] / Math.max(1, sites[1])).toFixed(1));
+  console.log('ok   every branch grows from a seeding house over whole plain sites, from its biome only, densest by its pillar, inside its claim, one network (' + seen + ' branches of ' + eligible + ' possible, ' + pits + ' with a pit)');
+}
+// A share of the houses that could seed growth do; a branch only ever grows
+// from one that does. And a raised floor that cannot be built is dropped with
+// everything grown from it, the rest wired and built again.
+{
+  let yes = 0, no = 0;
+  for (const seed of [7, 31337, 99]) {
+    const w = new BR.BandWorld(seed);
+    for (let i = -4; i <= 3; i++) for (let j = -4; j <= 3; j++) {
+      for (const L of w.cell(i, j, 0).lots.filter((x) => x.kind === 'yard' && BR.BIOME.anchorOf(BR.TPL.archetypes[x.pois[0].archetype]))) w.seedsGrowth(0, i, j, L.pois[0]) ? yes++ : no++;
+    }
+    for (let i = -2; i <= 1; i++) for (let j = -2; j <= 1; j++) {
+      const B = w.branch(0, i, j);
+      if (B) assert(w.seedsGrowth(0, i, j, w.cell(i, j, 0).lots.flatMap((L) => L.pois).find((P) => P.id === B.poi)), B.id + ' grew from a house that seeds');
+    }
+  }
+  assert(yes > 0 && no > 0 && yes > no, 'some seed, some do not: ' + yes + ' and ' + no);
+  assert.equal(new BR.BandWorld(7).seedsGrowth(0, 0, 0, { id: 'x', archetype: 'ranch' }), false, 'a house with no stair of its own never seeds');
+
+  const w = new BR.BandWorld(KNOWN.seed), full = w.branch(0, KNOWN.i, KNOWN.j);
+  const victim = full.sites.find((rs) => rs.k > 0 && full.sites.some((c) => c.parent === rs.k)) || full.sites.find((rs) => rs.k > 0);
+  const lost = new Set([victim.k]);
+  for (const rs of full.sites) if (lost.has(rs.parent)) lost.add(rs.k);
+  const f = new BR.BandWorld(KNOWN.seed), real = f.raisedSite.bind(f);
+  f.raisedSite = (rs) => (rs.k === victim.k ? null : real(rs));
+  const B = f.branch(0, KNOWN.i, KNOWN.j);
+  same(B.sites.map((rs) => rs.k), full.sites.filter((rs) => !lost.has(rs.k)).map((rs) => rs.k), 'the failed floor and its subtree are gone, the rest stand');
+  same(B.over, B.sites.map((rs) => rs.over)); same(B.caps.map((c) => c.site), B.over);
+  for (const cn of B.conns) assert(B.sites.some((rs) => cn.a === rs.id || cn.b === rs.id), cn.id + ' joins a floor that stands');
+  for (const rs of B.sites) assert(rs.conns.every((cn) => B.conns.includes(cn)) && rs.conns.every((cn) => rs.b.portals.some((p) => p.connection === cn.id)), rs.id + ' builds exactly its doors');
+  const g = f.graph(KNOWN.i, KNOWN.j, KNOWN.i, KNOWN.j, [0]);
+  same(g.issues, []); assert.equal(components(g.nodes, g.edges).sizes.length, 1);
+  console.log('ok   a share of the houses that could seed growth do (' + yes + ' of ' + (yes + no) + '); a raised floor that cannot be built goes with its subtree, the rest rewired');
 }
 console.log('All band-world checks passed.');

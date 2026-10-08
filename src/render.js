@@ -99,7 +99,8 @@
     for (const s of sites) paintPlanSite(g, s, x0, y0, tz);
     if (W.raisedIn) {
       g.fillStyle = PLAN.raised;
-      for (const rs of W.raisedIn(x0, y0, x0 + S, y0 + S)) for (const q of rs.rects)
+      // (only branches already planned: the plan view never plans one)
+      for (const rs of W.raisedIn(x0, y0, x0 + S, y0 + S, true)) for (const q of rs.rects)
         g.fillRect((q[0] - x0) * tz, (q[1] - y0) * tz, (q[2] - q[0]) * tz, (q[3] - q[1]) * tz);
     }
     if (tz >= 0.3) {

@@ -97,11 +97,12 @@
       let source = id.startsWith('template:') ? BR.TPL.generate({ archetype: id.slice(9), seed, site, wrongness: 0 }) : BR.FILL.generate({ filler: id.slice(7), seed, site, connections: BR.FILL.sampleConnections(site, 2, seed) });
       // a raised landing over its roof, as the world enters a branch (claims.js)
       if ($('raise').checked && BR.CLAIM) {
-        const z = (BR.BAND_CFG && BR.BAND_CFG.branch.z) || 6.5, st = BR.CLAIM.stairTop(source);
+        // one flight up from its top storey, as the world raises a pillar
+        const z = BR.CLAIM.pillarFloor(source), st = BR.CLAIM.stairTop(source);
         let got = null;
         // (the world's reach is where the lot edge is; here, whichever fits)
         for (const sd of (st && st.sides) || []) { for (const reach of [2.5, 1, 4]) { got = BR.CLAIM.raiseStair(source, { z, side: sd, reach }); if (got) break; } if (got) break; }
-        if (!got) throw new Error('This template has no stairwell on an outside wall whose stair could carry on up to ' + E.zLabel(z) + '. A two-storey house does.');
+        if (!got) throw new Error('This template has no stairwell on an outside wall whose stair could carry on up' + (z ? ' to ' + E.zLabel(z) : '') + '. A two-storey house or a townhouse does.');
         source = got.b;
       }
       current = direction === 'none' ? E.prepare(source) : E.connectionVariant(source, { direction, type: typeOf(), rise: riseOf() });

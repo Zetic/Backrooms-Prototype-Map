@@ -2,7 +2,7 @@
 // test mode (quick or full, tests/mode.js).
 const path = require('node:path'), MODE = require('./mode');
 for (const f of ['core', 'tpl/grid', 'tpl/framework', 'tpl/catalogue', 'tpl/floors', 'tpl/house', 'tpl/room', 'tpl/composite', 'tpl/neighborhood', 'tpl/park', 'tpl/zone', 'tpl/archetypes/house', 'tpl/archetypes/room', 'tpl/archetypes/neighborhood', 'tpl/archetypes/park', 'tpl/archetypes/lone',
-  'tpl/fillers/engine', 'tpl/fillers/kit', 'tpl/fillers/pool', 'tpl/fillers/corridors', 'tpl/fillers/halls', 'tpl/fillers/rooms', 'tpl/fillers/architectural', 'tpl/lot', 'poi', 'world', 'seams', 'tpl/elevation', 'tpl/connections', 'journeys', 'claims', 'band-world'])
+  'tpl/fillers/engine', 'tpl/fillers/kit', 'tpl/fillers/pool', 'tpl/fillers/corridors', 'tpl/fillers/halls', 'tpl/fillers/rooms', 'tpl/fillers/architectural', 'tpl/lot', 'poi', 'world', 'seams', 'tpl/elevation', 'tpl/connections', 'journeys', 'claims', 'biomes', 'band-world'])
   require(path.join(__dirname, '..', 'src', f + '.js'));
 const BR = globalThis.BR;
 

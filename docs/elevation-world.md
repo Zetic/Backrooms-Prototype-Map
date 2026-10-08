@@ -63,7 +63,7 @@ outline in both directions. Clicking the footprint reveals its other landing.
 | World vertical journeys | One per band pair per 512 m region (4 × 4 cells) | A territory of 40-56 × 32-48 m in one cell; even pairs in the region's west half, odd pairs in its east half; three doors onto each band |
 | Journey envelope | Lower reference −1.5 m to upper reference +14.5 m | The whole territory, through both bands |
 | Ground claim | Reference −1.5 m up to the raised floor slab above it, else +14.5 m | A ground site keeps its own floor; only its ceiling is capped |
-| Raised branch | One per cell at most, two filler sites, floor at reference +6.5 m | Hand-placed for now: proof that a column can hold two owners |
+| Raised branch | One per cell at most, 1-4 plain sites (1,200 m² at most), floor one flight over its house's top storey: reference +6.5 m (two-storey) or +9.5 m (townhouse) | Grown from a house that seeds growth (75% of those that could), of that house's biome |
 | Raised claim | Branch floor −0.25 m (its slab) to reference +14.5 m | Meets the ground claim exactly at the slab, never overlapping it |
 | Pit | 2 × 2 m, at least 3 m of fall, one per branch at most | A drilled one-way drop from the branch into the ground site |
 | Export limit | 64 band cells | Bounds synchronous inspection |
@@ -138,8 +138,15 @@ rather than shortened.
 
 ![A raised branch over the ground, on the map](raised-branch.png)
 
-*The map at seed 31337, cell (−3, 2) of band 0: the ground at 0 m, and the same
-place at +6.5 m with the branch over it.*
+*The map at seed 31337, cell (−3, 2) of band 0, as milestone 5 placed it: the
+ground at 0 m, and the same place at +6.5 m with the branch over it. Since
+growth step 2 the house there no longer seeds one; see the next picture.*
+
+![A branch of house rooms over the ground](house-branch.png)
+
+*Growth step 2 at seed 7, cell (3, −2) of band 0: a two-storey house's stair
+carried up a flight, and a branch of four house-room sites grown from its
+landing at +6.5 m.*
 
 `BR.CLAIM` ([src/claims.js](../src/claims.js)) holds the mechanics, shared by
 the world and the elevation lab:
@@ -155,14 +162,23 @@ the world and the elevation lab:
   run, and returns the new blueprint, the landing and the door's world line.
 - `pitSpot`, `markDrop` and `drill` place and cut a pit (below).
 
-`planBranch(n, i, j)` plans the branch for a cell from the seed alone: the first
-yard lot in id order whose `stairTop` can carry up to +6.5 m, the side and reach
-that reach the lot's edge, then the first plain filler site across that door and
-a second sharing at least 5 m of edge with it. The raised sites are those whole
-filler sites (ids `b<n>|<i>,<j>:raised<k>`, owners `branch:<n>:<i>,<j>:<k>`),
-with their own connections minted between them and to the landing. A raised
-filler is picked exactly as a ground one is, but with no extra floors, and it
-must fit the claim envelope and build every minted connection.
+`planBranch(n, i, j)` grows the branch for a cell from the seed alone (growth
+step 2, [growth.md](growth.md)): the first yard lot in id order whose house
+seeds growth (`BIOME.anchorOf`, `grows` on the archetype), passes the seeded
+share (`branch.share`, 75%) and has a `stairTop` that can carry one flight up
+(to a floor on the half metre at least `branch.rise` 3.3 m up and clear of the
+top storey's ceiling, with 3 m of headroom left); the side and reach that reach
+the lot's edge; then the plain filler site across that door and, breadth first
+in a seeded order, plain neighbours sharing at least 5 m of edge, to 1-4 sites
+and 1,200 m², each one that keeps under the slab (`keepsUnder`, a raw build
+and `E.capCeilings`). The raised sites are those whole filler sites (ids
+`b<n>|<i>,<j>:raised<k>`, owners `branch:<n>:<i>,<j>:<k>`, with `hop`, `parent`
+and `biome`), with their own connections minted to the landing and from each
+site to the one it grew from. `raisedSite` builds each as a district site: a
+filler from its biome's pool with the biome's rooms standing in it
+(`BIOME.furnish`, then `LOT.build` with no extra floors), honouring every
+minted connection and fitting the claim envelope. A site that cannot be built
+is dropped with its subtree and the rest rebuilt.
 
 Building stays separate from planning: `World.buildRaw` builds a site without
 the cache or the hook, so the planner can measure a ground build, and every
@@ -197,11 +213,11 @@ absolute. Portal matching uses world XYZ.
 
 | Field | Meaning |
 | --- | --- |
-| `policy` | Reference spacing; `verticalJourneys: "composed"`, `journeysPerRegion`, `regionCells`; `layeredOwnership: "stacked-claims"`, `raisedBranches: "hand-placed"`, `branchFloor` |
+| `policy` | Reference spacing; `verticalJourneys: "composed"`, `journeysPerRegion`, `regionCells`; `layeredOwnership: "stacked-claims"`, `raisedBranches: "house-pillars"`, `growth` (`share`, `sites`, `biomes`) |
 | `journeys` | Each journey whose territory is in the region: id, origin, bands, style, and its stages (filler, height, leg) |
 | `pits` | Each drilled drop: id, the nodes it goes from and to, its world rectangle and its fall |
 | `bands` | Requested reference IDs and elevations |
-| `slices` | Per-band cell ownership and horizontal connection plans, not viewing slices; each site carries its `floorZ` and capped `ceilingZ`, and `raised[]` lists the cell's raised sites with their floor height |
+| `slices` | Per-band cell ownership and horizontal connection plans, not viewing slices; each site carries its `floorZ` and capped `ceilingZ`, and `raised[]` lists the cell's raised sites with their floor height, `biome` and `hop` (sites from the pillar) |
 | `layouts` | Owner, reservation owner, XY origin and complete elevation blueprint |
 | `reservations` | World XYZ envelopes |
 | `navigation` | Authoritative surface nodes and directed traversal edges |
@@ -249,7 +265,9 @@ layout QA.
 
 Connection zones and slope-following reservations (milestone 2), template
 floors with their own stairs (milestone 3), journeys between the bands
-(milestone 4) and layered ownership with a hand-placed raised branch and a
-drilled pit (milestone 5) are in place. Growing branches on their own, steering
-them, biome pools and linking two branches are the work after this, and an
-Unreal consumer that rebuilds the data stays on the plan.
+(milestone 4), layered ownership with a drilled pit (milestone 5) and a house
+pillar with a branch of its biome (growth step 2) are in place. Recursive
+growth with a budget per region and steering toward the next band (growth
+step 3), houseroom variety and linking growths come next
+([growth.md](growth.md)); an Unreal consumer that rebuilds the data stays on
+the plan.

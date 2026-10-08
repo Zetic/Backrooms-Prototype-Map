@@ -1,7 +1,10 @@
 # Elevation implementation plan
 
-Updated 2026-10-08 with milestone 5, layered ownership. Milestone 4 (world
-journeys) was merged in [PR #20](https://github.com/Zetic/Backrooms-Prototype-Map/pull/20),
+Updated 2026-10-08 with growth step 2, one house pillar and its branch (the
+growth design and its build order: [growth.md](growth.md)). Milestone 5
+(layered ownership, growth step 1) was merged in
+[PR #24](https://github.com/Zetic/Backrooms-Prototype-Map/pull/24), milestone 4 (world
+journeys) in [PR #20](https://github.com/Zetic/Backrooms-Prototype-Map/pull/20),
 milestone 3 (template floors) in [PR #19](https://github.com/Zetic/Backrooms-Prototype-Map/pull/19),
 milestone 2 (connection zones) in [PR #18](https://github.com/Zetic/Backrooms-Prototype-Map/pull/18),
 milestone 1 in [PR #16](https://github.com/Zetic/Backrooms-Prototype-Map/pull/16).
@@ -192,7 +195,8 @@ the atrium generator, world placement policy and associated previews are removed
 | Slope-following reservations | Implemented: one prism per 0.5 m of flight; space under the high end stays free |
 | Template floors | Milestone 3: two- and three-storey houses, sunken floors, galleries over an undercroft; the template's own stairs are real connectors |
 | World connections between reference bands | Milestone 4: one journey per pair of neighbouring bands per 512 m region, a stack of different fillers joined by stairs, ramps and ladders; neighbouring bands are one network. Other templates' zones stay unselected in exports |
-| Several owners in one column | Milestone 5: claims with height ranges, a hand-placed raised branch of two fillers at +6.5 m entered from a house's stairwell, the ground below it capped but otherwise unchanged, and a pit drilled one way down into it |
+| Several owners in one column | Milestone 5: claims with height ranges, the ground below a raised claim capped but otherwise unchanged, and a pit drilled one way down into it |
+| Growth | Step 2: a house that seeds growth carries its stairwell on up (its pillar) and a branch of its biome grows at that floor over 1-4 plain ground sites: houseroom fillers with house rooms standing in them, densest beside the pillar. Recursive growth and steering are next ([growth.md](growth.md)) |
 
 Old abstract stair annotations in source templates are not proof of a physical
 vertical connection. The adapter reports differing-floor legacy links as
@@ -496,7 +500,9 @@ top, with a slab between one claim and the next:
 
 ![A raised branch over the ground, on the map](raised-branch.png)
 
-*Seed 31337, band 0, cell (−3, 2), 49 × 32 m of it. Left, the ground at 0 m.
+*As milestone 5 placed it (since growth step 2 the house here no longer
+seeds a branch: only a share of houses do). Seed 31337, band 0, cell (−3, 2),
+49 × 32 m of it. Left, the ground at 0 m.
 Right, the same place with the cut at +6.5 m: the house's upper storey, the
 landing its stairwell carries up (and the door east out of it), the raised
 branch standing over the ground sites beyond, and the pit, a 6.5 m drop back
@@ -514,10 +520,10 @@ into the room below.*
   `reservationPlan` emits both, so eviction and generation order cannot let one
   owner into the other's space.
 
-The branch is hand-placed for now, one per cell at most, its floor at +6.5 m.
-`planBranch` takes the first yard lot in id order whose top-floor stairwell can
+In this milestone the branch was hand-placed, one per cell at most, its floor
+at +6.5 m (growth step 2, below, grows it instead). `planBranch` took the first yard lot in id order whose top-floor stairwell can
 carry on up, runs that stairwell out to the lot's edge with a door on the
-half-metre grid, and takes the first plain filler site across the door plus a
+half-metre grid, and took the first plain filler site across the door plus a
 second sharing at least 5 m of edge with it. Nothing about the ground plan
 changes: `cell.sites` is untouched, no lot or POI is ever covered, and the
 anchor house only gains rooms above its own top floor.
@@ -541,6 +547,80 @@ capped `ceilingZ`, and a top-level `pits[]`.
 Not yet, and deliberately out of this milestone: branches that grow and steer
 themselves, biome pools for what stands on them, branches linking to each other
 or to a journey, and drilled walls (the pit's horizontal counterpart).
+
+### Growth step 2 — One house pillar and its branch (implemented)
+
+The first growth: a house grows a small district of house rooms over the
+ground beside it (`src/biomes.js`, planned by `src/band-world.js`).
+
+![A branch of house rooms over the ground, on the map](house-branch.png)
+
+*Seed 7, band 0, cell (3, −2). Left, the ground at 0 m: a two-storey house
+(bottom right) and the plain sites around it. Right, the same place at +6.5 m:
+the house's upper storey, its stairwell carried up a flight, and the branch
+grown from its landing: four sites of hallways with seven rooms standing in
+them (a family room, a laundry and a walk-in closet beside the pillar; another
+family room, a dining room, a living room and a mudroom further out), and a
+pit back down.*
+
+- **Biomes.** A growth takes the biome of the house it starts from. An
+  archetype that can seed growth says so: `grows: { biome: 'houseroom' }` on
+  `two_storey` and `townhouse` (a house needs a stair of its own to carry on
+  up). Templates and fillers carry `biomes: [...]`; a lone room takes the tags
+  of its catalogue entry, so the house rooms the catalogue already makes into
+  templates are the first pool: bedroom, master bedroom, kitchen, dining,
+  living, family room, bathroom, ensuite, walk-in closet, pantry, laundry,
+  mudroom, foyer, and the closet. Seven fillers read as a house's insides and
+  are tagged too: corridor with rooms, enfilade, cell cluster, doors to
+  nowhere, beads, ring and loop hall. `BIOME.templates(id)` and
+  `BIOME.fillers(id)` are the pools; the workbench shows the tags and finds
+  them by name.
+- **The pillar.** The house's top stair climbs one more flight, as in
+  milestone 5, to a floor on the half metre at least 3.3 m up and clear of the
+  top storey's ceiling: +6.5 m over a two-storey house, +9.5 m over a
+  townhouse, with at least 3 m of headroom left in the band. A share of the
+  houses that could seed growth do (75%, by the seed), at most one per cell.
+- **The branch.** It grows from the plain ground site the landing's door opens
+  onto, over plain neighbours sharing at least 5 m of edge, breadth first in a
+  seeded order, to 1-4 sites and 1,200 m² at most. Each raised site has a door
+  to the one it grew from. A ground site joins only if everything it builds
+  keeps under the branch's slab (`E.capCeilings`). A raised site that cannot
+  be built is dropped with everything grown from it, and the rest are wired and
+  built again.
+- **A district site.** Each raised site is a houseroom filler with houseroom
+  rooms standing in it, as small templates stand inside ground fillers
+  (`BIOME.furnish` places them, `LOT.build` builds round them): 2-3 rooms
+  beside the pillar, 1-2 one site out, 0-1 further. Rooms keep 1.5 m inside the
+  site and from each other, their doors face into it, and they stand at least
+  3 m from the middle of each of its doorways; no room type twice in one site,
+  and every room's own doors open onto the filler round it. A site too tight for its
+  rooms is a district hallway with none. Every door the site was given is
+  built, and everything keeps inside its claim.
+- **What stays the same.** The ground plan is untouched, and the ground under
+  a branch keeps its floor and every connection (every site is on the cell's
+  route tree, so routes pass beneath it); only its ceilings are capped. Claims
+  touch at the slab and never overlap; the plan is a pure function of (seed,
+  band, cell). The pit is planned as in milestone 5, from whichever raised site
+  lines up with a ground site below.
+
+On the map a branch's rooms are drawn and hovered like any building ("raised
+branch · house rooms, beside its pillar · family room"), and clicking one
+selects it. The export lists each raised site's `biome` and `hop` (its
+distance from the pillar, in sites), each room as a layout of its own owned by
+its raised site's claim, and `policy.raisedBranches: "house-pillars"` with
+`policy.growth` (the share, the site range, the biomes). Over 144 cells of four
+seeds, 20 houses could have seeded a branch and 14 branches grew, 7 with a
+pit.
+
+Not yet: pillars rising from branches, a budget per region and steering toward
+the next band (step 3), new houseroom fillers (step 4), and seeds other than
+houses. Planning a branch builds its ground sites and its district once
+(about 0.1-0.4 s, up to about a second on a busy machine): when its cell
+first comes into detail view on the map, or a site of it is built, graphed or
+exported. The plan view never plans one: it tints only branches already
+planned. The export keeps the schema `br.world-elevation/0.2`; its `policy`
+changed (`raisedBranches`, `growth`; milestone 5's `branchFloor` is gone,
+each raised site carries its own `floorZ`).
 
 ### Milestone 6 — Unreal consumer proof
 

@@ -167,7 +167,8 @@
    *                      b? (prebuilt), origin? (where a prebuilt b's site frame sits),
    *                      edge? ({ portalId: connId }: doors that are themselves
    *                      edge connections of the site, not the filler's) }],
-   *        hint? (passed to the filler: the yard's { yard: [rects], adapters: [rects] }) }
+   *        hint? (passed to the filler: the yard's { yard: [rects], adapters: [rects] }),
+   *        floors? (false: the filler lays no floors at other heights) }
    * Returns { schema, site, setting (br.filler), buildings: [{ id, origin, b,
    * conns: { portalId: connId } }], conns (the edge connections honoured),
    * issues, ms }.
@@ -216,7 +217,7 @@
     const rectList = (v) => Array.isArray(v) && v.every((q) => Array.isArray(q) && q.length === 4);
     const hint = spec.hint ? Object.fromEntries(Object.entries(spec.hint).map(([k, v]) => [k, rectList(v) ? v.map(move) : v])) : null;
     const fid = spec.filler || FILL.pick({ seed: spec.seed, site: { rects }, weights: spec.weights });
-    let f = FILL.generate({ filler: fid, seed: spec.seed, site, connections: use, hint });
+    let f = FILL.generate({ filler: fid, seed: spec.seed, site, connections: use, hint, floors: spec.floors });
     if (f.error) { out.issues.push(f.error); f = FILL.generate({ filler: 'warren', seed: spec.seed, site, connections: use }); }
     out.setting = f;
     out.at = [dx, dy];
