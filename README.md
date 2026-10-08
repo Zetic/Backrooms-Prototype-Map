@@ -90,8 +90,10 @@ Open `workbench.html` to:
 Templates have floors at their own heights: houses of two and three storeys
 (`two_storey`, `townhouse`) with a real stair in their stairwell, sunken
 living rooms and hall floors with steps down, and galleries along tall halls
-(`docs/elevation.md`, milestone 3). The workbench shows a tab per floor and
-draws the stairs.
+(`docs/elevation.md`, milestone 3). The workbench shows a tab per floor, and
+both the workbench and the map draw the stairs that reach each floor: the map
+shows them at their width with the heights they join, and clicking one moves
+the cut height to where it arrives.
 
 Bands are joined by journeys (milestone 4): in every 512 m region, one
 territory climbs to the band above and another to the band below. A journey

@@ -269,13 +269,14 @@
   /**
    * A pattern is kept only if its stair or steps can really be built and the
    * building still holds together: the elevation layer (when loaded) fits and
-   * validates them on a copy first.
+   * validates them on a copy first. Returns that adaptation (its stairs are
+   * kept on the building), or null.
    */
   function buildable(c, vid) {
     const E = BR.ELEV;
     // without the elevation layer nothing can be proved, so nothing is applied:
     // a building never depends on which modules happen to be loaded
-    if (!E || !E.prepare || !E.linkFloors) return false;
+    if (!E || !E.prepare || !E.linkFloors) return null;
     try {
       const p = E.prepare(c, { deferCapabilities: true });
       // every stair the building asks for is built, this one included (a new
@@ -283,8 +284,8 @@
       // (exits up and down are not searched here: that is the adapter's job later)
       const need = (c.verticals || []).filter((v) => !v.dead && (v.rooms || []).length > 1).reduce((t, v) => t + v.rooms.length - 1, 0);
       const built = p.connectors.filter((k) => k.internal);
-      return built.some((k) => k.vertical === vid) && built.length === need && !E.validate(p).errors.some((e) => !/^no physical/.test(e));
-    } catch (err) { return false; }
+      return built.some((k) => k.vertical === vid) && built.length === need && !E.validate(p).errors.some((e) => !/^no physical/.test(e)) ? p : null;
+    } catch (err) { return null; }
   }
 
   /**
@@ -295,24 +296,26 @@
     if (!b || b.error || !recipe) return b;
     const rng = new BR.Rng(BR.hash4(seed >>> 0, TG.hashStr(String(id || b.archetype || b.filler || '')), 0xF100, 0));
     // the building's own meta object stays (its build time is written into it afterwards)
-    const made = [], commit = (got) => { for (const k of Object.keys(got.b)) if (k !== 'meta') b[k] = got.b[k]; made.push(got.made); };
+    // (the last proof is of the building as it ends up: its stairs are kept from it)
+    let proof = null;
+    const made = [], commit = (got, p) => { for (const k of Object.keys(got.b)) if (k !== 'meta') b[k] = got.b[k]; made.push(got.made); proof = p; };
     if (recipe.gallery && rng.f() < (recipe.gallery.p === undefined ? 1 : recipe.gallery.p)) {
       let n = 0;
       for (const spot of gallerySpots(b, recipe.gallery, rng)) {
         if (n++ >= 4) break;                      // each try is proved by the elevation layer: a few, longest first
-        const got = raise(b, spot);
-        if (got && buildable(got.b, got.vid)) { commit(got); break; }
+        const got = raise(b, spot), p = got && buildable(got.b, got.vid);
+        if (p) { commit(got, p); break; }
       }
     }
     if (recipe.sunken && rng.f() < (recipe.sunken.p === undefined ? 1 : recipe.sunken.p)) {
       let n = 0;
       for (const spot of sunkenSpots(b, recipe.sunken, rng)) {
         if (n++ >= 6) break;
-        const got = sink(b, spot, recipe.sunken, rng);
-        if (got && buildable(got.b, got.vid)) { commit(got); break; }
+        const got = sink(b, spot, recipe.sunken, rng), p = got && buildable(got.b, got.vid);
+        if (p) { commit(got, p); break; }
       }
     }
-    if (made.length) { b.meta = b.meta || {}; b.meta.floors = made; }
+    if (made.length) { b.meta = b.meta || {}; b.meta.floors = made; BR.ELEV.bakeStairs(b, proof); }
     return b;
   };
   FLOORS._internal = { moveWalls, uncovered, subtract, gallerySpots, sunkenSpots, raise, sink, buildable, largest };

@@ -169,6 +169,7 @@
       return b;
     }
     const b = clone(source), base = o.elevation || 0;
+    delete b.stairs;                     // kept stairs become connectors below
     b.source = { schema: source.schema, archetype: source.archetype || source.filler, engine: source.engine, seed: source.seed };
     b.schema = E.SCHEMA; b.kind = 'adapter';
     b.fillId = o.fillId || 'fill:' + (source.archetype || source.filler) + ':' + source.seed;
@@ -184,8 +185,57 @@
     b.connectors = []; b.holes = []; b.voids = []; b.route = [];
     // The template's own stairs (`verticals`) become physical connections
     // where they fit; any that cannot stay unresolved in navigation.
-    if (resolvable(source).length) { refresh(b, { deferCapabilities: true }); resolveVerticals(b, source); }
+    if (resolvable(source).length) { refresh(b, { deferCapabilities: true }); resolveVerticals(b, source, base); }
     return refresh(b, o);
+  }
+
+  // ------------------------------------------------------------ a template's own stairs, kept
+  /**
+   * What a blueprint's stairs are laid out against: its floors, rooms, walls,
+   * openings, columns, zones and verticals. A kept stair stands only while
+   * this still matches.
+   */
+  function stairsKey(b) {
+    return TG.hashStr(JSON.stringify([(b.levels || []).map((l) => [l.index, l.elevation]),
+      b.rooms.map((r) => [r.id, r.rects, r.level || 0, r.floor || 0, r.ceiling]),
+      b.walls.map((w) => [w.a, w.b, w.level || 0, w.kind || '', w.rooms || []]),
+      b.openings.map((o) => [o.a, o.b, o.level || 0]),
+      (b.columns || []).map((c) => [c.rect, c.level || 0, c.room]), (b.zones || []).map((z) => [z.room, z.rects]),
+      resolvable(b).map((v) => [v.id, v.rooms, v.types, v.kind, v.shape, v.walled])]));
+  }
+  /** a connector moved up by dz (its path, landings and reserved prisms) */
+  function liftConnector(c, dz) {
+    const k = clone(c);
+    if (!dz) return k;
+    for (const p of k.path.concat(k.landings)) p[2] = round(p[2] + dz);
+    for (const v of reservationsOf(k)) { v.z0 = round(v.z0 + dz); v.z1 = round(v.z1 + dz); }
+    return k;
+  }
+  const keptCache = new WeakMap();
+  /** a template's kept stairs (b.stairs.links), or null if it has none or its geometry has changed since */
+  function keptStairs(b) {
+    if (!b || !b.stairs || b.schema === E.SCHEMA) return null;
+    if (!keptCache.has(b)) keptCache.set(b, b.stairs.key === stairsKey(b) ? b.stairs.links : null);
+    return keptCache.get(b);
+  }
+  /**
+   * Lay a template's own stairs out once, where it is generated, and keep them
+   * on it: b.stairs = { key, links: [{ vertical, link, connector, holes }] },
+   * in its own frame (heights from its ground floor). prepare() takes them as
+   * they are instead of laying them out again, and the map draws them without
+   * adapting the blueprint. `prepared`: an adaptation of this very blueprint
+   * already made (a floor pattern's proof), so nothing is laid out twice.
+   */
+  function bakeStairs(b, prepared) {
+    if (!b || b.error || b.schema === E.SCHEMA) return b;
+    delete b.stairs; keptCache.delete(b);
+    if (!resolvable(b).length || !E.linkFloors) return b;
+    let p = prepared;
+    if (!p) { try { p = prepare(b, { deferCapabilities: true }); } catch (err) { return b; } }
+    const links = p.connectors.filter((c) => c.internal && c.vertical && c.link)
+      .map((c) => ({ vertical: c.vertical, link: c.link, connector: liftConnector(c, -(p.bands[0].elevation || 0)), holes: clone(p.holes.filter((h) => h.connector === c.id)) }));
+    if (links.length) b.stairs = { key: stairsKey(b), links };
+    return b;
   }
 
   const resolvable = (source) => (source.verticals || []).filter((v) => !v.dead && Array.isArray(v.rooms) && v.rooms.length >= 2);
@@ -195,16 +245,20 @@
    * gallery) gets a real stair or ramp between their actual floors, with its
    * cutouts and reservation, in place of the abstract link.
    */
-  function resolveVerticals(b, source) {
+  function resolveVerticals(b, source, base) {
     if (!E.linkFloors) return;
+    // stairs kept on the template where it was generated are taken as they are
+    const kept = new Map((keptStairs(source) || []).map((l) => [l.vertical + ':' + l.link, l]));
     for (const v of resolvable(source)) for (let k = 1; k < v.rooms.length; k++) {
       const ra = b.rooms.find((r) => r.id === v.rooms[k - 1]), rc = b.rooms.find((r) => r.id === v.rooms[k]);
       if (!ra || !rc || Math.abs(ra.floorZ - rc.floorZ) < EPS) continue;
       const [lo, hi] = ra.floorZ < rc.floorZ ? [ra, rc] : [rc, ra];
       const types = v.types || (v.kind === 'ramp' ? ['ramp', 'stair'] : ['stair', 'ramp']);
-      const got = E.linkFloors(b, 's:' + lo.id, 's:' + hi.id, { types, shape: v.shape, walled: v.walled, id: 'link:' + (v.id || 'v') + ':' + k });
+      const s = kept.get(v.id + ':' + k);
+      const got = s && s.connector.from === 's:' + lo.id && s.connector.to === 's:' + hi.id ? { connector: liftConnector(s.connector, base || 0), holes: clone(s.holes) }
+        : E.linkFloors(b, 's:' + lo.id, 's:' + hi.id, { types, shape: v.shape, walled: v.walled, id: 'link:' + (v.id || 'v') + ':' + k });
       if (!got) continue;
-      got.connector.vertical = v.id;
+      got.connector.vertical = v.id; got.connector.link = k;
       b.connectors.push(got.connector); b.holes.push(...got.holes);
       // a stair arriving over a rail (a gallery's open edge): the rail keeps a gap for it
       const arr = got.connector.arrival, h = arr && Math.abs(arr[0][1] - arr[1][1]) < EPS;
@@ -391,5 +445,5 @@
     return { errors: [...new Set(errors)], warnings: [...new Set(warnings)] };
   }
 
-  Object.assign(E, { exitOrder, mainFloor, arrivalsOn, prepare, ladderVariant, refresh, capabilities, validate, reachable, ReservationIndex, volumeOverlap, reservationsOf, prism, addRoomWalls, addHoles, floorPoint, inside, overlap });
+  Object.assign(E, { stairsKey, bakeStairs, keptStairs, liftConnector, exitOrder, mainFloor, arrivalsOn, prepare, ladderVariant, refresh, capabilities, validate, reachable, ReservationIndex, volumeOverlap, reservationsOf, prism, addRoomWalls, addHoles, floorPoint, inside, overlap });
 })(typeof window !== 'undefined' ? window : globalThis);

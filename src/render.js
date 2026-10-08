@@ -55,15 +55,18 @@
     const blueprint = (b, origin, layer, labels, key) => {
       const o = at(origin, layer, labels, key);
       if (W.floorZ !== undefined) {
+        // (connection tags wait for the last pass, so no neighbour's walls cover them)
         BR.ELEV.drawCutaway(g, b, { ...o, cutZ: Number.isFinite(opts.cutZ) ? opts.cutZ : W.floorZ,
-          baseZ: b.schema === BR.ELEV.SCHEMA ? 0 : W.floorZ,
+          baseZ: b.schema === BR.ELEV.SCHEMA ? 0 : W.floorZ, deferLabels: true,
           ghost: !!opts.ghost && opts.focus === key, focus: opts.focus === key });
         return;
       }
       TPL.drawBuilding(g, b, o);
     };
-    for (const layer of ['floors', 'walls']) for (const r of ready) {
-      if (r.filler) blueprint(r.filler, r.fillerOrigin, layer, lab && (opts.focus === r.site.id || r.filler.levels.length > 1), r.site.id);
+    // floors, then walls, then the tags of stairs, ramps and ladders over both
+    for (const layer of W.floorZ !== undefined ? ['floors', 'walls', 'labels'] : ['floors', 'walls']) for (const r of ready) {
+      // (a filler's floors are labelled when it has more than one height: a gallery, a sunken floor)
+      if (r.filler) blueprint(r.filler, r.fillerOrigin, layer, lab && (opts.focus === r.site.id || r.filler.levels.length > 1 || !!r.filler.stairs), r.site.id);
       for (const B of r.buildings) blueprint(B.b, B.origin, layer, lab, r.site.id + '/' + B.poi.id);
     }
     if (seams.size) TPL.drawSeamOpenings(g, [...seams.values()], { scale: tz, ox: -x0 * tz, oy: -y0 * tz });

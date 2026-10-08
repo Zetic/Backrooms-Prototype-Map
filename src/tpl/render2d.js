@@ -49,8 +49,9 @@
 
   /**
    * The stairs the elevation layer builds from a building's verticals, cached
-   * per building: [{ c (connector), from, to (source levels) }]. Only drawn
-   * when asked (o.stairs): it adapts the blueprint, which map painting never does.
+   * per building: [{ c (connector), from, to (source levels) }]. The ones kept
+   * on the building where it was generated (b.stairs) if they still fit it;
+   * otherwise it is adapted to build them. Drawn when asked (o.stairs).
    */
   const stairCache = new WeakMap();
   function builtStairs(b) {
@@ -58,8 +59,11 @@
     if (!E || !E.prepare || !E.linkFloors || !(b.verticals || []).some((v) => !v.dead && (v.rooms || []).length > 1)) return [];
     if (!stairCache.has(b)) {
       let list = [];
-      try {
-        const p = E.prepare(b, { deferCapabilities: true }), lvOf = (sid) => { const r = b.rooms.find((x) => 's:' + x.id === sid); return r ? r.level || 0 : 0; };
+      const lvOf = (sid) => { const r = b.rooms.find((x) => 's:' + x.id === sid); return r ? r.level || 0 : 0; };
+      const kept = E.keptStairs && E.keptStairs(b);
+      if (kept) list = kept.map((l) => ({ c: l.connector, from: lvOf(l.connector.from), to: lvOf(l.connector.to) }));
+      else try {
+        const p = E.prepare(b, { deferCapabilities: true });
         list = p.connectors.filter((c) => c.internal).map((c) => ({ c, from: lvOf(c.from), to: lvOf(c.to) }));
       } catch (err) { list = []; }
       stairCache.set(b, list);
@@ -124,11 +128,11 @@
     if (floors) drawMarkings(g, b, lv, X, Y, S, TH);
     if (!walls) { g.restore(); return; }
     // ---- verticals (stairs / lifts): a tread pattern in the room. Not where
-    // the elevation layer has built the real stair (drawn as a connector), nor
-    // for steps into a sunken floor or a gallery's stair, which have no room of
-    // their own to mark
-    const stairs = o.stairs ? builtStairs(b) : [];
-    const built = new Set((b.connectors || []).concat(stairs.map((x) => x.c)).map((c) => c.vertical).filter(Boolean));
+    // the elevation layer has built the real stair (drawn as a connector, or
+    // kept on the template), nor for steps into a sunken floor or a gallery's
+    // stair, which have no room of their own to mark
+    const stairs = o.stairs ? builtStairs(b) : [], kept = (BR.ELEV && BR.ELEV.keptStairs && BR.ELEV.keptStairs(b)) || [];
+    const built = new Set((b.connectors || []).concat(stairs.map((x) => x.c), kept.map((l) => l.connector)).map((c) => c.vertical).filter(Boolean));
     // the real stairs (o.stairs): solid on the floor they start from, an outline
     // where they arrive (the opening you look down into), each half metre a tread
     for (const { c, from, to } of stairs) {

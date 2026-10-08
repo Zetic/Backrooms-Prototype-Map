@@ -81,7 +81,8 @@
       for (let t = 0; t < tries; t++) {
         const spec = { archetype: req.archetype, override: req.override || null, seed: (t ? mix32((req.seed >>> 0) + t) : req.seed) >>> 0, site: { w, h }, approach: req.approach };
         if (req.wrongness !== undefined && req.wrongness !== null) spec.wrongness = req.wrongness;
-        b = TPL.generate(Object.assign({}, spec, { archetype: recipe }));
+        // (its stairs are laid out in the composite as a whole, not here)
+        b = TPL.generate(Object.assign({}, spec, { archetype: recipe, stairs: false }));
         if (!b.error) { b.spec = spec; break; }
       }
       cache.set(key, b);

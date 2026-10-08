@@ -199,8 +199,15 @@ offered); exports list zones but the world never selects one.
 Known limits: galleries need an 8 m straight stretch of wall, so halls with
 pier-jogged walls (cross-pillar, gallery) get none; one gallery and one sunken
 floor at most per building; the lab builds templates with no wrongness, so
-the park's sunken pit shows in the workbench (wrongness slider), not the lab;
-map painting draws a stairwell as an abstract tread mark (it never adapts).
+the park's sunken pit shows in the workbench (wrongness slider), not the lab.
+
+Kept stairs (after milestone 4): a template's stairs are laid out once where
+it is generated and kept on it (`b.stairs = { key, links }`,
+`ELEV.bakeStairs`, called at the end of `TPL.generate` and `FILL.generate`,
+or by `FLOORS.apply` from the proof it already made; composite children get
+`stairs: false`). `prepare` adopts them while `stairsKey(b)` still matches,
+and the map cutaway draws them (`cutawayParts`), so the map shows how every
+elevated surface is reached without adapting anything.
 
 ## Milestone 4 as implemented
 
@@ -294,7 +301,8 @@ follows actual floors.
 | `workbench.html` | Template/filler workshop and local floor inspection |
 
 Performance: ordinary map painting reads the original blueprints and band offset;
-it does not run spatial adaptation or ladder candidate searches per draw.
+it does not run spatial adaptation or ladder candidate searches per draw (a
+template's own stairs come kept on it from generation).
 `world.spatial(site)` caches explicit-Z adaptation for graph/export use. Candidate
 enumeration is deferred during world adaptation and materialized for export.
 Keep this boundary intact. Cutaway plans cache actual floor intervals (maximum
@@ -310,7 +318,7 @@ Full regression command:
 node tests/run-all.js
 ```
 
-Milestone 4 passes the full suite (373 checks), including five horizontal-world
+Milestone 4 passes the full suite (373 checks; 375 with kept stairs), including five horizontal-world
 seeds, every template/filler family's up/down potential
 (`tests/elevation.test.js`), `tests/connections.test.js`, `tests/floors.test.js`
 (storeys, sunken floors, galleries, template stairs, exits, the tower test),
