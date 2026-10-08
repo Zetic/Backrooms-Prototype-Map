@@ -12,7 +12,7 @@ state of each build step. Implementation detail lives in
 | 2 | One house pillar and its branch: a multi-storey house's stairwell carries on up; one houseroom branch grows at a pillar floor, drawn from a first tagged pool | Done: PR #25 |
 | 3 | Recursive growth: pillars from branches, a per-region budget and plan, steering toward the next band; today's journey plot becomes the fallback | Done: PR #26 (see below). The journey plot is removed from the world rather than kept as a fallback (owner's call) |
 | 3b | Denser growth: an origin in every 2 × 2 block placed by the ground plan, bigger branches, tall rooms grown round, a smaller landing reserve, every growth on the zoomed-out map, planning spread over frames | Done: PR #27 (see below) |
-| 4 | Houseroom variety: house rooms, literally: hallways, bedrooms, living rooms and whole houses, not generic layouts that read as a house | Done: this step (see below) |
+| 4 | Houseroom variety: house rooms, literally: hallways, bedrooms, living rooms and whole houses, not generic layouts that read as a house | Done: PR #28 (see below) |
 | 5 | Emergent connections: pits that drill down to the next exposed volume first, then holes rolled on shared walls; drilled walls after | Pits between a branch and the ground exist (milestone 5) |
 | 6 | Linking growths: branches of the same biome that come close join up, and districts cross region borders at planned points | |
 
