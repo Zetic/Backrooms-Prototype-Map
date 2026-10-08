@@ -358,8 +358,23 @@ gallery.
 
 **Inspection.** The lab and the map cutaway show every floor; the workbench
 has a tab per floor and draws the real stairs (solid where they start,
-outlined where they arrive) with sunken floors labelled by their depth. Map
-painting still never adapts a blueprint.
+outlined where they arrive) with sunken floors labelled by their depth.
+
+**Kept stairs** (added after milestone 4). A template's stairs are laid out
+once, where it is generated, and kept on it (`stairs`, see
+[the template contract](templates.md)): a floor pattern keeps the stairs it
+proved, a house of several storeys has its laid out at the end of
+generation. `prepare` takes them as they are instead of laying them out
+again (the tests check they are identical), and the map cutaway draws them
+from the template, so every elevated surface on the map shows how it is
+reached: the stair up a hall's side wall to its gallery, a house's
+switchbacks, the steps into a sunken floor, each at its width with its two
+heights; click one to move the cut to where it arrives. Map painting still
+never adapts a blueprint.
+
+![Kept stairs on the map](map-stairs.png) A template whose geometry changed after it was
+generated has its kept stairs ignored (they are fingerprinted) and laid out
+again.
 
 **World.** A band's site envelope now runs from -1.5 m (a sunken floor to
 -1.25 m, plus its slab) to +14.5 m: the same 16 m, so bands still never

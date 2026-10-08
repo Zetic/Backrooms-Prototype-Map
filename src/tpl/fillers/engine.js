@@ -1205,7 +1205,10 @@
     }, smooth);
     // floors at other heights (tpl/floors.js): a gallery, a sunken floor
     // (spec.floors === false: a caller that stacks fillers itself, a journey's stages)
-    return F.floors && BR.FLOORS && spec.floors !== false ? BR.FLOORS.apply(out, F.floors, seed, F.id) : out;
+    if (F.floors && BR.FLOORS && spec.floors !== false) BR.FLOORS.apply(out, F.floors, seed, F.id);
+    // its own stairs, laid out once and kept (a floor pattern keeps the ones it proved)
+    if (!out.error && !out.stairs && BR.ELEV && BR.ELEV.bakeStairs) BR.ELEV.bakeStairs(out);
+    return out;
   }
 
   FILL.generate = generate;

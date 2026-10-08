@@ -77,7 +77,7 @@
   <label class="tg" for="height">Cutaway height</label>
   <input id="height" type="range" step="0.01" style="width:100%" aria-label="Cutaway height">
   <div class="row"><input id="height-value" type="number" step="any" aria-label="Cutaway height in metres"><span>m</span><button id="height-reset">Band height</button></div>
-  <div class="note">Shows the highest floor below the cut at each location. Darker floors are farther below it. Click a template to inspect its floors. Journeys join the bands: in every 512 m region one climbs to the band above and one to the band below, through floors of different templates.</div>
+  <div class="note">Shows the highest floor below the cut at each location. Darker floors are farther below it. Stairs, ramps and ladders show how each floor is reached: click one to move the cut to where it arrives, or click a template to inspect its floors. Journeys join the bands: in every 512 m region one climbs to the band above and one to the band below, through floors of different templates.</div>
   <div class="row"><button id="journey-down" title="Centre the view on the nearest journey down">Journey ↓</button><button id="journey-up" title="Centre the view on the nearest journey up">Journey ↑</button></div>
   <div id="selection" hidden>
     <div class="sec" id="selection-name"></div>
@@ -354,7 +354,7 @@
     for (const c of candidates) {
       c.baseZ = c.b.schema === BR.ELEV.SCHEMA ? 0 : world.floorZ;
       c.room = BR.ELEV.hitCutaway(c.b, x - c.origin[0], y - c.origin[1], state.cutZ, c.baseZ);
-      c.connector = BR.ELEV.connectionAt(c.b, x - c.origin[0], y - c.origin[1], state.cutZ, state.opts.ghost && selectedTemplate && selectedTemplate.key === c.key);
+      c.connector = BR.ELEV.connectionAt(c.b, x - c.origin[0], y - c.origin[1], state.cutZ, state.opts.ghost && selectedTemplate && selectedTemplate.key === c.key, c.baseZ);
       if (c.room || c.connector) return c;
     }
     return null;
