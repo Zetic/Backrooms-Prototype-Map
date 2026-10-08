@@ -19,7 +19,7 @@
  *                whole house of the biome stands inside it too, likelier
  *                near the pillar.
  *
- *   BIOME.DEFS[id]                       { label, houses: [chance of a whole house per site, by distance] }
+ *   BIOME.DEFS[id]                       { label, houses: [chance of a whole house per site, by distance], floors(rs): filler weights by level and distance }
  *   BIOME.anchorOf(arch)                 the biome an archetype starts, or null
  *   BIOME.templates(id), BIOME.fillers(id)   the pool
  *   BIOME.rooms(id)                      the catalogue's room types of the biome
@@ -34,7 +34,12 @@
   BIOME.DEFS = {
     // the chance a site has a whole house standing in it, by its distance
     // from the pillar (0: the site the landing opens onto)
-    houseroom: { label: 'house rooms', houses: [0.7, 0.5, 0.35], margin: 1, gap: 1.5, doorClear: 2 }
+    houseroom: { label: 'house rooms', houses: [0.7, 0.5, 0.35], margin: 1, gap: 1.5, doorClear: 2,
+      // which floor of the house a site is, so a growth reads as one home: the
+      // living rooms and kitchen where the first level is entered, an upstairs
+      // hall (with its sitting room) where each level above is, bedroom wings
+      // round them (the order the rest are tried in when that one cannot be built)
+      floors: (rs) => rs.hop !== 0 ? { house_bedrooms: 1, house_upstairs: 1e-3 } : rs.level <= 1 ? { house_living: 1, house_bedrooms: 1e-3 } : { house_upstairs: 1, house_bedrooms: 1e-3 } }
   };
   const tagged = (x, id) => Array.isArray(x.biomes) && x.biomes.includes(id);
   BIOME.anchorOf = (arch) => (arch && arch.grows && BIOME.DEFS[arch.grows.biome] ? arch.grows.biome : null);
@@ -44,8 +49,15 @@
   BIOME.fillers = (id) => FILL.list().filter((F) => tagged(F, id)).sort((a, b) => a.id.localeCompare(b.id));
   /** the catalogue's room types of the biome */
   BIOME.rooms = (id) => Object.keys(TPL.CAT.ROOMS).filter((t) => tagged(TPL.CAT.ROOMS[t], id)).sort();
-  /** weights for FILL.pick: the biome's fillers only (every other filler at 0; one kept out of the pool weighs `biomeWeight`) */
-  BIOME.fillerWeights = (id) => Object.fromEntries(FILL.list().map((F) => [F.id, tagged(F, id) ? (F.biomeWeight || F.weight || 1) : 0]));
+  /**
+   * weights for FILL.pick: the biome's fillers only (every other filler at 0;
+   * one kept out of the pool weighs `biomeWeight`); for a raised site `rs`,
+   * those its biome gives that floor (`floors`), when it says
+   */
+  BIOME.fillerWeights = (id, rs) => {
+    const D = BIOME.DEFS[id], plan = rs && D && D.floors ? D.floors(rs) : null;
+    return Object.fromEntries(FILL.list().map((F) => [F.id, !tagged(F, id) ? 0 : plan ? plan[F.id] || 0 : F.biomeWeight || F.weight || 1]));
+  };
 
   /**
    * Where `count` of the biome's templates stand inside one site (its own

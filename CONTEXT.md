@@ -23,8 +23,11 @@ of every 2 × 2 block, branches are a little bigger, tall rooms are grown
 round, the landing reserve is only the sites near each house, and the map
 draws every growth without freezing. Step 4, **house rooms**: branch floors
 are house hallways lined with bedrooms, living rooms, kitchens and the like,
-often with a whole small house standing in them. The Unreal consumer of the exported
-data is milestone 6.
+often with a whole small house standing in them (PR #28). The map's cut view
+then got **layering across claims** (PR #29): an upper floor hides everything
+under it. In progress: **one home per growth** (step 4b), a fix for floors
+with several homes' worth of living rooms, kitchens and bathrooms (see "In
+progress" below). The Unreal consumer of the exported data is milestone 6.
 
 ## Repository state
 
@@ -33,8 +36,9 @@ data is milestone 6.
   packages. `index.html` is the map, `workbench.html` the template workshop,
   `elevation.html` the elevation lab. Serve the folder statically to inspect
   (`python3 -m http.server 8765`).
-- `main` holds everything up to growth step 4 (PR #28). The map layering fix is on
-  `claude/fast-test-runs-l53vww` (the branch name is reused).
+- `main` holds everything up to the map layering fix (PR #29, merged
+  2026-10-08). Step 4b (one home per growth) is in progress on
+  `claude/fast-test-runs-l53vww` (the branch name is reused for every PR).
   The branches `claude/world-journeys`, `claude/kept-stairs`,
   `claude/house-branch` and `claude/recursive-growth` are merged and can be
   deleted.
@@ -86,6 +90,24 @@ must stand on its own and must not be defined by how a slice looks.
   drawn at their width, not as thin lines.
 - The user reviews visually. When changing vertical generation, look at the lab
   and the map, and say plainly what the picture shows.
+
+**The owner's decisions so far (Cody, 2026-10-08), keep them:**
+- Growths start only at POIs: one growth house per 2 × 2 block of cells,
+  planted by the ground plan. No stair cells from plain ground sites.
+- Tall rooms (halls with a gallery) are grown round, never cut down to fit.
+- "House rooms" means literal house rooms: house hallways, bedrooms, living
+  rooms, kitchens, whole houses. Not backrooms layouts that feel like a house
+  (the generic fillers left the house pool in step 4).
+- A growth should read as one believable home, not several homes' rooms
+  jumbled together (step 4b, in progress).
+- The map's cut view shows, at each spot, the highest floor below the cut;
+  an upper floor fully covers what is below it (only a pit shows through),
+  and lower floors are drawn darker.
+
+**How Cody likes to work:** Cody reads the main project chat only, not
+threads. Report in plain language with no jargon (no ids, flags or file names
+unless asked), with a picture where it helps. No timing measurements unless
+asked.
 
 **Rejected, keep retired:** the atrium (one large reserved box, filled with
 repeated same-size rooms, one theme up a tall stack). Do not fill unused
@@ -349,6 +371,42 @@ over, every growth on the zoomed-out map, no freeze while planning.
   step 3), about 7 sites a growth. The remaining failures are mostly a site
   past the landing door that is a POI or too small.
 
+**In progress: step 4b, one home per growth** (`src/biomes.js`,
+`src/growth.js`, `src/tpl/fillers/house.js`). Cody's report: one +10.5 m floor
+(seed 31337, around x −52, y 145) had about 9 living rooms, 3 kitchens, 9
+bathrooms and 5 bedrooms, and a bathroom over a thin "living" strip with a
+window between them. Causes found:
+- A level is 2-6 sites, and each site was laid out as a whole house floor of
+  its own, so each brought its own living room and kitchen (up to 5 kitchens
+  and 12 living rooms on one level at that spot).
+- Room caps scaled with the site's area (2 living rooms and 2 bathrooms per
+  200 m²), and leftover pockets defaulted to offices and storage.
+- The bathroom with the window belongs to a cottage standing in the floor:
+  the blue mark is the cottage's exterior window; its door opens onto the
+  cottage's own hallway. The thin living strip is a filler room squeezed
+  between the hallway and the cottage (nothing stopped a 1.5 m deep room).
+Fix as it stands (not yet merged):
+- Each site gets a role from its level and distance (`DEFS.houseroom.floors`,
+  read by `BIOME.fillerWeights(id, rs)`): the first site of level 1 is the
+  living floor, the first site of each higher level an upstairs hall, every
+  other site a bedroom wing. `raisedSite` tries the role's filler and its
+  fallback (bedroom wing, or upstairs hall for a wing) with three seeds each,
+  and never a living floor out of turn; growth rates are unchanged.
+- Caps no longer scale with area (`cap` in house.js): one each of living,
+  dining, kitchen, family room and master; bedrooms 4 in a wing, 3 upstairs,
+  2 on the living floor; a bathroom plus one per 3 bedrooms; a linen closet
+  plus one per 3. What a home does not need stays solid; infill off the
+  hallway only adds rooms the floor still wants.
+- A room too shallow for its type becomes a smaller one or stays solid.
+- `tests/band-world.test.js` checks every branch floor for one home's rooms
+  and every level for at most one kitchen and one living room. Over two seeds:
+  at most 1 kitchen and 1 living room a level (it was up to 5 and 12); 40 of 48
+  origins grow and 32 arrive (as before).
+Left to do: the before and after picture at Cody's spot, the docs
+(`docs/growth.md`, `docs/fillers.md`), and a look at whether the living floor
+now has too much empty hallway. Open question for Cody: windows on whole houses
+standing inside a floor (they face the hallway or solid now, never a room).
+
 **Map layering across claims** (`src/render.js`). A map tile paints its
 claims one layer at a time from the ground up: the ground's floors, walls,
 seams and tags, then each raised floor at or under the cut, which first blanks
@@ -478,10 +536,12 @@ geometry and behaviour, not field assignments.
   milestone, committed as Claude (`git -c user.name="Claude" -c
   user.email="noreply@anthropic.com" commit`), commit messages ending with the
   session's attribution lines.
-- Pull requests opened through the GitHub REST API with `gh api` (`gh api
-  repos/Zetic/Backrooms-Prototype-Map/pulls -X POST -f title=... -f head=...
-  -f base=main -F body=@file`). PR bodies end with the Claude Code
-  attribution.
+- Pull requests opened with the GitHub MCP tools (`mcp__github__*`; no `gh`
+  CLI in cloud sessions), as a draft first, marked ready once CI is green. PR
+  bodies use a Before / After opening and end with the Claude Code
+  attribution. No PR template in the repo.
+- Progress goes to the main chat through the coordinator session: the draft
+  link with a picture, then green, then merged.
 - The user is often away: make reasonable calls, report them plainly, and stop
   only for decisions that cannot be undone.
 - For big changes, an independent review agent checks the diff before the PR.
@@ -549,17 +609,23 @@ about 30%, but the tests run with V8's defaults, as the browser does.)
 
 ## Next
 
-1. **Growth polish**, in rough order of value:
+1. **Finish step 4b** (one home per growth, above) and merge it.
+2. **Balcony and window connections** (the next design step Cody raised):
+   galleries and balconies stand at about +3.25-3.75 m, the first branch floor
+   at +6.5 m or more, so a balcony never opens onto a branch. Line them up
+   (a lower first floor where a gallery is near, or galleries at branch
+   heights), then decide how a balcony or window joins a floor beside it.
+3. **Growth polish**, in rough order of value:
    - Take planning off the paint path entirely (a Web Worker), so no frame
      runs long.
-   - Line branch floors up with gallery heights so balconies open onto them.
-   - Growth downward toward the band below, the same way.
+   - Growth downward toward the band below, the same way (open: Cody has
+     asked about it, nothing built).
    - Tune the block size, steered share and landing reserve now that every
      growth shows on the zoomed-out map.
    - Pits from every level (into the floor below, not only the ground), and
      holes rolled on shared walls (step 5).
    - Growths of the same biome that come close join up (step 6).
-2. **Milestone 6: an Unreal consumer proof.** The export is one connected
+4. **Milestone 6: an Unreal consumer proof.** The export is one connected
    multi-band network wherever a growth arrives.
    - First, an engine-neutral reference builder in this repo: read a
      `br.world-elevation` export and emit simple geometry (glTF or OBJ):
@@ -573,6 +639,10 @@ about 30%, but the tests run with V8's defaults, as the browser does.)
      `TPL.CAT.CONNECTIONS`).
    - Freeze what the consumer relies on: version the world export
      (`br.world-elevation/0.3`) once the consumer reads it.
-3. **More vertical variety inside templates**: galleries on jogged walls,
+5. **More vertical variety inside templates**: galleries on jogged walls,
    mezzanines open on several sides, split-level houses, composites with
    storeys, curved stairs or ramps for curved fillers.
+6. **Quick test speed on 2 cores** (open question): the quick run's target
+   of about 60 s on 2 cores is not met (see "What still costs time" above);
+   the fix is in the generator's deoptimisations, not the runner. Only on
+   request: Cody does not want timing measurements unless asked.

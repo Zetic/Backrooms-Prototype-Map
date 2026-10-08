@@ -312,13 +312,18 @@
     const conns = rs.conns.map((cn) => connView(cn, rs.id, rs.origin));
     const count = new BR.Rng(BR.hash4(rs.seed, 0xba0a, 0, 0)).f() < D.houses[Math.min(rs.hop, D.houses.length - 1)] ? 1 : 0;
     const rooms = BR.BIOME.furnish({ biome: rs.biome, site: { rects }, conns, count, seed: rs.seed });
-    const weights = BR.BIOME.fillerWeights(rs.biome), pool = BR.BIOME.fillers(rs.biome).map((F) => F.id);
+    const weights = BR.BIOME.fillerWeights(rs.biome, rs), pool = BR.BIOME.fillers(rs.biome).map((F) => F.id).sort((x, y) => weights[y] - weights[x]);
     // (FILL.pick falls back to a passage when nothing weighted fits: only the biome's own are tried)
     const ids = [...new Set([0, 1, 2, 3].map((t) => BR.FILL.pick({ seed: BR.hash4(rs.seed, t, 0, 0xba07), site: { rects }, weights })).concat(pool))].filter((f) => pool.includes(f));
+    // (a biome that says which floor this is tries that floor, and its
+    // fallback, a few times over, and never a floor it did not ask for: a
+    // second living floor would be a second home's)
+    const tries = D.floors ? [0, 1, 2].flatMap((t) => pool.filter((f) => weights[f] > 0).map((f) => [ids.length + t * pool.length + pool.indexOf(f), f]))
+      : [...ids.entries()];
     const isLanding = (v) => String(v.room).startsWith('elev:landing:');
     const fits = (a) => a.surfaces.every((v) => isLanding(v) || (v.floorZ >= -EPS && v.ceilingZ <= room + EPS));
     // (with a climb: a stair or ramp anywhere it fits before a ladder anywhere)
-    for (const types of leg ? [['stair', 'ramp'], ['ladder']] : [null]) for (const list of rooms.length ? [rooms, []] : [[]]) for (const [t, filler] of ids.entries()) {
+    for (const types of leg ? [['stair', 'ramp'], ['ladder']] : [null]) for (const list of rooms.length ? [rooms, []] : [[]]) for (const [t, filler] of tries) {
       const r = BR.LOT.build({ seed: BR.hash4(rs.seed, t, list.length, 0xba07), site: { rects }, filler, connections: clone(conns), buildings: list, floors: false });
       // (LOT falls back to a warren when a filler fails: not this biome's)
       if (!r.setting || r.setting.error || r.setting.filler !== filler || r.conns.length !== conns.length) continue;

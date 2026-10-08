@@ -337,7 +337,7 @@ console.log('ok   the level schedule: exact legs on the half metre, a storey und
   const pool = new Set(BR.BIOME.templates('houseroom').map((a) => a.id)), fillers = new Set(BR.BIOME.fillers('houseroom').map((F) => F.id));
   const K = GROWTH.CFG.block;
   let origins = 0, growths = 0, steered = 0, arrived = 0, levels2 = 0, blocks = 0, reached = 0, plain = 0, kept = 0, houses = 0, floors = 0;
-  const roomTypes = new Set(), HOUSE = new Set(BR.FILL.HOUSE_TYPES);
+  const roomTypes = new Set(), HOUSE = new Set(BR.FILL.HOUSE_TYPES), perLevel = {};
   for (const seed of MODE.size([7], [7, 31337, 99])) {
     const w = seed === 7 ? w7 : new BR.BandWorld(seed), owner = new Map(), byBlock = new Map();
     for (let i = -4; i <= 3; i++) for (let j = -4; j <= 3; j++) {
@@ -385,6 +385,11 @@ console.log('ok   the level schedule: exact legs on the half metre, a storey und
           roomTypes.add(rm.type);
         }
         floors++; houses += kinds.length;
+        // one home's rooms, however big the floor: a bathroom for every few bedrooms, one of each living room
+        const n = (t) => b.rooms.filter((rm) => rm.type === t).length, beds = n('bedroom') + n('master');
+        assert(n('bath') <= 1 + Math.floor(beds / 3) && n('master') <= 1 && ['living', 'kitchen', 'dining', 'family'].every((t) => n(t) <= 1), rs.id + ': one home\'s rooms (' + beds + ' bedrooms, ' + n('bath') + ' bathrooms, ' + n('living') + ' living rooms)');
+        const key = seed + ' ' + G.id + '/' + rs.level, lv = perLevel[key] = perLevel[key] || { kitchen: 0, living: 0 };
+        lv.kitchen += n('kitchen'); lv.living += n('living');
         for (const x of [b].concat(r.buildings.map((y) => y.b))) for (const s of x.surfaces) {
           if (String(s.room).startsWith('elev:landing:')) continue;
           assert(s.floorZ >= rs.floorZ - EPS && s.ceilingZ <= rs.top + EPS, rs.id + ' keeps inside its claim');
@@ -413,6 +418,8 @@ console.log('ok   the level schedule: exact legs on the half metre, a storey und
   assert(steered >= 0.5 * growths && arrived >= 0.6 * steered, 'steered growths mostly arrive: ' + arrived + ' of ' + steered);
   assert(reached >= 0.6 * blocks, 'most blocks have a way up: ' + reached + ' of ' + blocks);
   assert(kept > 0 && kept < 0.3 * plain, 'band 1 keeps a few plain sites for arrivals, not a share of them all: ' + kept + ' of ' + plain);
+  // a level is one home's floor: one kitchen and one living room at most
+  for (const [k, lv] of Object.entries(perLevel)) assert(lv.kitchen <= 1 && lv.living <= 1, k + ': ' + lv.kitchen + ' kitchens, ' + lv.living + ' living rooms on one level');
   assert(houses >= 0.1 * floors && roomTypes.size >= 14, 'house floors of every kind of room, whole houses in some: ' + houses + ' houses on ' + floors + ' floors, ' + [...roomTypes].sort());
   console.log('ok   every growth: its own cells, floors over plain ground (cut down nowhere) or the floor below, its biome only, inside its claims, exact legs, no shafts (' +
     growths + ' growths from ' + origins + ' origins, ' + arrived + ' reach band 1, ' + reached + ' of ' + blocks + ' blocks with a way up; ' + kept + ' of ' + plain + ' plain sites kept for arrivals; ' +
