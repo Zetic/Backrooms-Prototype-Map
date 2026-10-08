@@ -19,7 +19,7 @@ refreshed with milestone 4 implemented; the next work is milestone 5.
 - Milestone 3, template floors, is merged in
   [PR #19](https://github.com/Zetic/Backrooms-Prototype-Map/pull/19).
 - Milestone 4, world journeys, is on `claude/world-journeys`, based on that
-  merge. Check current `main` and open PRs before starting: another agent may
+  merge, in [PR #20](https://github.com/Zetic/Backrooms-Prototype-Map/pull/20). Check current `main` and open PRs before starting: another agent may
   advance the repository after this snapshot.
 - Plain JavaScript, browser globals under `BR`, no build step or runtime package
   installation. Open `index.html` for the map, `workbench.html` for the template
@@ -71,7 +71,7 @@ occupied width, rather than as thin diagonal lines.
 | [#16](https://github.com/Zetic/Backrooms-Prototype-Map/pull/16) | Implemented continuous cutaway/local-floor inspection and removed the atrium from generation and the lab |
 | [#18](https://github.com/Zetic/Backrooms-Prototype-Map/pull/18) | Milestone 2: connection zones, stair/ramp variants, slope-following reservations, the ladder-fallback fix, presentation in both directions |
 | [#19](https://github.com/Zetic/Backrooms-Prototype-Map/pull/19) | Milestone 3: two- and three-storey houses, sunken floors, galleries, the template's own stairs built as real connectors |
-| `claude/world-journeys` | Milestone 4: journeys between the bands, stacks of different fillers joined by stairs, ramps and ladders |
+| [#20](https://github.com/Zetic/Backrooms-Prototype-Map/pull/20) | Milestone 4: journeys between the bands, stacks of different fillers joined by stairs, ramps and ladders |
 
 Keep the atrium retired. Its large reserved box, repeated
 same-size rooms and single theme across a tall stack were poor demonstrations
