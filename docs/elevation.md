@@ -1,7 +1,8 @@
 # Elevation implementation plan
 
-Updated 2026-10-08 with milestone 4, world journeys. Milestone 3 (template
-floors) was merged in [PR #19](https://github.com/Zetic/Backrooms-Prototype-Map/pull/19),
+Updated 2026-10-08 with milestone 5, layered ownership. Milestone 4 (world
+journeys) was merged in [PR #20](https://github.com/Zetic/Backrooms-Prototype-Map/pull/20),
+milestone 3 (template floors) in [PR #19](https://github.com/Zetic/Backrooms-Prototype-Map/pull/19),
 milestone 2 (connection zones) in [PR #18](https://github.com/Zetic/Backrooms-Prototype-Map/pull/18),
 milestone 1 in [PR #16](https://github.com/Zetic/Backrooms-Prototype-Map/pull/16).
 For the next agent's repository entry points and implementation context, read
@@ -191,6 +192,7 @@ the atrium generator, world placement policy and associated previews are removed
 | Slope-following reservations | Implemented: one prism per 0.5 m of flight; space under the high end stays free |
 | Template floors | Milestone 3: two- and three-storey houses, sunken floors, galleries over an undercroft; the template's own stairs are real connectors |
 | World connections between reference bands | Milestone 4: one journey per pair of neighbouring bands per 512 m region, a stack of different fillers joined by stairs, ramps and ladders; neighbouring bands are one network. Other templates' zones stay unselected in exports |
+| Several owners in one column | Milestone 5: claims with height ranges, a hand-placed raised branch of two fillers at +6.5 m entered from a house's stairwell, the ground below it capped but otherwise unchanged, and a pit drilled one way down into it |
 
 Old abstract stair annotations in source templates are not proof of a physical
 vertical connection. The adapter reports differing-floor legacy links as
@@ -486,7 +488,61 @@ neighbours are planned round its rectangle, not its floors), more than one
 journey per region or district-dependent density and style, and journeys of
 more than one band.
 
-### Milestone 5 — Unreal consumer proof
+### Milestone 5 — Layered ownership (implemented)
+
+One column of the world can hold several owners at different heights
+(`src/claims.js`, placed by `src/band-world.js`). Each claim has a bottom and a
+top, with a slab between one claim and the next:
+
+![A raised branch over the ground, on the map](raised-branch.png)
+
+*Seed 31337, band 0, cell (−3, 2), 49 × 32 m of it. Left, the ground at 0 m.
+Right, the same place with the cut at +6.5 m: the house's upper storey, the
+landing its stairwell carries up (and the door east out of it), the raised
+branch standing over the ground sites beyond, and the pit, a 6.5 m drop back
+into the room below.*
+
+- A **ground claim** runs from the band's floor limit to whatever stands over
+  it: the floor slab of a raised claim, or the band's ceiling limit where
+  nothing does. The site keeps its own floor and its own plan; only its
+  ceilings are capped (`E.capCeilings`), and a cap that would leave a room
+  under 2.2 m is refused instead.
+- A **raised claim** runs from that slab up to the band's ceiling limit. It
+  holds a raised branch: whole plain filler sites of the cell, built with no
+  extra floors, placed at the branch's floor height.
+- The two meet exactly at the slab. Touching is legal; overlapping is not, and
+  `reservationPlan` emits both, so eviction and generation order cannot let one
+  owner into the other's space.
+
+The branch is hand-placed for now, one per cell at most, its floor at +6.5 m.
+`planBranch` takes the first yard lot in id order whose top-floor stairwell can
+carry on up, runs that stairwell out to the lot's edge with a door on the
+half-metre grid, and takes the first plain filler site across the door plus a
+second sharing at least 5 m of edge with it. Nothing about the ground plan
+changes: `cell.sites` is untouched, no lot or POI is ever covered, and the
+anchor house only gains rooms above its own top floor.
+
+A **pit** is the first emergent connection: templates cut no openings in their
+own roofs, so the pit is drilled. `pitSpot` looks for a clear 2 × 2 m square on
+the branch's floor with a clear floor at least 3 m below it and nothing
+crossing the shaft between them; `drill` cuts a floor hole above and a ceiling
+hole below, both owned by the drop, and reserves the shaft as a void on the
+lower claim. The navigation graph pairs the two halves into one directed
+`forward` edge of kind `pit`, so the drop is one way: a pit has no ladder and
+no rope, it drops the player into what is below.
+
+On the map a raised branch paints with the ground at its own height, with the
+ground showing through its pit; hovering either tells you what stands over
+what. In the elevation lab, "Carry its stair on up" builds the landing on any
+template with a stair of its own. The export is `br.world-elevation/0.2`:
+`policy.layeredOwnership`, per-slice `raised[]`, each site's `floorZ` and
+capped `ceilingZ`, and a top-level `pits[]`.
+
+Not yet, and deliberately out of this milestone: branches that grow and steer
+themselves, biome pools for what stands on them, branches linking to each other
+or to a journey, and drilled walls (the pit's horizontal counterpart).
+
+### Milestone 6 — Unreal consumer proof
 
 Build a small consumer that reconstructs floors, walls, slabs, openings,
 connection areas and protected voids. Agree width, headroom, slopes and traversal

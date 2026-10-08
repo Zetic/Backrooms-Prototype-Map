@@ -18,7 +18,7 @@
 
   const BG = '#3b3934';
   const LOD = { detail: 1, plan: 0.12, labels: 7 };
-  const PLAN = { site: [138, 128, 104], lot: [152, 132, 96], poi: [196, 160, 104], journey: [126, 156, 154], line: 'rgba(30,27,24,0.55)' };
+  const PLAN = { site: [138, 128, 104], lot: [152, 132, 96], poi: [196, 160, 104], journey: [126, 156, 154], raised: 'rgba(181,164,197,0.45)', line: 'rgba(30,27,24,0.55)' };
   const COL = { route: '#e8913a', loop: '#3fb6bf', cross: '#e0609a', portal: '#3fbf6f', hover: 'rgba(255,255,255,0.95)', outline: 'rgba(255,255,255,0.35)' };
   const now = () => (typeof performance !== 'undefined' ? performance : Date).now();
   const css = (c) => 'rgb(' + c.map((v) => Math.round(v)).join(',') + ')';
@@ -33,6 +33,9 @@
   /** detail: blueprints of every site meeting the tile; false if some were not built in time */
   function paintDetail(g, W, x0, y0, S, tz, deadline, opts) {
     const sites = W.sitesIn(x0 - 0.5, y0 - 0.5, x0 + S + 0.5, y0 + S + 0.5), ready = [];
+    // claims stacked over the ground (band-world.js): drawn with the rest, at
+    // their own heights, so the cut height alone decides what you see
+    const raised = W.raisedIn ? W.raisedIn(x0 - 0.5, y0 - 0.5, x0 + S + 0.5, y0 + S + 0.5).map((rs) => W.raisedBuild(rs)) : [];
     let complete = true;
     g.fillStyle = BG; g.fillRect(0, 0, S * tz, S * tz);
     for (const s of sites) {
@@ -64,7 +67,8 @@
       TPL.drawBuilding(g, b, o);
     };
     // floors, then walls, then the tags of stairs, ramps and ladders over both
-    for (const layer of W.floorZ !== undefined ? ['floors', 'walls', 'labels'] : ['floors', 'walls']) for (const r of ready) {
+    // (a raised floor last within each pass: it stands over the ground's)
+    for (const layer of W.floorZ !== undefined ? ['floors', 'walls', 'labels'] : ['floors', 'walls']) for (const r of ready.concat(raised)) {
       // (a filler's floors are labelled when it has more than one height: a gallery, a sunken floor)
       if (r.filler) blueprint(r.filler, r.fillerOrigin, layer, lab && (opts.focus === r.site.id || r.filler.levels.length > 1 || !!r.filler.stairs), r.site.id);
       for (const B of r.buildings) blueprint(B.b, B.origin, layer, lab, r.site.id + '/' + B.poi.id);
@@ -93,6 +97,11 @@
       for (const s of W.cell(i, j).sites) sites.push(s);
     }
     for (const s of sites) paintPlanSite(g, s, x0, y0, tz);
+    if (W.raisedIn) {
+      g.fillStyle = PLAN.raised;
+      for (const rs of W.raisedIn(x0, y0, x0 + S, y0 + S)) for (const q of rs.rects)
+        g.fillRect((q[0] - x0) * tz, (q[1] - y0) * tz, (q[2] - q[0]) * tz, (q[3] - q[1]) * tz);
+    }
     if (tz >= 0.3) {
       g.strokeStyle = PLAN.line; g.lineWidth = 1;
       g.beginPath();

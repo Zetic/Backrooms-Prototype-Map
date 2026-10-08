@@ -438,6 +438,7 @@
       if (opts && opts.band !== undefined) { this.band = opts.band; this.floorZ = opts.floorZ; }
       if (opts && opts.plannedLots) this.plannedLots = opts.plannedLots;
       if (opts && opts.buildTransition) this.buildTransition = opts.buildTransition;
+      if (opts && opts.afterBuild) this.afterBuild = opts.afterBuild;
       this.limits = Object.assign({}, CFG.limits, opts && opts.limits);
       this.cells = new Map();
       this.builds = new Map();
@@ -482,14 +483,21 @@
       if (!site._filler) site._filler = FILL.pick({ seed: site.seed, site: { rects: local(site.rects, site.bbox[0], site.bbox[1]) }, weights: fillerWeights(site.openness) });
       return site._filler;
     }
-    /** a site's blueprints (cached) */
+    /** a site's blueprints (cached). `afterBuild`, when the world has one, is
+     * the last word on a build: a pure function of the site that may change
+     * what it got (band-world.js caps a site's ceilings under a claim above
+     * it and carries a stairwell on up into one). */
     build(site) {
       return World.lru(this.builds, site.id, this.limits.builds, () => {
         const r = buildSite(this, site);
+        if (this.afterBuild) this.afterBuild(site, r);
         this.stats.sitesBuilt++; this.stats.buildMs += r.ms; this.stats.poisBuilt += r.buildings.length; this.stats.issues += r.issues.length;
         return r;
       });
     }
+    /** a site's blueprints, built afresh and neither cached nor finished by
+     * `afterBuild`: what that hook itself is worked out from */
+    buildRaw(site) { return buildSite(this, site); }
     hasBuild(site) { return this.builds.has(site.id); }
     /** the site on the other side of a connection, or null */
     peer(site, cn) {

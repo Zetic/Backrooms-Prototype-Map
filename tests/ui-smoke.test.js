@@ -86,7 +86,7 @@ check('selection clears ghost focus', !window.__cutaway.selected && !last.opts.f
 elements.get('band-up').dispatch('click'); flush();
 check('band selection resets cut to its reference height', window.__world().band === 1 && last.opts.cutZ === 16 && new URLSearchParams(location.hash.slice(1)).get('band') === '1');
 elements.get('export-world').dispatch('click'); flush();
-check('world JSON export keeps spatial geometry and matched connections', exported?.schema === 'br.world-elevation/0.1' && exported.bands.length === 3 && exported.portalMatches.length > 0 && exported.issues.length === 0 && exported.policy.verticalJourneys === 'composed');
+check('world JSON export keeps spatial geometry and matched connections', exported?.schema === 'br.world-elevation/0.2' && exported.bands.length === 3 && exported.portalMatches.length > 0 && exported.issues.length === 0 && exported.policy.verticalJourneys === 'composed' && exported.policy.layeredOwnership === 'stacked-claims' && exported.slices.every((s) => s.sites.every((q) => Number.isFinite(q.ceilingZ)) && Array.isArray(s.raised)));
 elements.get('band-down').dispatch('click'); flush();
 check('ground band resets to ground zero', window.__world().band === 0 && last.opts.cutZ === 0);
 check('retired atrium controls are absent', !elements.has('find-up') && !elements.has('find-down'));

@@ -206,4 +206,162 @@ assert.throws(() => new BR.BandWorld(7, { band: 0.5 }), /integer/);
 assert.throws(() => new BR.BandWorld(7).exportRegion(0, 0, 8, 8, [0]), /64/);
 assert.equal(E.generate,undefined);
 console.log('ok   invalid portal matching, region sizes and band indices rejected');
+
+// Layered ownership (milestone 5): a column of the world holds several
+// claims, stacked. A raised branch stands over whole ground sites beside a
+// two-storey house, entered from its stairwell carried on up, with a pit
+// drilled from it into the ground site below.
+{
+  // the known place: seed 31337, band 0, cell (-3, 2)
+  const w = new BR.BandWorld(31337), i = -3, j = 2, B = w.branch(0, i, j);
+  assert(B, 'the known cell has a branch');
+  assert.equal(B.floorZ, 6.5); assert.equal(B.sites.length, 2);
+  assert.equal(w.cell(i, j, 0).sites.find((s) => s.id === B.anchor).kind, 'lot', 'its anchor is a house on its own lot');
+  // the ground plan is identical with and without it
+  const plain = new BR.BandWorld(31337), CLAIM = BR.CLAIM;
+  BR.CLAIM = null;
+  try {
+    const bare = new BR.BandWorld(31337);
+    assert.equal(bare.branch(0, i, j), null, 'without claims there is no branch');
+    const ground = (W) => JSON.stringify(W.cell(i, j, 0).sites.map((s) => [s.id, s.kind, s.rects, s.conns, s.pois.map((P) => P.id)]));
+    same(ground(bare), ground(plain));
+    const built = (W, s) => { const r = W.build(s), f = r.filler; return JSON.stringify([f && f.filler, f && f.rooms.map((q) => [q.id, q.rects, q.level || 0]), r.buildings.map((x) => [x.poi.id, x.b.footprint[0].rects])]); };
+    for (const s of bare.cell(i, j, 0).sites) same(built(bare, s), built(plain, bare.cell(i, j, 0).sites.find((q) => q.id === s.id) && s), s.id + ' plan');
+    for (const s of plain.cell(i, j, 0).sites) {
+      const mine = built(plain, s), theirs = built(bare, bare.site(s.id));
+      assert.equal(mine, theirs, s.id + ': the floors below a claim are the same with and without it');
+    }
+  } finally { BR.CLAIM = CLAIM; }
+  assert(BR.CLAIM && BR.CLAIM.raiseStair, 'claims are back');
+
+  // no two claims in the column overlap in 3D, and the slab between them is the branch's floor
+  const res = w.reservationPlan(i, j, 0, 0), index = new E.ReservationIndex();
+  for (const r of res) assert(index.reserve(r.owner, r.volumes).ok, r.owner + ' overlaps another claim');
+  const over = new Map(B.caps.map((c) => [c.site, c.cap]));
+  for (const rs of B.sites) {
+    const mine = res.find((r) => r.owner === rs.owner), below = res.find((r) => r.owner === rs.over);
+    assert(mine && below, rs.id + ' and the ground under it are both owned');
+    assert.equal(below.volumes[0].z1, over.get(rs.over), 'the ground claim stops at the cap');
+    assert.equal(mine.volumes[0].z0, rs.floorZ - E.SLAB, 'the claim above starts at its own floor slab');
+    assert.equal(mine.volumes[0].z0, below.volumes[0].z1, 'one slab between them, no gap and no overlap');
+    assert.equal(mine.volumes[0].z1, BR.BAND_CFG.ceilingLimit, 'and it owns the rest of the column');
+    same(mine.volumes[0].rects, below.volumes[0].rects);
+    // the ground site keeps its floor and every room under the cap
+    const b = w.spatial(w.site(rs.over)).filler;
+    assert(b.surfaces.every((s) => s.floorZ === 0 || s.floorZ > BR.BAND_CFG.floorLimit - 1e-7), rs.over + ' kept its floor');
+    assert(b.surfaces.every((s) => s.ceilingZ <= over.get(rs.over) + 1e-7), rs.over + ' keeps under its cap');
+  }
+  // an unclaimed site still owns its whole band envelope
+  const free = w.cell(i, j, 0).sites.find((s) => s.kind === 'filler' && !B.over.includes(s.id));
+  assert.equal(w.ceilingOf(free), BR.BAND_CFG.ceilingLimit);
+
+  // the landing: the house's own stair carried on up, and a door into the branch
+  const host = w.spatial(w.site(B.anchor)), house = host.buildings.find((x) => x.poi.id === B.poi);
+  const landing = house.b.rooms.find((r) => r.id === B.landing.room);
+  assert(landing && landing.floorZ === 6.5, 'the landing stands at the branch floor');
+  assert(house.b.connectors.some((c) => c.to === 's:' + landing.id), 'the house own stair climbs to it');
+  assert.equal(house.conns[B.landing.portal], B.landing.connection, 'its door is the branch connection');
+  const g = w.graph(i, j, i, j, [0]);
+  same(g.issues, []); same(g.unresolved, []);
+  assert.equal(components(g.nodes, g.edges).sizes.length, 1, 'the branch is part of the cell network, not a second one');
+  const at = (z) => g.navigation.nodes.filter((s) => s.floorZ === z);
+  assert(at(6.5).length > 4 && at(0).length > 4, 'floors at both heights');
+  // you can walk from the ground up into the branch and back down again
+  const ground = at(0).find((s) => !s.owner.startsWith('journey:')), raised = at(6.5).find((s) => s.owner.startsWith(B.id));
+  assert(walk(g, ground.id).has(raised.id) && walk(g, raised.id).has(ground.id), 'up into the branch and back');
+
+  // the pit: one way down, from the branch into the ground site below
+  assert(B.pit, 'the branch has a pit');
+  assert.equal(g.pits.length, 1);
+  const pit = g.pits[0];
+  assert(pit.fall >= 3, 'a pit is a drop');
+  const down = g.navigation.edges.filter((e) => e.kind === 'pit');
+  assert.equal(down.length, 1); assert.equal(down[0].direction, 'forward');
+  assert(!g.edges.some((e) => e.includes(pit.from) && e.includes(pit.to)), 'a pit is never a two-way edge');
+  // its two halves agree, and each blueprint cuts its own side
+  const top = w.raisedBuild(B.sites.find((rs) => rs.id === B.pit.top.site)).filler, low = w.spatial(w.site(B.pit.bottom.site)).filler;
+  for (const [b, role, face] of [[top, 'top', 'floor'], [low, 'bottom', 'ceiling']]) {
+    const d = b.drops.filter((x) => x.id === B.pit.id);
+    assert.equal(d.length, 1, role + ' names the pit once');
+    assert.equal(d[0].role, role);
+    assert(b.holes.some((h) => h.connector === B.pit.id && h.face === face), role + ' cuts its ' + face);
+    same(E.validate(b).errors.filter((e) => !/^no physical/.test(e)), []);
+  }
+  assert(low.voids.some((v) => v.id === 'void:' + B.pit.id), 'the lower claim keeps the shaft clear');
+}
+console.log('ok   a column holds stacked claims: a raised branch over capped ground sites, its landing, and a one-way pit back down');
+
+// The branch is a function of (seed, band, cell): fresh worlds agree, caches
+// may be evicted, and the export says the same thing in any order.
+{
+  const i = -3, j = 2, a = new BR.BandWorld(31337);
+  const expected = a.exportRegion(i, j, i, j, [0]);
+  assert.equal(expected.schema, 'br.world-elevation/0.2');
+  assert.equal(expected.policy.layeredOwnership, 'stacked-claims');
+  assert.equal(expected.policy.raisedBranches, 'hand-placed');
+  assert.equal(expected.pits.length, 1);
+  const slice = expected.slices[0];
+  assert.equal(slice.raised.length, 2);
+  for (const rs of slice.raised) {
+    assert.equal(rs.floorZ, 6.5);
+    const under = slice.sites.find((s) => s.id === rs.over);
+    assert(under && under.ceilingZ === rs.floorZ - E.SLAB, 'every slice says where one claim stops and the next begins');
+    assert(expected.layouts.some((l) => l.reservationOwner === rs.owner && l.owner === rs.owner), 'a raised floor is a layout of its own');
+  }
+  // every raised floor's geometry fits the claim it was given
+  for (const item of expected.layouts) {
+    const r = expected.reservations.find((q) => q.owner === item.reservationOwner);
+    assert(r, item.owner + ' has a claim');
+    for (const v of item.blueprint.volumes) for (const q of v.rects) {
+      const world = [q[0] + item.origin[0], q[1] + item.origin[1], q[2] + item.origin[0], q[3] + item.origin[1]];
+      assert(r.volumes.some((e) => {
+        let remainder = [world];
+        for (const rect of e.rects) remainder = remainder.flatMap((p) => BR.TG.rsub(p, rect));
+        return e.z0 <= v.z0 + 1e-7 && e.z1 >= v.z1 - 1e-7 && !remainder.length;
+      }), item.owner + ': ' + v.id + ' fits its claim');
+    }
+  }
+  const b = new BR.BandWorld(31337, { limits: { cells: 2, builds: 2 }, elevationLimits: { bands: 1, journeys: 1, claims: 1, branches: 1, raised: 1 } });
+  // asked for in another order, with everything evicted in between
+  for (const rs of b.raisedSites(0, i, j)) b.raisedBuild(rs);
+  for (const s of b.cell(i, j, 0).sites.slice().reverse()) b.build(s);
+  for (const n of [4, -4]) for (const s of b.cell(i + 7, j - 5, n).sites.slice(0, 3)) b.build(s);
+  same(b.exportRegion(i, j, i, j, [0]), expected);
+  const strip = (B) => JSON.parse(JSON.stringify(B, (k, v) => (k === 'ms' ? undefined : v)));   // (build times are diagnostics, not plan)
+  same(strip(b.branch(0, i, j)), strip(a.branch(0, i, j)));
+  assert(b.branches.size <= 1 && b.raisedBuilds.size <= 1, 'branch caches stay bounded');
+}
+console.log('ok   branches, their pits and their exports are the same in fresh and evicting worlds, in any order');
+
+// Every branch anywhere obeys the same rules.
+{
+  let seen = 0, pits = 0;
+  for (const seed of MODE.size([31337], [31337, 7, 12345, 4242])) {
+    const w = new BR.BandWorld(seed);
+    for (let i = -3; i <= 2; i++) for (let j = -3; j <= 2; j++) {
+      const B = w.branch(0, i, j);
+      if (!B) continue;
+      seen++;
+      if (B.pit) pits++;
+      const cell = w.cell(i, j, 0);
+      tile(cell);                                  // the ground still tiles its cell exactly
+      for (const rs of B.sites) {
+        const under = cell.sites.find((s) => s.id === rs.over);
+        assert(under && under.kind === 'filler' && !under.pois.length, rs.id + ' stands over a plain filler site');
+        same(rs.rects, under.rects);                // whole sites, never part of one
+        const b = w.raisedBuild(rs).filler;
+        assert(b.surfaces.every((s) => s.floorZ >= rs.floorZ - 1e-7 && s.ceilingZ <= BR.BAND_CFG.ceilingLimit + 1e-7), rs.id + ' keeps inside its claim');
+        assert(rs.conns.length && rs.conns.every((cn) => b.portals.some((p) => p.connection === cn.id)), rs.id + ' built every connection it was given');
+      }
+      const g = w.graph(i, j, i, j, [0]);
+      same(g.issues, []);
+      assert.equal(components(g.nodes, g.edges).sizes.length, 1, seed + ' ' + i + ',' + j + ': one network');
+      for (const p of g.pits) assert(p.fall >= 3 && p.from !== p.to);
+      w.exportRegion(i, j, i, j, [0]);             // throws on any invalid connection
+    }
+  }
+  assert(seen >= MODE.size(1, 4), 'branches were found: ' + seen);
+  assert(pits >= 1, 'and pits drilled: ' + pits);
+  console.log('ok   every branch stands over whole plain sites, keeps inside its claim and leaves its cell one network (' + seen + ' branches, ' + pits + ' with a pit)');
+}
 console.log('All band-world checks passed.');

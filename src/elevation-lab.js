@@ -35,6 +35,7 @@
   if (args.has('rise')) $('rise').value = args.get('rise');
   const typeOf = () => $('type').value || 'auto', riseOf = () => (String($('rise').value).trim() === '' ? undefined : Number($('rise').value));
   for (const id of ['ghost','labels']) if (args.has(id)) $(id).checked = args.get(id) !== '0';
+  if (args.get('raise') === '1') $('raise').checked = true;
   $('mode').value = args.get('mode') === 'exact' ? 'exact' : 'cutaway';
 
   function fit(canvas, height) {
@@ -93,7 +94,16 @@
         current.capabilities = E.capabilities(current); // as the world export has it
       }
       else {
-      const source = id.startsWith('template:') ? BR.TPL.generate({ archetype: id.slice(9), seed, site, wrongness: 0 }) : BR.FILL.generate({ filler: id.slice(7), seed, site, connections: BR.FILL.sampleConnections(site, 2, seed) });
+      let source = id.startsWith('template:') ? BR.TPL.generate({ archetype: id.slice(9), seed, site, wrongness: 0 }) : BR.FILL.generate({ filler: id.slice(7), seed, site, connections: BR.FILL.sampleConnections(site, 2, seed) });
+      // a raised landing over its roof, as the world enters a branch (claims.js)
+      if ($('raise').checked && BR.CLAIM) {
+        const z = (BR.BAND_CFG && BR.BAND_CFG.branch.z) || 6.5, st = BR.CLAIM.stairTop(source);
+        let got = null;
+        // (the world's reach is where the lot edge is; here, whichever fits)
+        for (const sd of (st && st.sides) || []) { for (const reach of [2.5, 1, 4]) { got = BR.CLAIM.raiseStair(source, { z, side: sd, reach }); if (got) break; } if (got) break; }
+        if (!got) throw new Error('This template has no stairwell on an outside wall whose stair could carry on up to ' + E.zLabel(z) + '. A two-storey house does.');
+        source = got.b;
+      }
       current = direction === 'none' ? E.prepare(source) : E.connectionVariant(source, { direction, type: typeOf(), rise: riseOf() });
       }
       $('floor').innerHTML = current.levels.map((l) => {
@@ -122,6 +132,7 @@
   $('next').addEventListener('click', () => { $('seed').value = (Number($('seed').value) + 1) >>> 0; build(); });
   $('floor').addEventListener('change', () => chooseFloor(Number($('floor').value)));
   for (const id of ['ghost','labels']) $(id).addEventListener('change', () => { draw(); saveHash(); });
+  $('raise').addEventListener('change', build);
   $('mode').addEventListener('change', () => { if (!current) return; if ($('mode').value === 'exact') height = current.levels.find((l) => l.index === selected).elevation; heightControls(); draw(); saveHash(); });
   $('height').addEventListener('input', () => setHeight(Number($('height').value), true));
   $('height-value').addEventListener('change', () => setHeight($('height-value').value.trim() ? Number($('height-value').value) : NaN, true));
@@ -157,7 +168,7 @@
   }
   function saveHash() {
     if (!current) return;
-    const q = new URLSearchParams({ template: $('template').value, seed: String(current.seed), connection: $('connection').value, type: typeOf(), rise: riseOf() === undefined ? '' : String(riseOf()), width: String(current.site.w), depth: String(current.site.h), cut: String(height), mode: $('mode').value, ghost: $('ghost').checked ? '1' : '0', labels: $('labels').checked ? '1' : '0' });
+    const q = new URLSearchParams({ template: $('template').value, seed: String(current.seed), connection: $('connection').value, type: typeOf(), rise: riseOf() === undefined ? '' : String(riseOf()), width: String(current.site.w), depth: String(current.site.h), cut: String(height), mode: $('mode').value, ghost: $('ghost').checked ? '1' : '0', labels: $('labels').checked ? '1' : '0', raise: $('raise').checked ? '1' : '0' });
     history.replaceState(null, '', '#' + q);
   }
   $('plan').addEventListener('pointerleave', () => { $('hover').textContent = ''; });
