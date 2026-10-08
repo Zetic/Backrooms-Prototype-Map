@@ -102,9 +102,12 @@ the last, joined by stairs, ramps or ladders, with a floor to cross between
 each climb and the next. Some journeys lean to ramps, some to ladders, some
 to stairs; the largest share (4 in 9) take each floor's own preference.
 
-A column can also hold two owners at once (milestone 5): where a cell has a
-house whose stairwell can carry on up, a raised branch of a couple of fillers
-stands at +6.5 m over the ground sites next to it. The ground keeps its own
+A column can also hold two owners at once (milestone 5), and houses grow
+(growth step 2, [the growth design](docs/growth.md)): a two-storey house or a
+townhouse can carry its stairwell on up a flight, and from that landing a
+branch of house rooms grows at +6.5 m (+9.5 m over a townhouse) over one to
+four of the ground sites next to it: hallways and rooms of the house-room
+biome, densest beside the stair. The ground keeps its own
 floor with its ceiling capped under the branch, the two claims meet at the
 branch's floor slab, and a pit drilled through that floor drops into the site
 below — one way only, with no ladder and no rope.
@@ -156,7 +159,8 @@ The URL hash keeps the seed, position, zoom, band, cut height and toggles, for e
 | `tpl/floors.js` | Floor patterns on a finished building: sunken floors with steps, galleries over an undercroft |
 | `journeys.js` | Vertical journeys: different fillers stacked from one band's floor to the next, joined by connection variants with exact rises |
 | `claims.js` | Layered ownership mechanics: capping a ceiling under a claim above, carrying a stair up to a raised landing, and finding and drilling a pit between two claims |
-| `band-world.js` | Deterministic reference-band networks, journey plans across band pairs, hand-placed raised branches and their pits, stacked spatial claims, exact portal matching and canonical world export |
+| `biomes.js` | Growth biomes: which archetypes seed growth, the pools a branch draws from, and where a district's rooms stand in a site |
+| `band-world.js` | Deterministic reference-band networks, journey plans across band pairs, house pillars and the branches that grow from them, their pits, stacked spatial claims, exact portal matching and canonical world export |
 
 ```js
 const W = new BR.World(31337);
@@ -237,7 +241,10 @@ The runner checks:
   drilling it twice changes nothing. In the world no two claims overlap in 3D,
   a ground claim and the raised claim over it meet exactly at the branch's
   floor slab, the ground plan is the same with layering off, the branch is
-  walkable from the house and back, and a pit only goes down.
+  walkable from the house to every room in it and back, and a pit only goes
+  down. Every branch grows from a house that seeds growth, over whole plain
+  sites joined edge to edge, from its biome's pool only (no room twice in a
+  site), densest beside its pillar, and only a share of such houses grow one.
 - **Fillers.** Every filler keeps the contract on any site shape and honours
   every connection. The pool leans enclosed, and fillers are fast.
 - **The world, on five seeds (two in quick mode).** Sites tile every cell exactly. Connections are

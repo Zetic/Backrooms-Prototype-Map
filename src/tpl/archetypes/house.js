@@ -142,7 +142,7 @@
   });
 
   TPL.registerArchetype({
-    id: 'two_storey', engine: 'house', name: 'Two-storey house', category: 'house', rarity: 'uncommon', weight: 0.9,
+    id: 'two_storey', engine: 'house', grows: { biome: 'houseroom' }, name: 'Two-storey house', category: 'house', rarity: 'uncommon', weight: 0.9,
     blurb: 'Living rooms downstairs, bedrooms upstairs: a stairwell beside the front hall climbs to a landing hallway.',
     site: { w: [15, 22], h: [9, 12] },
     storeys: 2,
@@ -171,7 +171,7 @@
   });
 
   TPL.registerArchetype({
-    id: 'townhouse', engine: 'house', name: 'Townhouse', category: 'house', rarity: 'rare', weight: 0.3,
+    id: 'townhouse', engine: 'house', grows: { biome: 'houseroom' }, name: 'Townhouse', category: 'house', rarity: 'rare', weight: 0.3,
     blurb: 'Three narrow storeys: kitchen and living below, bedrooms on the first floor, the master suite and a study at the top of the stair.',
     site: { w: [11, 14], h: [11, 14] },
     storeys: 3,

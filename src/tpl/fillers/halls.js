@@ -183,7 +183,7 @@
 
   // ------------------------------------------------------------ loop hall
   FILL.register({
-    id: 'loop_hall', floors: { gallery: { p: 0.4, rooms: ['hall'] } }, name: 'Loop hall', feel: 'mixed', weight: 3,
+    id: 'loop_hall', biomes: ['houseroom'], floors: { gallery: { p: 0.4, rooms: ['hall'] } }, name: 'Loop hall', feel: 'mixed', weight: 3,
     blurb: 'A wide 3-5 m hall in an L, U or ring round a block of 2-4 rooms that open off it, closing into a loop; solid or a little warren outside.',
     doors: { opening: 0.6, door: 0.3, wide: 0.1 }, loops: 0.1,
     fits: (S) => Math.min(...dims(S)) >= 20,

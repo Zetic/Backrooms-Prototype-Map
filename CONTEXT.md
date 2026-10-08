@@ -8,12 +8,16 @@ vertical generation.
 
 Milestones 1 to 5 of the elevation plan are done, plus a follow-up that puts a
 template's own stairs on the map, and a tooling milestone, **fast test runs**
-(a parallel runner with quick and full modes, and CI; see below). Milestone 5,
-**layered ownership**, is the first step of the growth design (the design doc
-is a Claude artifact in the project thread, not in the repo): a column can hold
-several owners stacked at different heights, with a hand-placed raised branch
-over the ground and a drilled pit back down. Growing and steering branches is
-the work after it; the Unreal consumer of the exported data is milestone 6.
+(a parallel runner with quick and full modes, and CI; see below). Since
+milestone 5 the work follows the **growth design**, now in the repo as
+[docs/growth.md](docs/growth.md) with its build order and the state of each
+step. Step 1 is milestone 5, **layered ownership** (a column holds several
+owners stacked at different heights, with a pit drilled back down). Step 2,
+**one house pillar and its branch**, is this branch: a house that seeds growth
+carries its stairwell on up, and a branch of its biome (`houseroom`) grows at
+that floor over the ground beside it. Step 3, recursive growth with a budget
+per region and steering toward the next band, is next; the Unreal consumer of
+the exported data is milestone 6.
 
 ## Repository state
 
@@ -22,10 +26,9 @@ the work after it; the Unreal consumer of the exported data is milestone 6.
   packages. `index.html` is the map, `workbench.html` the template workshop,
   `elevation.html` the elevation lab. Serve the folder statically to inspect
   (`python3 -m http.server 8765`).
-- `main` holds everything below up to PR #23 (`cc5733b`); layered ownership is
-  [#24](https://github.com/Zetic/Backrooms-Prototype-Map/pull/24), open on
-  `claude/fast-test-runs-l53vww` (the branch kept its name from #23). The
-  branches `claude/world-journeys` and `claude/kept-stairs` are merged and can
+- `main` holds everything up to layered ownership (PR #24, `a58c8f8`). Growth
+  step 2 is on `claude/house-branch`. The branches `claude/world-journeys`,
+  `claude/kept-stairs` and `claude/fast-test-runs-l53vww` are merged and can
   be deleted.
 - Lesson from #21: it was stacked on `claude/world-journeys` and merged into
   that branch after #20 had already merged, so it missed `main` until #22
@@ -44,7 +47,8 @@ the work after it; the Unreal consumer of the exported data is milestone 6.
 | [#20](https://github.com/Zetic/Backrooms-Prototype-Map/pull/20) | Milestone 4: journeys between bands, stacks of different fillers joined by stairs, ramps and ladders |
 | [#21](https://github.com/Zetic/Backrooms-Prototype-Map/pull/21), [#22](https://github.com/Zetic/Backrooms-Prototype-Map/pull/22) | Kept stairs: a template's stairs laid out once at generation and drawn on the map (#22 brought #21 to `main`) |
 | [#23](https://github.com/Zetic/Backrooms-Prototype-Map/pull/23) | Fast test runs: parallel runner, quick and full modes, CI on every PR |
-| [#24](https://github.com/Zetic/Backrooms-Prototype-Map/pull/24) | Milestone 5: layered ownership, a hand-placed raised branch over the ground and a pit drilled back down |
+| [#24](https://github.com/Zetic/Backrooms-Prototype-Map/pull/24) | Milestone 5 (growth step 1): layered ownership, a hand-placed raised branch over the ground and a pit drilled back down |
+| `claude/house-branch` | Growth step 2: biomes, a house pillar, and a branch of house rooms grown from it |
 
 ## What the user wants
 
@@ -91,11 +95,12 @@ radii and exact connection adapters.
 | Kept stairs (#22) | Laid out once at generation and kept on the template (`b.stairs = { key, links }`); `prepare` adopts them while the geometry fingerprint matches; the map draws them |
 | Journeys (M4) | `src/journeys.js`: per band pair per 512 m region, a territory holding a stack of different fillers climbing 16 m, each climb a stair, ramp or ladder with an exact rise. Styles: mixed, stairs, ramps, ladders |
 | World | `BR.BandWorld`: independently seeded horizontal bands, joined by journeys. Plans are pure functions of (seed, region, band pair); generation order and cache eviction change nothing |
-| Layered ownership (M5) | `src/claims.js`: claims with height ranges in one column, ceilings capped under a claim above, a house's stairwell carried up to a raised landing, and pits found and drilled between two claims. `band-world.js` plans one hand-placed raised branch per cell at +6.5 m (two plain filler sites) and one pit down into the ground |
+| Layered ownership (M5) | `src/claims.js`: claims with height ranges in one column, ceilings capped under a claim above, a house's stairwell carried up to a raised landing, and pits found and drilled between two claims, one drilled from a branch down into the ground |
+| Growth (step 2) | `src/biomes.js`: archetypes that seed growth (`grows`), biome tags on rooms, templates and fillers, the `houseroom` pool, `furnish`. `band-world.js` grows at most one branch per cell from a seeding house (a share of them): its stair carried one flight up (+6.5 m or +9.5 m), then 1-4 plain ground sites edge to edge, each a houseroom filler with house rooms in it |
 | World export | `br.world-elevation/0.2`: layouts, reservations, navigation, exact portal matches, `policy.verticalJourneys: 'composed'`, `policy.layeredOwnership: 'stacked-claims'`, a `journeys` summary, per-slice `raised[]` with each site's `floorZ`/capped `ceilingZ`, a top-level `pits[]`, `verticalFrontier` for journey doors onto an unexported band |
 | Map | Raised branches painted with the ground at their own height (the ground showing through their pits), hover telling you what stands over what; continuous cutaway by height, band switching; a template's stairs at their width with their heights (click one to move the cut to where it arrives); sunken floors at their depth; journey territories teal at plan zoom; *Journey ↓ / ↑* buttons; hover names a journey's bands, style and floors |
 | Lab | Any template or filler with direction/type/rise; zones view; "Carry its stair on up" for the raised landing a branch is entered from; a journey per style with its climbs, floors and route profile |
-| Workbench | Every template and filler, a tab per floor, real stairs drawn |
+| Workbench | Every template and filler, a tab per floor, real stairs drawn; biome tags shown and searchable (`houseroom`) |
 
 ## Essential spatial rules
 
@@ -182,7 +187,7 @@ draw connection tags in a last pass, after every wall.
 
 **Milestone 5, layered ownership** (`src/claims.js`, `src/band-world.js`).
 - `reservationPlan` emits one claim per site: ground `[floorLimit − slab,
-  ceilingOf(site)]`, raised `[branchFloor − slab, ceilingLimit]`. `ceilingOf`
+  ceilingOf(site)]`, raised `[its floor − slab, ceilingLimit]`. `ceilingOf`
   returns the branch's floor slab where one stands over the site.
 - Planning must not need a build and building must not need the plan:
   `World.buildRaw` builds a site uncached and without the hook (for the
@@ -204,11 +209,42 @@ draw connection tags in a last pass, after every wall.
   carry a `drop` with one id and rectangle; `graph()` pairs them into one
   directed `forward` edge of kind `pit` and no undirected edge, so the drop is
   one way. No ladder, no rope.
-- Known place for the proof: seed 31337, band 0, cell (−3, 2). The anchor lot
-  is `b0|-3,2:68` (side E, reach 2.5 m), the raised sites stand over
-  `b0|-3,2:71` and `b0|-3,2:47`, and the pit `pit:branch:0:-3,2:0` falls 6.5 m
-  at [−265.5, 381.5, −263.5, 383.5]. Seeds 7, 99, 12345 and 4242 also have
-  branches (1-3 per 36 cells, several with pits).
+- Milestone 5's known place (seed 31337, band 0, cell (−3, 2)) no longer has a
+  branch since step 2: only a share of seeding houses grow one, and that house
+  rolls out. The tests' known place is now seed 7, band 0, cell (3, −2).
+
+**Growth step 2, one house pillar and its branch** (`src/biomes.js`,
+`src/band-world.js`; [docs/growth.md](docs/growth.md)).
+- Biome data: `grows: { biome: 'houseroom' }` on `two_storey` and `townhouse`;
+  `biomes: ['houseroom']` on 13 catalogue rooms (copied onto their lone
+  templates by `archetypes/lone.js`), the `closet` template and seven fillers
+  (corridor_rooms, enfilade, cells, doors_nowhere, beads, ring, loop_hall).
+  `BIOME.anchorOf`, `templates`, `fillers`, `fillerWeights`.
+- `planBranch(n, i, j)`: the first yard lot in id order whose house seeds
+  growth, passes the seeded share (`CFG.branch.share` 0.75, salt `0xba08`
+  with the POI id), and whose stair can carry one flight up: `z` = the half
+  metre at or above max(top floor + 3.3, top ceiling + slab), at most
+  `ceilingLimit − 3`. Then `raiseStair` as in milestone 5, the plain site
+  across the landing's door, and breadth-first growth over plain neighbours
+  sharing ≥ 5 m of edge (seeded order, salt `0xba09`), to `sites` [1, 4] and
+  `area` 1,200 m², each ground site checked with `keepsUnder` (a raw build and
+  `capCeilings`). Raised sites carry `hop`, `parent`, `biome`; doors are minted
+  to the landing and from each site to its parent.
+- `raisedSite(rs)`: `BIOME.furnish` places 2-3 / 1-2 / 0-1 rooms by hop (1.5 m
+  margins, 3 m clear of doorways, no type twice, uniform weights), then
+  `LOT.build({ ..., floors: false })` with biome fillers only (four seeded
+  picks, then each in turn; LOT's warren fallback is rejected), then without
+  rooms. Every minted door must be honoured; everything must fit the claim.
+  Result: `b` (the filler, placed), `fillerOrigin` (LOT's `at` moves it off
+  the site origin: the pit uses this origin), `buildings` (rooms, placed, poi
+  `{ id, archetype, name, biome }`). A site that fails is dropped with its
+  subtree and the rest rewired and rebuilt.
+- `seedsGrowth(n, i, j, P)` is the share roll; `CLAIM.pillarFloor(b, rise)`
+  is the landing height rule, shared with the lab's "Carry its stair on up".
+- `raisedBuild` returns the rooms as buildings, so render, graph, export and
+  hover treat them as any POI building. The export adds `biome` and `hop` to
+  `slices[].raised[]` and `policy.raisedBranches: 'house-pillars'`,
+  `policy.growth`.
 
 ## Known limits
 
@@ -227,11 +263,22 @@ draw connection tags in a last pass, after every wall.
   gallery and one sunken floor per building; no mezzanines open on several
   sides, split levels or composites with storeys of their own.
 - Seams (shared walls between blueprints) are not computed against journeys.
-- A raised branch is hand-placed, not grown: one per cell at most, always two
-  plain filler sites at +6.5 m, entered only from a yard lot's stairwell, and
-  it never covers a lot or a POI. It does not steer, link to another branch or
-  to a journey, and nothing picks the fillers on it by biome. About 1 to 3
-  cells in 36 have one.
+- A branch grows from a house only (the only seeding archetypes are
+  `two_storey` and `townhouse`), one flight up, at most one per cell and
+  within its cell; no pillar rises from a branch yet, nothing steers toward the
+  next band, and branches do not link to each other or to a journey. It never
+  covers a lot or a POI. Over 144 cells of four seeds, 14 branches grew where
+  20 houses could have seeded one.
+- The houseroom pool is the catalogue's lone house rooms and seven existing
+  fillers, so districts read as hallways with a few rooms in them; new
+  houseroom fillers are step 4.
+- Planning a branch builds its ground sites and its district (about 0.1-0.4 s,
+  up to about a second under load) when its cell first comes into detail view
+  or a site of it is built, so the map can pause briefly there; the plan view
+  only tints branches already planned (`raisedIn(..., planned)`).
+- A raised site that cannot be built is dropped with its subtree; a parent
+  that fails only because of a child's door is dropped too (rather than the
+  child). In practice none fails: over 300 cells, 0 of 51 raised sites.
 - A pit needs 3 m of fall, a clear 2 × 2 m square on both floors and a clear
   shaft between them, so a branch often has none. Drilled walls (the
   horizontal counterpart) do not exist yet.
@@ -256,7 +303,8 @@ draw connection tags in a last pass, after every wall.
 | `src/tpl/elevation-view.js` | Cutaway, connection drawing, kept-stair parts, route profile |
 | `src/journeys.js` | Journeys |
 | `src/claims.js` | Layered ownership: capped ceilings, a stair carried up to a raised landing, pits found and drilled |
-| `src/band-world.js` | Bands, journey plans and slices, raised branches and their pits, stacked claims, spatial graph, world export |
+| `src/biomes.js` | Growth biomes: seeding archetypes, pools, `furnish` |
+| `src/band-world.js` | Bands, journey plans and slices, house pillars and their branches, pits, stacked claims, spatial graph, world export |
 | `src/render.js`, `index.html` | Map tiles and interaction |
 | `src/elevation-lab.js`, `elevation.html`; `workbench.html` | Lab; workbench |
 
@@ -358,23 +406,29 @@ about 30%, but the tests run with V8's defaults, as the browser does.)
 
 ## Next
 
-1. **Grow the branches** (the next step of the growth design, after layered
-   ownership). The mechanics are in place; what is missing is a planner that
-   decides where branches go instead of one hand-placed per cell:
-   - A branch should grow from a semi-spine (a pillar of fillers off a POI),
-     spread over the sites it can reach at its height, and stop on a budget
-     rather than on a fixed count of two sites.
-   - Steering: a branch should prefer to grow away from the spine it started
-     from, and a second branch at another height should be able to stand over
-     the first (the claims already allow it; nothing plans it).
-   - Biome pools: which fillers may stand on a branch (the "house biome" the
-     user described), instead of the ordinary filler pool with no floors.
-   - Linking: a branch meeting another branch or a journey, through a seam, a
-     drilled wall or a pit. Pits are in; drilled walls are the next emergent
-     connection.
-   - Keep the rules this milestone established: whole sites only, claims that
-     touch but never overlap, the ground plan unchanged, and a plan that is a
-     pure function of (seed, band, cell).
+1. **Growth step 3: recursive growth** ([docs/growth.md](docs/growth.md)).
+   Step 2 grows one branch from a house, one flight up, inside its cell. Next:
+   - A growth plan per region (not per cell), a pure function of (seed,
+     region, the region's ground plan), with a budget of pillars and branch
+     sites; a share of eligible POIs seed.
+   - Pillars from branches: a branch site raises a pillar of 3-8 m (one or more
+     flights, each an exact rise, a floor at each landing) a few sites away
+     from the last, and a new branch grows at its floor, over the branch below
+     (the claims already allow a claim over a claim; `ceilingOf` and
+     `reservationPlan` need to stack more than two).
+   - Steering: after growing, check whether any chain reaches the next band;
+     if none does, extend the most promising branch upward until one does. A
+     chain within reach of the next band ends in an ordinary site there.
+   - Today's journey plot becomes the fallback where steering fails, and
+     "journey" becomes the player's route (the renaming the design asks for).
+   - Keep: no shafts, no template repeated along one chain, exact rises, whole
+     sites, claims that touch but never overlap, the ground plan unchanged.
+   - The checks change to "a way up exists in each region with every emergent
+     connection removed".
+   Open questions the design leaves for the user: whether every region must
+   guarantee a way up, which other POIs seed and with which biomes, the seeding
+   share, whether districts cross region borders, and whether the journey plot
+   survives as a rare style.
 2. **Milestone 6: an Unreal consumer proof.** The export is now one connected
    multi-band network, so it is ready to be consumed.
    - First, an engine-neutral reference builder in this repo: read a

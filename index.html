@@ -129,6 +129,7 @@
 <script src="src/tpl/connections.js"></script>
 <script src="src/journeys.js"></script>
 <script src="src/claims.js"></script>
+<script src="src/biomes.js"></script>
 <script src="src/tpl/elevation-view.js"></script>
 <script src="src/poi.js"></script>
 <script src="src/world.js"></script>
@@ -231,7 +232,7 @@
       const hit = hitTemplate(s, x, y, false);
       if (hit && hit.room) {
         const z = hit.room.floorZ, room = hit.room.room;
-        html += '<br>' + (hit.raised ? '<b>raised branch</b> · ' : '') + esc(room.name) + ' · floor ' + BR.ELEV.zLabel(z) + ' · clear height ' + room.ceiling + ' m · ' + Math.max(0, state.cutZ - z).toFixed(2) + ' m below cut';
+        html += '<br>' + (hit.raised ? '<b>raised branch</b> · ' + (hit.raised.biome ? esc((BR.BIOME.DEFS[hit.raised.biome] || {}).label || hit.raised.biome) + ', ' + (hit.raised.hop ? hit.raised.hop + (hit.raised.hop === 1 ? ' site' : ' sites') + ' from its pillar' : 'beside its pillar') + ' · ' : '') : '') + esc(room.name) + ' · floor ' + BR.ELEV.zLabel(z) + ' · clear height ' + room.ceiling + ' m · ' + Math.max(0, state.cutZ - z).toFixed(2) + ' m below cut';
         const pit = (hit.b.drops || []).find((d) => d.role === 'top' && x - hit.origin[0] >= d.rect[0] && x - hit.origin[0] < d.rect[2] && y - hit.origin[1] >= d.rect[1] && y - hit.origin[1] < d.rect[3]);
         if (pit) html += '<br><b>pit</b> · drops ' + pit.fall.toFixed(2) + ' m into what is below, no way back up';
       } else html += '<br>No walkable floor below this cut here';
@@ -357,7 +358,12 @@
     // a claim stacked over this ground comes first: at a cut below its floor
     // it simply has nothing here, and the ground site answers instead
     const rs = world.raisedAt && world.raisedAt(x, y);
-    if (rs) { const rr = world.raisedBuild(rs); candidates.push({ b: rr.filler, origin: rr.fillerOrigin, key: rs.id, name: 'raised branch · ' + rr.filler.name, raised: rs }); }
+    if (rs) {
+      // its rooms first (they stand inside its filler), then the filler round them
+      const rr = world.raisedBuild(rs), biome = rs.biome ? (BR.BIOME.DEFS[rs.biome] || {}).label || rs.biome : '';
+      for (const B of rr.buildings) candidates.push({ b: B.b, origin: B.origin, key: rs.id + '/' + B.poi.id, name: 'raised branch · ' + B.poi.name + (biome ? ' (' + biome + ')' : ''), raised: rs });
+      candidates.push({ b: rr.filler, origin: rr.fillerOrigin, key: rs.id, name: 'raised branch · ' + rr.filler.name + (biome ? ' (' + biome + ')' : ''), raised: rs });
+    }
     if (!world.hasBuild(s) && !build) { if (!candidates.length) return null; }
     else {
       const r = world.build(s);

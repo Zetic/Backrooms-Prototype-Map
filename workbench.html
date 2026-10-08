@@ -218,7 +218,7 @@
     'filler:pool': { id: 'filler:pool', filler: null, engine: 'filler', name: 'Pool pick (weighted)', category: 'filler', feel: 'pool', site: { w: [8, 36], h: [8, 32] },
       blurb: 'Each seed picks a filler by weight among those that fit the site: 70 / 20 / 10 enclosed / mixed / open.' }
   };
-  for (const F of FILL.list()) FILLERS['filler:' + F.id] = { id: 'filler:' + F.id, filler: F.id, engine: 'filler', name: F.name, category: 'filler', feel: F.feel, weight: F.weight, site: F.site, blurb: F.blurb };
+  for (const F of FILL.list()) FILLERS['filler:' + F.id] = { id: 'filler:' + F.id, filler: F.id, engine: 'filler', name: F.name, category: 'filler', feel: F.feel, weight: F.weight, site: F.site, blurb: F.blurb, biomes: F.biomes };
   const entry = (id) => TPL.archetypes[id] || FILLERS[id];
   const entries = () => TPL.listArchetypes().concat(Object.values(FILLERS));
   const isFiller = (id) => !!FILLERS[id];
@@ -421,7 +421,8 @@
       if (state.fav && !favs.has(a.id)) return false;
       if (state.bad) { const h = healthOf(a.id); if (!h || h.cls === 'g') return false; }
       if (!q) return true;
-      const hay = [a.id, a.name, a.engine, a.category, a.blurb, a.layout, a.room, a.feel, TPL.sizeClass(a), a.engine === 'filler' ? '' : (a.pool || 'expected') + ' pool'].join(' ').toLowerCase();
+      const hay = [a.id, a.name, a.engine, a.category, a.blurb, a.layout, a.room, a.feel, TPL.sizeClass(a), a.engine === 'filler' ? '' : (a.pool || 'expected') + ' pool',
+        (a.biomes || []).join(' '), a.grows ? 'seeds ' + a.grows.biome : ''].join(' ').toLowerCase();
       return q.split(/\s+/).every((w) => hay.indexOf(w) >= 0);
     });
     const by = state.sort;
@@ -463,7 +464,9 @@
     return '<input type="checkbox" class="cmp" title="add to Compare (c)"' + (C.has(a.id) ? ' checked' : '') + '>' +
       '<span class="star' + (favs.has(a.id) ? ' on' : '') + '" title="favourite (f)">' + (favs.has(a.id) ? '★' : '☆') + '</span>' +
       '<span class="nm" title="' + esc(a.id) + '">' + esc(a.name || a.id) + (a.id.indexOf('custom:') === 0 ? ' <span class="k">(edited)</span>' : '') + '</span>' +
-      '<span class="sz"' + (a.pool === 'weird' ? ' style="color:#f0a092;border-color:#7a3d33" title="weird pool: out of place, placed rarely"' : '') + '>' + (a.engine === 'filler' ? esc(a.feel) : TPL.sizeClass(a) + (a.pool === 'weird' ? ' · weird' : '')) + '</span><span class="st">' + st + '</span>';
+      '<span class="sz"' + (a.pool === 'weird' ? ' style="color:#f0a092;border-color:#7a3d33" title="weird pool: out of place, placed rarely"' : '') + '>' + (a.engine === 'filler' ? esc(a.feel) : TPL.sizeClass(a) + (a.pool === 'weird' ? ' · weird' : '')) +
+      // growth biomes (src/biomes.js): the pool a branch draws it from, or the branch a house grows
+      (a.grows ? ' · ↑ ' + esc(a.grows.biome) : (a.biomes || []).length ? ' · ' + esc(a.biomes.join(' · ')) : '') + '</span><span class="st">' + st + '</span>';
   }
   function renderLib() {
     const L = filtered(), lib = $('lib');

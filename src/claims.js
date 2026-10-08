@@ -24,6 +24,7 @@
  *               no rope).
  *
  *   CLAIM.stairTop(b)                      its top stairwell and the sides it faces
+ *   CLAIM.pillarFloor(b, rise?)            the height a pillar's first landing goes to
  *   CLAIM.raiseStair(b, { z, side, reach, width })
  *   CLAIM.pitSpot(top, bottom, opts)       where a pit can drill through
  *   CLAIM.drill(top, bottom, spot, id)     cut it, both sides
@@ -72,6 +73,19 @@
       best = { vertical: v, room, rect: q.slice(), floorZ: round(lv(room.level)), ceilingZ: round(lv(room.level) + (room.ceiling || 2.5)), sides };
     }
     return best;
+  };
+
+  /**
+   * Where a pillar's first landing goes over a template's top stairwell
+   * (growth step 2): one flight up, to the half metre at or above both its
+   * top floor + `rise` and its top storey's ceiling + slab. null without a
+   * stairwell. The world and the lab use the same rule.
+   */
+  CLAIM.PILLAR = { rise: 3.3 };
+  CLAIM.pillarFloor = function pillarFloor(b, rise) {
+    const st = CLAIM.stairTop(b), E = BR.ELEV;
+    if (!st) return null;
+    return Math.ceil(Math.max(st.floorZ + (rise === undefined ? CLAIM.PILLAR.rise : rise), st.ceilingZ + E.SLAB) * 2 - EPS) / 2;
   };
 
   /**
