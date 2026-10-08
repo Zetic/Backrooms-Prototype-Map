@@ -1,10 +1,10 @@
 # Map procedural generation: agent handoff
 
-Snapshot: 2026-10-07. This is implementation context; the durable design and
+Snapshot: 2026-10-08. This is implementation context; the durable design and
 milestones live in [docs/elevation.md](docs/elevation.md). Read that document and
 [docs/elevation-world.md](docs/elevation-world.md) before changing vertical
 generation. It was first written for milestone 2 (closed PR #17) and is now
-refreshed with milestone 3 implemented; the next work is milestone 4.
+refreshed with milestone 4 implemented; the next work is milestone 5.
 
 ## Repository and starting point
 
@@ -16,7 +16,9 @@ refreshed with milestone 3 implemented; the next work is milestone 4.
   [PR #18](https://github.com/Zetic/Backrooms-Prototype-Map/pull/18) (merge commit
   `50d51ae`). It carried this handoff: the user closed the documentation-only
   PR #17 and PR #11 and asked for the fixes to land with the milestone.
-- Milestone 3, template floors, is on `claude/template-floors`, based on that
+- Milestone 3, template floors, is merged in
+  [PR #19](https://github.com/Zetic/Backrooms-Prototype-Map/pull/19).
+- Milestone 4, world journeys, is on `claude/world-journeys`, based on that
   merge. Check current `main` and open PRs before starting: another agent may
   advance the repository after this snapshot.
 - Plain JavaScript, browser globals under `BR`, no build step or runtime package
@@ -68,7 +70,8 @@ occupied width, rather than as thin diagonal lines.
 | [#15](https://github.com/Zetic/Backrooms-Prototype-Map/pull/15) | Tried to improve the atrium footprint/population; the resulting repetitive rooms did not satisfy the user |
 | [#16](https://github.com/Zetic/Backrooms-Prototype-Map/pull/16) | Implemented continuous cutaway/local-floor inspection and removed the atrium from generation and the lab |
 | [#18](https://github.com/Zetic/Backrooms-Prototype-Map/pull/18) | Milestone 2: connection zones, stair/ramp variants, slope-following reservations, the ladder-fallback fix, presentation in both directions |
-| `claude/template-floors` | Milestone 3: two- and three-storey houses, sunken floors, galleries, the template's own stairs built as real connectors |
+| [#19](https://github.com/Zetic/Backrooms-Prototype-Map/pull/19) | Milestone 3: two- and three-storey houses, sunken floors, galleries, the template's own stairs built as real connectors |
+| `claude/world-journeys` | Milestone 4: journeys between the bands, stacks of different fillers joined by stairs, ramps and ladders |
 
 Keep the atrium retired. Its large reserved box, repeated
 same-size rooms and single theme across a tall stack were poor demonstrations
@@ -91,13 +94,14 @@ spline smoothing and the removed organic layouts should not return.
 | Types and preferences | Rules in `TPL.CAT.CONNECTIONS` (width, slope range, headroom, landings). Templates set `vertical: { prefer: [...] }`; auto falls back down the list to the ladder. Lawns allow routes; other zones keep them off |
 | Template floors | Houses of two and three storeys (`storeys`, the `stack` plan); floor patterns on a finished building (`tpl/floors.js`): sunken floors with steps, galleries over an undercroft. Rooms carry a `floor` offset; a gallery has a level of its own. Tall ceilings still do not create floors by themselves |
 | Template stairs | Every source `vertical` becomes a real stair (`linkFloors`): a switchback per storey in a stairwell, steps into a sunken floor, a straight stair up to a gallery. A link that fits nowhere stays abstract and unresolved, with a warning |
-| Main world | `BR.BandWorld` wraps independently seeded horizontal networks. There are no generated physical connections between bands. Exports carry every layout's zones, unselected |
+| Main world | `BR.BandWorld` wraps independently seeded horizontal networks, joined by one journey per pair of neighbouring bands per 512 m region. Exports carry every other layout's zones, unselected |
+| Journeys | `src/journeys.js`: a bottom filler on the whole territory, 3-4 smaller fillers at about 4 m steps, a top filler 16 m up; each climb a connection variant with an exact rise; styles mixed, stairs, ramps, ladders; one validated blueprint with absolute heights |
 | World policy | Reference spacing 16 m; ordinary site envelope from band reference -1.5 m (a sunken floor to -1.25 m, plus slab) to +14.5 m. These are current planning policies, not universal floor heights |
 | Cutaway | Highest actual floor at or below the chosen height at each XY, uncovered lower floors shaded by depth, explicit floor holes reveal lower geometry |
 | Inspection | Continuous cut height plus exact local floor choices; the lab has type/rise controls, a zones view (of the storey in view) and table; the workbench has a tab per floor, draws the real stairs and labels sunken floors, and links to the lab |
 | Route drawing | Stairs/ramps piece by piece at their width: solid in view, blue dashed hidden below, violet dashed above. Ladders are an outline and hatch. Far landings are outlined both ways |
 | Reservations | Atomic owner-level prism index with protected voids. Stairs/ramps reserve one prism per 0.5 m of flight from just under the walking surface to headroom |
-| World export | `br.world-elevation/0.1`, canonical ownership/reservations/navigation and exact matching of physical portals. Three exported bands currently contain three separate horizontal networks |
+| World export | `br.world-elevation/0.1`, canonical ownership/reservations/navigation and exact matching of physical portals; `policy.verticalJourneys: 'composed'`, a `journeys` summary, and a journey's doors onto an unexported band in `verticalFrontier` |
 
 The ramp/overlap picture in `docs/cutaway-preview.png` uses
 `tests/cutaway-fixture.js`, a presentation fixture. It is not a selectable
@@ -198,18 +202,67 @@ floor at most per building; the lab builds templates with no wrongness, so
 the park's sunken pit shows in the workbench (wrongness slider), not the lab;
 map painting draws a stairwell as an abstract tread mark (it never adapts).
 
-## Next milestone: world journeys composed from templates
+## Milestone 4 as implemented
 
-Milestone 4 from the design: build sparse vertical journeys between the
-world's bands by matching successive templates' connection zones, with
-horizontal exploration on every floor between arrival and the next
-departure. The pieces are ready: every template offers zones up and down from
-its top and bottom storeys, away from its own stairs; multi-storey templates
-climb a band's height internally. Plan related footprints and protected voids
-together across bands before generating neighbours, keep generation order and
-cache eviction from changing ownership, and replace `verticalJourneys: 'none'`
-in the world export. Do not repeat one template through a stack, and do not
-fill reservations with repetitive rooms (the retired atrium).
+- `src/journeys.js` (`BR.JOURNEY`). `plan({seed, w, h})` decides a journey's
+  doors (three filler connections onto each band, ids `low0..`, `high0..`)
+  before anything is built; `generate({id, seed, w, h, lower, doors, style})`
+  builds every planned door or throws. Stages: a bottom filler on the whole
+  territory, then for each leg a connection variant of the stage
+  (`E.connectionVariant(f, {direction: 'up', type, rise, deferCapabilities})`,
+  one type at a time, in the style's order), its landing opened on a free side
+  (`elev:o:exit`), the next stage a smaller filler built against that side
+  (`nextArea`, with an `arrive` connection where the doorway is), and finally a
+  top filler on the territory less the last climb's footprint. Fillers come
+  from the pool with `floors: false` (no patterns inside a journey), used
+  fillers weighted 0, ceilings clamped under the next slab.
+- Rules enforced while choosing each leg: arrival to departure at least
+  max(6 m, 0.35 × the stage's longer side); the first climb at least
+  max(6 m, 0.25 × the territory's longer side) from every lower door, the last
+  landing 6 m from every upper door and its climb clear of them; no leg's
+  footprint over another's and starts at least 4 m apart; the next stage at
+  least 9 m a side, inside the territory less 2 m, preferring the side that
+  sits least over earlier stages. Styles: `JOURNEY.styleOf(spec)` when none is
+  given.
+- Composition (`placed`): ids prefixed `k<n>.`, XY shifted to the stage's
+  origin, Z to its height (walls, gaps, openings, portals with their `at`,
+  zones, columns, curves, connectors, reservations, holes, voids). Each landing's
+  exit replaces the next stage's `arrive` portal with a graph edge. Rooms are
+  banded by floor height. `E.refresh` derives the rest; `validate` must pass
+  except capabilities, which exports materialize.
+- `src/band-world.js`: `journeyPlan(lower, ri, rj)` (region of 4 × 4 cells,
+  even pairs west half, odd pairs east half, a rectangle ≥ 8 m inside a cell
+  and clear of both bands' border openings), `journey(p)` (cached, four
+  seeds), `plannedLots(n, i, j)` (reserved lots for the world's cell planner,
+  doors from the plan, nothing built), `buildTransition(site)` (binds only the
+  site's own band's doors), `standIn(p, n)` (an ordinary filler behind the same
+  doors when no journey fits), `nearestJourney(direction, x, y)`. The world's
+  existing reserved-lot path (`World` options `plannedLots`, `buildTransition`)
+  does the rest. The graph keys a transition's nodes by its blueprint's
+  `fillId`, so the one journey blueprint is emitted once across both bands.
+- `ladderVariant` finds ladder candidates even with deferred capabilities;
+  fillers and templates accept `floors: false`.
+- Map: teal journey territories at plan zoom, hover text, *Journey ↓ / ↑*
+  buttons. Lab: a journey per style, its climbs and stages in the report, its
+  route as the profile.
+
+Known limits: one journey per band pair per region, always one band tall; the
+journey's neighbours are planned round its rectangle, not its floors; no
+branches into a band partway up; ramps are rare outside the ramp style (they
+need 12-16 m of straight wall); a journey takes 0.2-0.3 s to build on
+average (up to about 0.9 s, over a second for the first while the code warms
+up), done in one piece when its site is first built, so the map stalls that
+long when one comes into detail view, and *Journey ↓ / ↑* builds the nearest
+one to make sure it exists; a landing and the stage beside it each keep their
+own wall on the line between them (with matching openings).
+
+## Next milestone: Unreal consumer proof
+
+Milestone 5 from the design: a small consumer that reconstructs floors, walls,
+slabs, openings, connection areas and protected voids from the world export,
+and agrees width, headroom, slopes and traversal with the game. The export is
+now a connected multi-band network: a three-band export of the two
+neighbouring cells holding a region's two journeys is one walkable component.
 
 ## Presentation issue from the milestone-1 review (fixed)
 
@@ -235,7 +288,8 @@ follows actual floors.
 | `src/tpl/floors.js` | Floor patterns on a finished building: sunken floors, galleries |
 | `src/tpl/elevation-view.js` | Cutaway plans/cache, floor visibility, connection/zone drawing and route profile |
 | `src/elevation-lab.js`, `elevation.html` | Direction/type/rise selection, height/exact-floor controls, capability/link/zone reports and export |
-| `src/band-world.js` | Band networks, placement offsets, ownership, portal graph and canonical world export |
+| `src/journeys.js` | Journeys: door plans, stage fillers, legs with exact rises, composition into one blueprint |
+| `src/band-world.js` | Band networks, journey plans and slices, placement offsets, ownership, portal graph and canonical world export |
 | `src/render.js`, `index.html` | Actual map tile painting/cache and map interaction/selected-template inspection |
 | `workbench.html` | Template/filler workshop and local floor inspection |
 
@@ -256,15 +310,19 @@ Full regression command:
 node tests/run-all.js
 ```
 
-Milestone 3 passes the full suite (364 checks), including five horizontal-world
+Milestone 4 passes the full suite (373 checks), including five horizontal-world
 seeds, every template/filler family's up/down potential
-(`tests/elevation.test.js`), `tests/connections.test.js` and
-`tests/floors.test.js` (storeys, sunken floors, galleries, template stairs,
-exits, the tower test, world placement and workbench drawing).
+(`tests/elevation.test.js`), `tests/connections.test.js`, `tests/floors.test.js`
+(storeys, sunken floors, galleries, template stairs, exits, the tower test),
+`tests/journeys.test.js` (24 journeys over every style: exact rises, different
+fillers, no shafts, each floor crossed, planned doors, walks both ways) and
+`tests/band-world.test.js` (three bands one network, order and eviction,
+stand-ins). The world's streaming-speed check (under 5 ms a site) runs close
+to its limit on seed 4242 on main as well, and can fail on a busy machine.
 Native canvas pixel checks and actual-map tile reuse were also checked. DOM and
 canvas adapters exercise controllers; they are not complete browser-layout QA.
 
-For vertical changes, begin with `tests/elevation.test.js`, `tests/connections.test.js`, `tests/floors.test.js`, `tests/cutaway.test.js`,
+For vertical changes, begin with `tests/elevation.test.js`, `tests/connections.test.js`, `tests/floors.test.js`, `tests/journeys.test.js`, `tests/cutaway.test.js`,
 `tests/elevation-ui.test.js`, `tests/band-world.test.js` and
 `tests/band-render.test.js`. Use the full runner before publishing generation
 changes. Add meaningful cases for actual zones/types, endpoint failures and

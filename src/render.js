@@ -18,14 +18,14 @@
 
   const BG = '#3b3934';
   const LOD = { detail: 1, plan: 0.12, labels: 7 };
-  const PLAN = { site: [138, 128, 104], lot: [152, 132, 96], poi: [196, 160, 104], line: 'rgba(30,27,24,0.55)' };
+  const PLAN = { site: [138, 128, 104], lot: [152, 132, 96], poi: [196, 160, 104], journey: [126, 156, 154], line: 'rgba(30,27,24,0.55)' };
   const COL = { route: '#e8913a', loop: '#3fb6bf', cross: '#e0609a', portal: '#3fbf6f', hover: 'rgba(255,255,255,0.95)', outline: 'rgba(255,255,255,0.35)' };
   const now = () => (typeof performance !== 'undefined' ? performance : Date).now();
   const css = (c) => 'rgb(' + c.map((v) => Math.round(v)).join(',') + ')';
 
   /** a plan-view tone for a site: a little darker the more enclosed its biome, a touch of noise per site */
   function planTone(s) {
-    const base = s.kind !== 'filler' ? PLAN.lot : PLAN.site, k = 0.86 + 0.18 * s.openness + ((s.seed & 255) / 255 - 0.5) * 0.06;
+    const base = s.kind === 'transition' ? PLAN.journey : s.kind !== 'filler' ? PLAN.lot : PLAN.site, k = 0.86 + 0.18 * s.openness + ((s.seed & 255) / 255 - 0.5) * 0.06;
     return css(base.map((v) => Math.min(255, v * k)));
   }
 

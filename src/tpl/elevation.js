@@ -241,7 +241,10 @@
     if (!['up', 'down'].includes(dir)) throw new Error('connection direction must be up or down');
     const delta = o.rise === undefined ? 8 : o.rise;
     if (!Number.isFinite(delta) || delta < 3) throw new Error('ladder landing separation must be at least 3 m');
-    const b = prepare(source, o), candidates = b.capabilities[dir].candidates;
+    const b = prepare(source, o);
+    // a lean caller (deferCapabilities) still needs the ladder's own candidates, not every zone
+    if (b.capabilities[dir].deferred) b.capabilities = capabilities(b, { zones: [] });
+    const candidates = b.capabilities[dir].candidates;
     const rooms = new Map(b.rooms.map((r) => [r.id, r]));
     for (const p of candidates) {
       const trial = clone(b), host = rooms.get(trial.surfaces.find((s) => s.id === p.surface).room);

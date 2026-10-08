@@ -476,7 +476,7 @@
     poisIn(x0, y0, x1, y1) { return this.sitesIn(x0, y0, x1, y1).flatMap((s) => s.pois.filter((P) => P.bbox[0] < x1 && P.bbox[2] > x0 && P.bbox[1] < y1 && P.bbox[3] > y0)); }
     /** the filler that builds a site: the pool's pick with the biome's weights, the yard for a lot, none for a flush lot */
     fillerOf(site) {
-      if (site.kind === 'transition') return 'terraced_atrium';
+      if (site.kind === 'transition') return 'journey';
       if (site.kind === 'flush') return null;
       if (site.kind === 'lot') return 'yard';
       if (!site._filler) site._filler = FILL.pick({ seed: site.seed, site: { rects: local(site.rects, site.bbox[0], site.bbox[1]) }, weights: fillerWeights(site.openness) });

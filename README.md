@@ -93,6 +93,13 @@ living rooms and hall floors with steps down, and galleries along tall halls
 (`docs/elevation.md`, milestone 3). The workbench shows a tab per floor and
 draws the stairs.
 
+Bands are joined by journeys (milestone 4): in every 512 m region, one
+territory climbs to the band above and another to the band below. A journey
+is a stack of different templates, each a floor of its own about 4 m above
+the last, joined by stairs, ramps or ladders, with a floor to cross between
+each climb and the next. Some journeys lean to ramps, some to ladders, some
+to stairs; the largest share (4 in 9) take each floor's own preference.
+
 Open [the elevation lab](elevation.html) to inspect actual floors, continuous
 cutaway heights and the connection zones of every template and filler: where a
 ladder, stair or ramp fits up or down, and a connected variant of any of them
@@ -113,13 +120,11 @@ uses band controls, a continuous cut height, and template-specific inspection.
 | Wheel / pinch / `+` / `-` | Zoom. Blueprints from 1 px/m, room labels in POIs from 7 px/m |
 | Go to | Enter `x, y` |
 | Site outlines / Connection graph | Show the sites and the graph between them |
-| Band controls | Inspect an independently generated horizontal band |
+| Band controls | Inspect another horizontal band (each generated independently, joined by journeys) |
+| Journey ↓ / Journey ↑ | Centre the view on the nearest journey down or up from the active band |
 | Cutaway height | Highest floor below the cut at each XY; lower floors shaded by depth |
 | Click a template | Its actual floor choices, focused upper-floor ghosting and JSON export |
-| Hover | The site's template, size, connections, biome and build time; the POI, its setting and its doors |
-
-The atrium is currently removed; world bands remain separate until replacement
-vertical journeys are implemented. See [the current plan](docs/elevation.md).
+| Hover | The site's template, size, connections, biome and build time; the POI, its setting and its doors; a journey's bands, style and floors |
 
 The URL hash keeps the seed, position, zoom, band, cut height and toggles, for example
 `#seed=31337&x=20&y=70&z=9&graph=1`.
@@ -137,7 +142,8 @@ The URL hash keeps the seed, position, zoom, band, cut height and toggles, for e
 | `tpl/elevation.js`, `tpl/elevation-view.js`, `elevation-lab.js` | Stacked surfaces, reservations, ladder variants, validation, cutaway, JSON renderer and standalone lab |
 | `tpl/connections.js` | Connection zones (ladder, stair, ramp), template preferences, slope-following reservations, `connectionVariant`, and `linkFloors` (a template's own stairs between its floors) |
 | `tpl/floors.js` | Floor patterns on a finished building: sunken floors with steps, galleries over an undercroft |
-| `band-world.js` | Deterministic reference-band networks, spatial reservations, exact portal matching and canonical world export |
+| `journeys.js` | Vertical journeys: different fillers stacked from one band's floor to the next, joined by connection variants with exact rises |
+| `band-world.js` | Deterministic reference-band networks, journey plans across band pairs, spatial reservations, exact portal matching and canonical world export |
 
 ```js
 const W = new BR.World(31337);
@@ -185,6 +191,13 @@ The runner checks:
   over an undercroft with headroom, reached by a stair up a side wall; every
   template stair is built, or stays abstract with a warning where nothing
   fits; exits up and down keep away from where those stairs arrive.
+- **Journeys.** Every journey climbs exactly 16 m through floors of different
+  fillers, never stacks one climb over another, makes you cross each floor
+  between arriving and leaving, builds exactly the doors the world planned,
+  and is walkable from either band. Styles tilt the climbs. In the world,
+  neighbouring bands become one network, whichever band is generated first and
+  whatever the caches drop; a journey that cannot be built leaves an ordinary
+  filler behind the same doors.
 - **Fillers.** Every filler keeps the contract on any site shape and honours
   every connection. The pool leans enclosed, and fillers are fast.
 - **The world, on five seeds.** Sites tile every cell exactly. Connections are
