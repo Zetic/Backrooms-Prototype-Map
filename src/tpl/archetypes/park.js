@@ -10,6 +10,7 @@
  * pillars: { p (chance of any), every (grid spacing), size, pad (m) }.
  * seats: how many bench spots. ceiling: the hall's (m).
  * vertical: preferred connection types (a long ramp first: the park is big enough).
+ * floors: the pit (wrongness) is a real sunken floor, with steps down into it.
  */
 (function (root) {
   'use strict';
@@ -26,6 +27,7 @@
     seats: [1, 4],
     ceiling: [4.5, 7],
     vertical: { prefer: ['ramp', 'stair', 'ladder'] },
+    floors: { sunken: { zones: ['pit'], depth: [0.6, 1.25] } },
     wrongness: 0.15
   });
 })(typeof window !== 'undefined' ? window : globalThis);

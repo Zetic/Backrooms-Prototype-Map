@@ -183,7 +183,7 @@
 
   // ------------------------------------------------------------ loop hall
   FILL.register({
-    id: 'loop_hall', name: 'Loop hall', feel: 'mixed', weight: 3,
+    id: 'loop_hall', floors: { gallery: { p: 0.4, rooms: ['hall'] } }, name: 'Loop hall', feel: 'mixed', weight: 3,
     blurb: 'A wide 3-5 m hall in an L, U or ring round a block of 2-4 rooms that open off it, closing into a loop; solid or a little warren outside.',
     doors: { opening: 0.6, door: 0.3, wide: 0.1 }, loops: 0.1,
     fits: (S) => Math.min(...dims(S)) >= 20,
@@ -444,7 +444,7 @@
 
   // ------------------------------------------------------------ office remnant
   FILL.register({
-    id: 'office', name: 'Office remnant', feel: 'mixed', weight: 2,
+    id: 'office', floors: { gallery: { p: 0.2, rooms: ['hall'] }, sunken: { p: 0.2, rooms: ['hall'], size: [3, 5], depth: [0.45, 0.75] } }, name: 'Office remnant', feel: 'mixed', weight: 2,
     blurb: 'A big room scattered with short partition stubs in loose rows, like cubicles taken out, and a few small offices along one or two edges.',
     doors: { opening: 0.5, door: 0.4, wide: 0.1 }, loops: 0.15,
     fits: (S) => Math.min(...dims(S)) >= 20,
@@ -562,7 +562,7 @@
 
   // ------------------------------------------------------------ scattered pillars
   FILL.register({
-    id: 'scattered_pillars', name: 'Scattered pillars', feel: 'open', weight: 2,
+    id: 'scattered_pillars', floors: { gallery: { p: 0.2, rooms: ['hall'] }, sunken: { p: 0.25, rooms: ['hall'], size: [3.5, 6], depth: [0.6, 1.2] } }, name: 'Scattered pillars', feel: 'open', weight: 2,
     blurb: 'A big room with small 0.5-1 m pillars at random, non-grid spacing, thicker in places, and a notched edge.',
     doors: { opening: 0.65, wide: 0.35 }, loops: 0.3,
     fits: (S) => Math.min(...dims(S)) >= 18,

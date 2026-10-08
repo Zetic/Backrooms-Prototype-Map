@@ -10,6 +10,9 @@
  *               L      public bar, private wing going back
  *               deep   public in front, private behind (narrow sites)
  *               split  [master suite][public][bedrooms]
+ *               stack  two or three storeys over one footprint: public
+ *                      rooms below, bedrooms above, a stair core up one
+ *                      side (archetype.storeys)
  *   public    recursive slicing: entry-facing rooms (foyer, living) toward
  *             the main side, service rooms (mudroom, laundry, kitchen)
  *             toward the garage
@@ -38,7 +41,7 @@
   // into the more private room), the window each wants to the outside, and
   // that a closet in a house is a private, narrow, slightly taller one.
   // minW / maxAsp in units of the largest rect; win: window rule (units).
-  const T = TPL.CAT.types(['foyer', 'living', 'family', 'dining', 'kitchen', 'office', 'bedroom', 'master', 'bath', 'ensuite', 'closet', 'wic', 'linen', 'hall', 'laundry', 'mudroom', 'pantry', 'utility', 'garage'], {
+  const T = TPL.CAT.types(['foyer', 'living', 'family', 'dining', 'kitchen', 'office', 'bedroom', 'master', 'bath', 'ensuite', 'closet', 'wic', 'linen', 'hall', 'laundry', 'mudroom', 'pantry', 'utility', 'garage', 'stairwell'], {
     foyer: { privacy: 1 },
     living: { privacy: 1, win: { w: [3, 5], every: 9, max: 3, need: 1 } },
     family: { privacy: 1, win: { w: [3, 4], every: 9, max: 2, need: 1 } },
@@ -57,7 +60,8 @@
     mudroom: { privacy: 2 },
     pantry: { privacy: 6 },
     utility: { privacy: 4 },
-    garage: { privacy: 2, win: { w: [2, 2], every: 16, max: 1, sill: 1.2 } }
+    garage: { privacy: 2, win: { w: [2, 2], every: 16, max: 1, sill: 1.2 } },
+    stairwell: { privacy: 0 }
   });
   const ORDER = ['foyer', 'living', 'family', 'dining', 'kitchen', 'pantry', 'laundry', 'mudroom', 'office', 'master', 'bedroom', 'bath', 'linen'];
   // slicing keys: toward the street / toward the service (garage) side
@@ -97,6 +101,7 @@
     P.closets = arch.closets === undefined ? 0.6 : arch.closets;
     P.backDoor = arch.backDoor === undefined ? 0.6 : arch.backDoor;
     P.sideDoor = arch.sideDoor === undefined ? 0.25 : arch.sideDoor;
+    P.storeys = arch.storeys ? (Array.isArray(arch.storeys) ? rng.int(arch.storeys[0], arch.storeys[1]) : arch.storeys) : 1;
     // program-stage wrongness
     if (ctx.mut.has('twin')) {
       const pick = rng.pick(P.rooms.filter((e) => ['kitchen', 'bath', 'living', 'dining'].indexOf(e.type) >= 0));
@@ -443,8 +448,8 @@
    */
   function portals(B, P, ctx, rng, info) {
     const { W, H } = ctx.site, rooms = B.rooms, OUT = TPL.OUTSIDE;
-    const R = new TG.Raster(W, H, -1);
-    rooms.forEach((rm, i) => { for (const r of rm.rects) R.fill(r, i); });
+    const R = new TG.Raster(W, H, -1), ground = (i) => !rooms[i].level;
+    rooms.forEach((rm, i) => { if (ground(i)) for (const r of rm.rects) R.fill(r, i); });
     const clearRow = (x0, x1, y) => y < 0 || y >= H || R.all([x0, y, x1, y + 1], -1);
     const clearCol = (x, y0, y1) => x < 0 || x >= W || R.all([x, y0, x + 1, y1], -1);
     const yF = info.yF;
@@ -452,7 +457,7 @@
     let door = null;
     for (const type of ['foyer', 'living', 'family', 'dining', 'hall', 'office', 'kitchen']) {
       for (let i = 0; i < rooms.length && !door; i++) {
-        if (rooms[i].type !== type) continue;
+        if (rooms[i].type !== type || !ground(i)) continue;
         for (const r of rooms[i].rects) {
           if (r[3] !== yF || r[2] - r[0] < 4 || !clearRow(r[0], r[2], yF)) continue;
           const dw = r[2] - r[0] >= 9 && rng.f() < 0.2 ? 3 : 2;
@@ -475,7 +480,7 @@
       let back = null;
       for (const type of ['kitchen', 'laundry', 'mudroom', 'dining', 'family', 'utility', 'living']) {
         for (let i = 0; i < rooms.length && !back; i++) {
-          if (rooms[i].type !== type) continue;
+          if (rooms[i].type !== type || !ground(i)) continue;
           for (const r of rooms[i].rects) if (r[2] - r[0] >= 4 && clearRow(r[0], r[2], r[1] - 1)) { back = i; break; }
         }
         if (back !== null) break;
@@ -488,7 +493,7 @@
     // ---- side exit (garage / mudroom / laundry / kitchen)
     if (rng.f() < P.sideDoor) {
       for (const type of ['garage', 'mudroom', 'laundry', 'utility', 'kitchen']) {
-        const i = rooms.findIndex((rm) => rm.type === type);
+        const i = rooms.findIndex((rm) => rm.type === type && !rm.level);
         if (i < 0) continue;
         const r = rooms[i].rects[0];
         const side = clearCol(r[0] - 1, r[1], r[3]) ? 'W' : clearCol(r[2], r[1], r[3]) ? 'E' : null;
@@ -511,29 +516,36 @@
       const pref = ['mudroom', 'laundry', 'utility', 'kitchen', 'hall', 'dining', 'family', 'foyer', 'pantry', 'living'];
       let best = null;
       B.rooms.forEach((rm, i) => {
-        if (i === info.garage) return;
+        if (i === info.garage || rm.level) return;
         const k = pref.indexOf(rm.type);
         if (k < 0 || touch(g.rects, rm.rects) < 4) return;
         if (!best || k < best.k) best = { i, k };
       });
       if (best) B.conn(info.garage, best.i, 'door', { into: best.i, prio: 8, required: true });
     }
-    // ceilings
+    // ceilings; a storey's rooms keep under the floor above (its slab included)
+    const L = info.levels || 1, LH = info.levelHeights || [], top = L - 1;
     B.rooms.forEach((rm) => {
       const c = T[rm.type].ceil;
       if (c) rm.ceiling = Math.round(rng.range(c[0], c[1]) * 10) / 10;
+      if ((rm.level || 0) < top) rm.ceiling = Math.min(rm.ceiling || 2.5, Math.round((LH[rm.level || 0] - 0.3) * 10) / 10);
     });
     if (ctx.mut.has('ceiling')) {
-      const cands = B.rooms.filter((rm) => ['living', 'hall', 'bedroom', 'kitchen', 'dining', 'bath'].indexOf(rm.type) >= 0);
+      // a tall one only where nothing stands above it
+      const cands = B.rooms.filter((rm) => ['living', 'hall', 'bedroom', 'kitchen', 'dining', 'bath'].indexOf(rm.type) >= 0 && (rm.level || 0) === top);
       const rm = rng.pick(cands);
       if (rm) { rm.ceiling = rng.f() < 0.5 ? 1.9 : Math.round(rng.range(5, 7) * 10) / 10; rm.tags = (rm.tags || []).concat('wrong:ceiling'); }
     }
     if (ctx.mut.has('stairs')) {
       // a staircase that climbs into the ceiling: a vertical link with nothing above
-      const i = B.rooms.findIndex((rm) => rm.type === 'hall') >= 0 ? B.rooms.findIndex((rm) => rm.type === 'hall') : B.rooms.findIndex((rm) => rm.type === 'living');
+      // (in a house of several storeys, on its top floor)
+      const at = (type) => B.rooms.findIndex((rm) => rm.type === type && (rm.level || 0) === top);
+      const i = at('hall') >= 0 ? at('hall') : at('living');
       if (i >= 0) { B.verticals.push({ kind: 'stair', rooms: [i], dead: true, tags: ['wrong:stairsToNowhere'] }); B.rooms[i].tags = (B.rooms[i].tags || []).concat('wrong:stairsToNowhere'); }
     }
-    return { W: ctx.site.W, H: ctx.site.H, levels: 1, rooms: B.rooms, conns: B.conns, verticals: B.verticals, meta: Object.assign({ front: info.yF }, meta) };
+    const out = { W: ctx.site.W, H: ctx.site.H, levels: L, rooms: B.rooms, conns: B.conns, verticals: B.verticals, meta: Object.assign({ front: info.yF }, meta) };
+    if (info.levelHeights) out.levelHeights = info.levelHeights.slice();
+    return out;
   }
   function garageRect(Rg, gar, x, yT, rng) {
     const top = Math.max(yT, Rg[3] - gar.d);
@@ -680,8 +692,90 @@
     return finish(B, P, ctx, rng, { yF, garage: -1, garDoor: 0 }, { type: 'split' });
   }
 
-  const PLANS = { bar: planBar, L: planL, deep: planDeep, split: planSplit };
+  /**
+   * Two or three storeys over one footprint. A stair core runs front to back
+   * up one side: the foyer at the front, a stairwell (2 m by 4.5 m: room for
+   * a switchback, fitted by the elevation layer) behind it on the outer wall,
+   * a hallway beside the stairwell. The stairwell and the hallway repeat on
+   * every floor; upstairs the hallway also spans the foyer. The rest of the
+   * footprint holds the public rooms on the ground floor and the bedrooms
+   * above; a third floor takes the master suite (and a study) on a smaller
+   * footprint against the core. A garage stays single-storey, beside.
+   * Upper floors keep the ground floor's walls where they stand over them.
+   */
+  function planStack(P, ctx, rng) {
+    const A = ctx.arch, Rg = region(ctx, rng, false), n = Math.max(2, Math.min(3, P.storeys));
+    const BW = TG.rw(Rg), BD = TG.rh(Rg), gar = garageDims(P, rng);
+    const { pub, priv } = groups(P);
+    const pubItems = pub.filter((e) => e.type !== 'foyer');
+    let up1 = priv, up2 = [];
+    if (n === 3) {
+      up2 = priv.filter((e) => e.type === 'master' || e.type === 'office');
+      up1 = priv.filter((e) => up2.indexOf(e) < 0);
+      if (!up2.length || !up1.length) return why(ctx, 'stack:floors');
+    }
+    const hw = Math.max(2, P.hallW), cw = 4 + hw;
+    const D = Math.min(BD, U(rr(rng, A.depth || [8, 10])));
+    if (D < 16) return why(ctx, 'stack:shallow');
+    const Wz = Math.max(10, Math.ceil(sumA(pubItems) / D), Math.ceil(privArea(P, up1) / D), runNeed(P, up1, D));
+    let gw = gar ? gar.w : 0;
+    if (cw + Wz + gw > BW) gw = 0;
+    if (cw + Wz > BW) return why(ctx, 'stack:narrow');
+    const coreLeft = rng.f() < 0.5, garLeft = !coreLeft;
+    const x0 = Rg[0] + Math.round((BW - cw - Wz - gw) * rng.range(0.2, 0.8)) + (gw && garLeft ? gw : 0);
+    const yF = Rg[3], yT = yF - D;
+    const core = coreLeft ? [x0, yT, x0 + cw, yF] : [x0 + Wz, yT, x0 + Wz + cw, yF];
+    const Z = coreLeft ? [x0 + cw, yT, x0 + cw + Wz, yF] : [x0, yT, x0 + Wz, yF];
+    // the core, front to back: foyer, stairwell (front end at the foyer), anything left behind it
+    let fd = rng.int(4, 6), back = D - fd - 9;
+    if (back > 0 && back < 3) { fd += back; back = 0; }
+    if (back < 0 || fd > 8) return why(ctx, 'stack:core');
+    const sx0 = coreLeft ? core[0] : core[2] - 4, hx0 = coreLeft ? core[0] + 4 : core[0], sY1 = yF - fd, sY0 = sY1 - 9;
+    const S = [sx0, sY0, sx0 + 4, sY1], strip = [hx0, yT, hx0 + hw, sY1], front = [core[0], sY1, core[2], yF], behind = back ? [sx0, yT, sx0 + 4, sY0] : null;
+    const B = makeBuilder(ctx), atLevel = (n0, lv) => { for (let k = n0; k < B.rooms.length; k++) B.rooms[k].level = lv; };
+    const stairs = [], toEnd = [sx0 + 2, sY1];
+    // ---- ground floor
+    const foyer = B.add('foyer', [front]);
+    stairs.push(B.add('stairwell', [S]));
+    B.add('hall', [strip]);
+    B.conn(stairs[0], foyer, 'opening', { w: 2, near: toEnd, prio: 8, required: true });
+    if (behind) {
+      const li = pubItems.findIndex((e) => ['laundry', 'mudroom', 'pantry'].indexOf(e.type) >= 0 && T[e.type].minW <= Math.min(4, back));
+      if (li >= 0) { const e = pubItems.splice(li, 1)[0]; B.add(e.type, [behind], { target: e.area, tags: e.tags }); }
+      else B.add('bath', [behind], { tags: ['powder room'] });
+    }
+    let gi = -1;
+    if (gw) {
+      const gx = garLeft ? x0 - gw : x0 + cw + Wz;
+      gi = B.add('garage', [[gx, Math.max(yT, yF - gar.d), gx + gw, yF]]);
+    }
+    if (!layoutPublic(B, Z, pubItems, gw ? (garLeft ? 'W' : 'E') : (rng.f() < 0.5 ? 'W' : 'E'), rng)) return why(ctx, 'stack:public');
+    // ---- upper floors: the stairwell and the hallway again, rooms beside them
+    const attach = coreLeft ? 'W' : 'E';
+    for (let lv = 1; lv < n; lv++) {
+      const n0 = B.rooms.length, list = lv === 1 ? up1 : up2;
+      const st = B.add('stairwell', [S]);
+      const hall = B.add('hall', [strip, front]);
+      if (behind) B.add(back >= 4 && lv === 1 ? 'bath' : 'linen', [behind]);
+      B.conn(st, hall, 'opening', { w: 2, near: toEnd, prio: 8, required: true });
+      stairs.push(st);
+      // the top of a three-storey house is smaller: only what its rooms need, against the core
+      let Zl = Z;
+      if (lv === 2) {
+        const need = Math.min(Wz, Math.max(8, Math.ceil(privArea(P, list) / D), runNeed(P, list, D)));
+        Zl = coreLeft ? [Z[0], yT, Z[0] + need, yF] : [Z[2] - need, yT, Z[2], yF];
+      }
+      if (!layoutPrivate(B, Zl, attach, [yT, yF], list, P, rng)) return why(ctx, 'stack:floor' + lv);
+      atLevel(n0, lv);
+    }
+    B.verticals.push({ kind: 'stair', rooms: stairs, shape: 'switchback', tags: ['stairwell'] });
+    const heights = [3.2, 3, 3].slice(0, n);
+    return finish(B, P, ctx, rng, { yF, garage: gi, garDoor: gar ? gar.door : 0, levels: n, levelHeights: heights }, { type: 'stack', storeys: n });
+  }
+
+  const PLANS = { bar: planBar, L: planL, deep: planDeep, split: planSplit, stack: planStack };
   function layout(P, ctx, rng) {
+    if (P.storeys > 1) return planStack(P, ctx, rng);
     const w = Object.assign({}, ctx.arch.plans || { bar: 1 });
     const type = rng.weighted(w);
     return PLANS[type] ? PLANS[type](P, ctx, rng) : null;
@@ -689,7 +783,7 @@
   function fallback(P, ctx, rng) {
     // trim the program to the essentials and try every plan type a few times
     const Q = Object.assign({}, P, { rooms: P.rooms.filter((e) => ['living', 'kitchen', 'bath', 'bedroom', 'master'].indexOf(e.type) >= 0).slice(0, 5), garage: null });
-    for (let k = 0; k < 40; k++) for (const f of [planDeep, planBar]) { const p = f(Q, ctx, rng); if (p) return p; }
+    for (let k = 0; k < 40; k++) for (const f of P.storeys > 1 ? [planStack] : [planDeep, planBar]) { const p = f(Q, ctx, rng); if (p) return p; }
     return null;
   }
 
@@ -719,6 +813,7 @@
   }
   const CIRC = { hall: 1, foyer: 1, living: 2, dining: 2, family: 2, kitchen: 3, mudroom: 3, laundry: 4, utility: 4 };
   function autoPenalty(u, v) {
+    if (u.type === 'stairwell' || v.type === 'stairwell') return Infinity;   // a stairwell opens where the stair arrives, nowhere else
     if (v.type === 'closet' || v.type === 'wic' || v.type === 'ensuite' || u.type === 'closet' || u.type === 'wic' || u.type === 'linen' || u.type === 'pantry') return Infinity;
     const cu = CIRC[u.type], cv = CIRC[v.type];
     if (u.type === 'garage' || v.type === 'garage') return (cu || cv) ? 5 : 14;
@@ -734,7 +829,7 @@
     let per = 0;
     for (const r of rm.rects) per += 2 * (TG.rw(r) + TG.rh(r));
     per -= touch(rm.rects, rm.rects);
-    for (const o of rooms) if (o !== rm) per -= touch(rm.rects, o.rects);
+    for (const o of rooms) if (o !== rm && (o.level || 0) === (rm.level || 0)) per -= touch(rm.rects, o.rects);
     return per;
   }
   function quickScore(plan, ctx) {
@@ -752,7 +847,8 @@
     if (n) t += (err / n) * 25;
     for (const k of byType('kitchen')) if (!byType('dining').concat(byType('family')).some((d) => touch(k.rects, d.rects) >= 4) && byType('dining').length) t += 6;
     for (const h of byType('hall')) {
-      const ok = rooms.some((r) => ['living', 'foyer', 'dining', 'family'].indexOf(r.type) >= 0 && touch(h.rects, r.rects) >= 2);
+      if (h.level) continue;                       // an upstairs hallway opens off the stair, not the living rooms
+      const ok = rooms.some((r) => ['living', 'foyer', 'dining', 'family'].indexOf(r.type) >= 0 && !r.level && touch(h.rects, r.rects) >= 2);
       if (!ok) t += 5;
     }
     const lv = byType('living')[0];

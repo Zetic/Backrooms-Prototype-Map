@@ -442,7 +442,9 @@
       id: 'p' + i, opening: 'o' + p.opening, level: p.level, room: id(p.room), role: p.role, kind: p.kind,
       side: O.side(p.side), width: m(res.openings[p.opening].s1 - res.openings[p.opening].s0), clear: p.clear, main: p.main, tags: p.tags
     }));
-    const verticals = (res.plan.verticals || []).map((v, i) => ({ id: 'v' + i, kind: v.kind, rooms: v.rooms.map(id), dead: !!v.dead, tags: v.tags || [] }));
+    // a vertical's hints for the elevation layer (shape, types, walled, local) pass through
+    const hints = (v) => { const h = {}; for (const k of ['shape', 'types', 'walled', 'local']) if (v[k] !== undefined) h[k] = v[k]; return h; };
+    const verticals = (res.plan.verticals || []).map((v, i) => Object.assign({ id: 'v' + i, kind: v.kind, rooms: v.rooms.map(id), dead: !!v.dead, tags: v.tags || [] }, hints(v)));
     const footprint = [];
     for (let lv = 0; lv < res.L; lv++) footprint.push({ level: lv, rects: TG.rectsWhere(res.R[lv], (v) => v >= 0).map(Rm) });
     const graph = { nodes: outRooms.map((r) => r.id).concat('outside'), edges: [] };
@@ -474,7 +476,9 @@
     const engine = TPL.engines[arch.engine];
     if (!engine) throw new Error('unknown engine ' + arch.engine);
     // a composite engine builds other templates and merges them (tpl/composite.js)
-    if (engine.composite) return TPL.compose(spec, arch, engine);
+    // floors at other heights (tpl/floors.js) are laid on the finished building
+    const floors = (b) => (arch.floors && BR.FLOORS && !b.error ? BR.FLOORS.apply(b, arch.floors, spec.seed >>> 0, arch.id) : b);
+    if (engine.composite) return floors(TPL.compose(spec, arch, engine));
     const seed = spec.seed >>> 0, ah = TG.hashStr(arch.id);
     const approach = spec.approach || 'S';
     const site = makeSite(spec, arch, seed, ah, approach);
@@ -525,6 +529,7 @@
       ms: 0
     };
     const b = output(res, ctx, meta);
+    floors(b);
     meta.ms = Math.round((now() - t0) * 10) / 10;
     Object.defineProperty(b, '_debug', { value: { res, ctx }, enumerable: false });
     return b;

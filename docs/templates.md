@@ -86,8 +86,10 @@ into `br.elevation/0.2` without mutating it. Every template and filler receives
 physical up/down connection zones through that common adapter: a ladder/hatch
 always, and stairs or ramps where its rooms fit them (`src/tpl/connections.js`). Bands,
 actual floor heights, shared reservations, and connected variants are described
-in [the elevation implementation plan](elevation.md). Existing abstract vertical
-links require authored XYZ paths before they are complete elevation exports.
+in [the elevation implementation plan](elevation.md). The adapter also builds the
+template's own stairs: every `vertical` becomes a real stair or steps between
+the actual floors it joins (`linkFloors`); one that fits nowhere stays an
+abstract, unresolved link with a warning.
 
 Lengths are in metres in the site frame. Ids are stable within a building.
 
@@ -95,13 +97,13 @@ Lengths are in metres in the site frame. Ids are stable within a building.
 |---|---|
 | `schema, engine, archetype, name, seed, approach, grid` | identity |
 | `site` | `{ w, h, rects }`: the allowance |
-| `levels[]` | `{ index, elevation, height }`; there is at least one |
+| `levels[]` | `{ index, elevation, height }`; there is at least one. A storey of a house, or a gallery's own floor (tpl/floors.js) |
 | `footprint[]` | `{ level, rects }`: built cells per level |
-| `rooms[]` | `{ id, type, name, zone, level, rects, area, ceiling, tags, parent, part? }`. `zone`: public, private, service or circulation. `tags` describe what the room is for (`kitchen`, `wet`, `sleeping`, `storage`, `vehicle`…, plus `wrong:*` for mutations). `parent`: the owning room of closets, ensuites and stalls. `part`: in a composite template, the part (`parts[]`) the room belongs to, `null` for the composite's own rooms |
+| `rooms[]` | `{ id, type, name, zone, level, rects, area, ceiling, tags, parent, part? }`. `zone`: public, private, service or circulation. `tags` describe what the room is for (`kitchen`, `wet`, `sleeping`, `storage`, `vehicle`…, plus `wrong:*` for mutations). `parent`: the owning room of closets, ensuites and stalls (and of a sunken floor, a gallery or an undercroft: the room it was cut from). `part`: in a composite template, the part (`parts[]`) the room belongs to, `null` for the composite's own rooms. `floor` (optional, m): the room's floor offset from its level, such as `-0.6` for a sunken floor; its `ceiling` is measured from that floor |
 | `walls[]` | `{ id, level, kind, a, b, rooms [idA, idB], thickness }`. `kind`: `exterior` (one side is the backrooms; that room id is `null`), `interior`, `open` (a boundary with no wall), `facade` (in a composite template: a part's outer wall against the composite's own rooms, such as a house front onto its yard; both room ids are set, thickness as exterior) |
 | `openings[]` | `{ id, level, wall, kind, a, b, width, rooms, swingInto, hinge, height \| sill+head, portal, part?, tags? }`. `kind`: `door`, `double`, `opening` (cased, no leaf), `slider`, `vehicle` (garage/roller door), `window`, `false` (a door on a wall that leads nowhere). In a composite, `part` names the part it came from, and a part's former portal keeps its tags (`front door`, `garage door`) |
 | `portals[]` | `{ id, opening, level, room, role, kind, side, width, clear, main, tags }`. Where the POI meets the backrooms. `role`: `entrance`, `exit` or `both`. `main` marks the main entrance. `clear`: metres of open floor the world must keep in front |
-| `verticals[]` | `{ id, kind, rooms: [bottom → top], dead, tags }`: stairs, lifts, ladders linking stacked rooms. `dead: true` means it leads nowhere (a mutation) |
+| `verticals[]` | `{ id, kind, rooms: [bottom → top], dead, tags, shape?, types?, walled?, local? }`: stairs, lifts, ladders linking stacked rooms (a stairwell's storeys), or a floor and one beside it at another height (`local`: a sunken floor), or a hall and its gallery. `dead: true` means it leads nowhere (a mutation). The hints tell the elevation layer what to build: `shape` (`switchback`, `straight`) to try first, `types` in order, `walled` (the flight runs along a real wall) |
 | `graph` | `{ nodes: [room ids, 'outside'], edges: [[a, b, kind, opening id], ...] }`. Edge kinds: the opening kinds, `open`, and vertical kinds |
 | `zones[]` | `{ id, type, name, room, level, rects, area, tags }`: marked areas of a room's floor, with no walls, for a later prop pass to read (a park's `lawn`, `path`, `plaza`, `playground`, `seating`). A room with zones is tiled by them exactly: every floor cell in one zone, each zone one connected patch. Optional; empty for templates that mark none |
 | `columns[]` | `{ id, room, level, rect }`: pillars standing in a room (the same as a filler's). Optional |
@@ -115,7 +117,8 @@ Guarantees, checked by `tests/templates.test.js`:
 * openings lie on their walls, and portals on exterior walls;
 * there is a main entrance facing `approach`;
 * every room can be reached from the outside through the graph, across levels
-  too;
+  too (a vertical joins consecutive levels and stacked rooms, or, `local`,
+  rooms side by side on one level);
 * no furniture or terrain fields appear.
 
 ### How the world uses it
@@ -248,7 +251,8 @@ window rule, ceiling range and tags.
 Current engines:
 
 * **`house`** (`src/tpl/house.js`): public / private / service zones and
-  plan types bar, T, L, deep and split.
+  plan types bar, T, L, deep and split, plus `stack` for a recipe with
+  `storeys`.
   * The public zone is cut by recursive slicing, entry rooms toward the main
     side and service rooms toward the garage.
   * The private wing searches hall position, master endcap and side
@@ -256,6 +260,13 @@ Current engines:
     plus reach-in closets carved beside bedroom doors.
   * A garage comes with a service room behind it.
   * Portals as above.
+  * `stack` (two or three storeys over one footprint): a stair core up one
+    side, the foyer at the front, a 2 m by 4.5 m stairwell on the outer wall
+    and a hallway beside it, the same stairwell and hallway on every storey.
+    Public rooms below, bedrooms above off the landing hallway, the master
+    suite (and a study) on a smaller third floor. Storeys are 3.2 m then 3 m;
+    the elevation layer builds a real switchback in the stairwell. Recipes
+    `two_storey` and `townhouse`.
 * **`neighborhood`** (`src/tpl/neighborhood.js`), the first composite
   engine (section 8): a street down a hall with houses along both sides,
   every house built by the `house` engine.
@@ -320,7 +331,16 @@ A **recipe** (archetype) is pure data in `src/tpl/archetypes/`:
   template tries first when the elevation lab or a later world journey asks it
   to go up or down (default stair, ramp, ladder; the ladder always ends the
   list). A preference is an order, not a promise: a type that does not fit the
-  rooms is refused and the next is tried ([docs/elevation.md](elevation.md)).
+  rooms is refused and the next is tried ([docs/elevation.md](elevation.md));
+* `storeys` (houses): 2 or 3, or `[min, max]`: the `stack` plan;
+* `floors`: floor patterns laid on the finished building by `tpl/floors.js`,
+  for any engine (fillers too): `{ sunken: { p, rooms, zones, depth, size },
+  gallery: { p, rooms, at, depth } }`. A sunken floor drops part of a room
+  (the park's `pit` zone sinks exactly where it is) with steps down into it; a
+  gallery raises a strip along a hall's straight wall, with an undercroft
+  below and a stair up a side wall. A pattern that does not fit, or whose
+  stair could not be built, is not applied; `meta.floors` says what was.
+  Templates built inside a composite have their patterns off.
 
 A new house type is a new recipe:
 
@@ -336,7 +356,8 @@ BR.TPL.registerArchetype({
 **Bigger POIs** use the same contract:
 
 * a skyscraper is several `levels` with stacked stair and lift `verticals`
-  (the tests build one with a test engine);
+  (the tests build one with a test engine; its stairs are real where its stair
+  core is big enough: a 2 m by 4.5 m core holds a switchback per storey);
 * a street of houses is a composite engine that runs child templates inside
   sub-sites and merges them (the neighborhood, section 8); a mall will be
   another.

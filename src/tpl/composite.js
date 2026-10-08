@@ -69,6 +69,9 @@
     function child(req) {
       const base = TPL.archetypes[req.archetype];
       if (!base) return { error: 'unknown archetype ' + req.archetype };
+      // a child keeps the floor it is built on: its own floor patterns are off
+      // (and say so in its spec, so it builds the same alone)
+      if (base.floors) req = Object.assign({}, req, { override: Object.assign({}, req.override || {}, { floors: null }) });
       const recipe = req.override ? Object.assign({}, base, req.override) : base;
       const w = (req.rect[2] - req.rect[0]) * G, h = (req.rect[3] - req.rect[1]) * G;
       const key = [req.archetype, req.seed >>> 0, w, h, req.approach, req.wrongness, JSON.stringify(req.override || null)].join('|');
@@ -219,7 +222,7 @@
         if (oid && opening === undefined) continue;
         res.links.push({ a: idMap[k].get(a), b: idMap[k].get(b), kind, opening: opening === undefined ? null : opening, child: true });
       }
-      for (const v of P.b.verticals || []) res.verticals.push({ kind: v.kind, rooms: v.rooms.map((id) => idMap[k].get(id)), dead: v.dead, tags: v.tags || [], part: k });
+      for (const v of P.b.verticals || []) res.verticals.push(Object.assign({}, v, { kind: v.kind, rooms: v.rooms.map((id) => idMap[k].get(id)), dead: v.dead, tags: v.tags || [], part: k }));
     });
     // ---- the composite's own portals
     for (const pt of plan.portals || []) {
@@ -334,7 +337,7 @@
       id: 'p' + i, opening: 'o' + p.opening, level: p.level, room: id(p.room), role: p.role, kind: p.kind,
       side: O.side(p.side), width: m(res.openings[p.opening].s1 - res.openings[p.opening].s0), clear: p.clear, main: p.main, tags: p.tags
     }));
-    const verticals = res.verticals.map((v, i) => ({ id: 'v' + i, kind: v.kind, rooms: v.rooms.map(id), dead: !!v.dead, tags: v.tags }));
+    const verticals = res.verticals.map((v, i) => { const o = { id: 'v' + i, kind: v.kind, rooms: v.rooms.map(id), dead: !!v.dead, tags: v.tags }; for (const k of ['shape', 'types', 'walled', 'local']) if (v[k] !== undefined) o[k] = v[k]; return o; });
     const zones = res.zones.map((z, i) => {
       counts['zone:' + z.type] = (counts['zone:' + z.type] || 0) + 1;
       const label = ((T[z.type] && T[z.type].label) || z.type.replace(/_/g, ' ')) + (counts['zone:' + z.type] > 1 ? ' ' + counts['zone:' + z.type] : '');

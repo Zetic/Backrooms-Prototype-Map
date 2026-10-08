@@ -29,11 +29,12 @@ const zoneAt = (b, x, y) => b.zones.find((z) => z.rects.some((q) => x > q[0] && 
 {
   let tiled = 0, patches = 0, crumbs = 0;
   for (const { b } of ok) {
-    const hall = b.rooms.find((r) => r.type === 'park');
-    const H = raster(b, [hall], (r) => r.rects), Z = raster(b, b.zones, (z) => z.rects);
+    // the park's floor: its hall, and the pit sunk into it (a floor of its own, tpl/floors.js)
+    const hall = b.rooms.find((r) => r.type === 'park'), floor = b.rooms.filter((r) => r === hall || r.parent === hall.id);
+    const H = raster(b, floor, (r) => r.rects), Z = raster(b, b.zones, (z) => z.rects);
     let miss = 0, stray = 0;
     for (let i = 0; i < H.R.length; i++) { if (H.R[i] >= 0 && Z.R[i] < 0) miss++; if (Z.R[i] >= 0 && H.R[i] < 0) stray++; }
-    if (!miss && !stray && !Z.overlap && !Z.off && b.zones.every((z) => z.room === hall.id)) tiled++;
+    if (!miss && !stray && !Z.overlap && !Z.off && b.zones.every((z) => floor.some((r) => r.id === z.room))) tiled++;
     // each zone is one connected patch, and none is a crumb
     for (const z of b.zones) {
       const cells = new Set(), key = (x, y) => x + ',' + y;
