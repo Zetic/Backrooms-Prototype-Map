@@ -196,9 +196,9 @@ the atrium generator, world placement policy and associated previews are removed
 | Generated local vertical connections | Ladder, straight/switchback stair and ramp variants, chosen by template preference and fit; selected in the elevation lab |
 | Slope-following reservations | Implemented: one prism per 0.5 m of flight; space under the high end stays free |
 | Template floors | Milestone 3: two- and three-storey houses, sunken floors, galleries over an undercroft; the template's own stairs are real connectors |
-| World connections between reference bands | Growth step 3: growths climb from house and stair pillars through floors of their biome, by legs with exact rises, and some land in the next band's landing sites; at least one steered growth is tried per block of 4 × 4 cells. Milestone 4's journey plots are gone from the world (the generator stays in the lab). Other templates' zones stay unselected in exports |
+| World connections between reference bands | Growth steps 3-3b: growths climb from house pillars through floors of their biome, by legs with exact rises, and most land in the next band's landing sites; one growth house is planted per block of 2 × 2 cells, three growths in four steered. Milestone 4's journey plots are gone from the world (the generator stays in the lab). Other templates' zones stay unselected in exports |
 | Several owners in one column | Milestone 5: claims with height ranges, the ground below a raised claim capped but otherwise unchanged, and a pit drilled one way down into it |
-| Growth | Steps 2-3: a house that seeds growth carries its stairwell on up (its pillar), or a block's stair cell takes a stair up from a plain ground site; floors of its biome grow at each level over 1-4 sites (houseroom fillers with house rooms in them), each level reached by a leg from the one below, the last reaching the next band. Districts cross cell and region borders. Houseroom variety is next ([growth.md](growth.md)) |
+| Growth | Steps 2-3b: the ground plan plants a growth house in one cell of every 2 × 2 block, and its stairwell carries on up (its pillar); floors of its biome grow at each level over 2-6 sites (houseroom fillers with house rooms in them), round any tall room, each level reached by a leg from the one below, the last reaching the next band. Districts cross cell and region borders. Houseroom variety is next ([growth.md](growth.md)) |
 
 Old abstract stair annotations in source templates are not proof of a physical
 vertical connection. The adapter reports differing-floor legacy links as
@@ -632,7 +632,8 @@ each raised site carries its own `floorZ`).
 
 The climb between bands is grown, not plotted (`src/growth.js`, used by
 `src/band-world.js`; the design and the owner's answers: [growth.md](growth.md)).
-The journey plots are gone from the world.
+The journey plots are gone from the world. Origins, ownership, branch size and
+landing sites as below were changed in step 3b (next section).
 
 - **Origins and ownership.** A cell is an origin when a house in it seeds
   growth, or when it is its block's stair cell (one cell per block of 4 × 4,
@@ -681,14 +682,41 @@ above, a climb from below shows through its landing site's opening; *Way ↑* an
 `level` and claim top, and slices list the growth's connections with an end in
 the cell.
 
-Planning a growth reads up to 25 cell plans (who owns what), raw builds of its
-sites and a few district builds per level: about 0.2-2 s per growth. The map
-plans the growths of the cells it shows in detail, and of the band below (for
-arrivals); the plan view never plans one.
-
 Not yet: houseroom variety (step 4), emergent connections beyond the first
 level's pit (step 5), growths joining each other (step 6), growth downward
 toward the band below, and seeds other than houses.
+
+### Growth step 3b — Denser growth (implemented)
+
+The owner asked for many more starting points, slightly bigger branches, tall
+rooms never grown over, and every growth on the zoomed-out map
+([growth.md](growth.md), step 3b).
+
+- **Origins.** One cell per block of 2 × 2 cells, by the seed alone
+  (`GROWTH.isOrigin`). `BandWorld` hands each band's World a `plants` hook,
+  and the ground plan of an origin cell places a growth house first (`poi.js`:
+  a two-storey house or townhouse, approach north or east, towards the middle
+  of the cell), kept only when its stair can carry on up (`GROWTH.raises`).
+  Stair pillars from plain ground sites are gone.
+- **Ownership.** Every cell goes to the nearest origin of the 3 × 3 blocks
+  round it (`GROWTH.owner`), from the seed alone: no cell plan is read to
+  settle it.
+- **Levels.** 2-6 sites a level, 2,000 m² at most.
+- **Tall rooms.** Fillers that can be tall carry `tall: true` (loop hall,
+  office, scattered pillars, pillar hall: the ones with a gallery). A floor
+  stands over a tagged site only when that site, built as it is, keeps every
+  ceiling under the floor's slab (`keepsUnder`, `CLAIM.topOf`); an untagged
+  site needs 4.5 m. The district grows round anything else.
+- **Landing sites.** The next band keeps only its plain sites within 36 m of
+  each growth house below (`GROWTH.kept`), less the sites its own growth
+  houses' doors open onto: about one plain site in ten instead of 40%.
+- **The map.** Both views plan growths a few at a time within each frame
+  (`growthReady`, `prepareGrowth`); a tile whose growths are not planned yet is
+  drawn as a draft and redrawn. The plan view keeps a footprint of each
+  growth's floors and arrival (up to 4,096) and draws every growth.
+
+Over 8 × 8 cells of three seeds, 40-43 of 48 origins grow and 32-34 arrive in
+band 1: about 21 growths and 17 ways up per 100 cells.
 
 ### Milestone 6 — Unreal consumer proof
 
@@ -737,10 +765,11 @@ Growth in the world, and a journey alone:
 
 ```js
 const world = new BR.BandWorld(7);
-const G = world.growth(0, 2, -2);              // origin cell (2, -2) of band 0: pillar, levels, legs, arrival, pit
+const G = world.growth(0, 0, 2);               // origin cell (0, 2) of band 0: pillar, levels, legs, arrival, pit
 G.levels;                                      // [{ level: 1, z: 9.5, floorZ: 9.5, sites: [...] }]
 G.arrival;                                     // { band: 1, site, ground (band 1's landing site), box, type, rise, conn, ... }
-world.growthAt(0, 1, -3);                      // the growth that may use a cell (its owner's)
+world.growthAt(0, 1, 2);                       // the growth that may use a cell (its owner's)
+BR.GROWTH.isOrigin(world, 0, 0, 2);            // true: one origin per block of 2 x 2 cells
 world.nearestWay('up', 0, 0);                  // { growth, at: [x, y], band }
 BR.GROWTH.schedule(6.5, new BR.Rng(1), true);  // { zs: [6.5, 11.5], arrive: true }
 const j = BR.JOURNEY.generate({ id: 'j', seed: 3, w: 48, h: 40, lower: 0, style: 'ramps' });   // milestone 4, lab only
@@ -776,11 +805,14 @@ a solid surface.
 ## Open tuning decisions
 
 - Reference-band spacing and variation between districts.
-- Frequency of local elevation changes and ways up: the block size (4 × 4
-  cells), the steered share (50% of house growths), the chance an unsteered
-  growth climbs on (50%), and the landing-site share (40%).
+- Frequency of local elevation changes and ways up: the block size (2 × 2
+  cells), the steered share (75%), the chance an unsteered growth climbs on
+  (50%), and how far round a growth house the next band keeps landing sites
+  (36 m).
 - How far apart consecutive legs of a growth must be (today: the furthest floor
-  of the level first), and how big a level may grow (1-4 sites, 1,200 m²).
+  of the level first), and how big a level may grow (2-6 sites, 2,000 m²).
+- Whether branch floors should line up with gallery heights (+3.25-3.75 m)
+  so a balcony can open onto one; the first floor is +6.5 m or +9.5 m today.
 - How often templates should have floors of their own, and which halls might
   take a gallery on a jogged wall.
 - Whether more zones should allow routes (today only lawns), and preferences

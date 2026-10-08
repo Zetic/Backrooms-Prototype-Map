@@ -95,18 +95,19 @@ both the workbench and the map draw the stairs that reach each floor: the map
 shows them at their width with the heights they join, and clicking one moves
 the cut height to where it arrives.
 
-Bands are joined by growth ([the growth design](docs/growth.md), steps 2-3).
-A two-storey house or a townhouse can carry its stairwell on up a flight, and
-every block of 4 × 4 cells has a stair cell whose plain ground site takes a
-stair up. From that landing, floors of house rooms grow over the ground sites
+Bands are joined by growth ([the growth design](docs/growth.md), steps 2-3b).
+Every block of 2 × 2 cells has one cell, by the seed, whose ground plan places
+a two-storey house or a townhouse that carries its stairwell on up a flight.
+From that landing, floors of house rooms grow over the ground sites
 round it (hallways and rooms of the house-room biome, densest by the stair),
 then a stair from one of those floors climbs to the next level, and so on: a
 townhouse's floor at +9.5 m climbs straight to the band above, a two-storey
-house's at +6.5 m (or a stair pillar's at +4.5-6.5 m) has one more level at
-+9.5-11.75 m first. The last climb lands on the next band's floor, in a site
-rebuilt round it. Growths spread across cell borders; every block's stair cell
-and half the houses always try to reach the band above, so ways up are spread
-over the world. A column holds several owners at once (milestone 5): the
+house's at +6.5 m has one more level at +9.5-11.75 m first. Floors grow round
+tall rooms (halls with a gallery), never over them. The last climb lands on the
+next band's floor, in a site kept for it near the house below, rebuilt round
+it. Growths spread across cell borders; three in four always try to reach the
+band above, so ways up are spread over the world, and the zoomed-out map shows
+every one. A column holds several owners at once (milestone 5): the
 ground keeps its own floor with its ceiling capped under the floor above, the
 claims meet at the slabs, and a pit drilled through a first floor drops into
 the site below — one way only, with no ladder and no rope. The old journey
@@ -240,14 +241,15 @@ The runner checks:
   drilling it twice changes nothing. In the world no two claims overlap in 3D
   and three can share a column, each meeting the next at a slab; the ground
   plan is the same with growth off; and a pit only goes down.
-- **Growth.** A known house growth and a known stair cell are walkable from
+- **Growth.** A known townhouse growth and a known two-storey growth are walkable from
   the ground up to the next band's floor and back; a growth's floors cross
   cell borders with their doors matched; growths and exports are the same in
   any order and with tiny caches. Every growth keeps to its own cells, stands
   over plain ground or the floor below, draws from its biome's pool, keeps
   inside its claims, climbs by exact legs with no climb over another, and
-  arrives only in landing sites; every block has one stair cell and most
-  blocks a way up.
+  arrives only in landing sites; every 2 × 2 block has one origin with its
+  house planted, most growths arrive, tall rooms are never grown over, and
+  under a third of plain sites are kept for landings.
 - **Fillers.** Every filler keeps the contract on any site shape and honours
   every connection. The pool leans enclosed, and fillers are fast.
 - **The world, on five seeds (two in quick mode).** Sites tile every cell exactly. Connections are

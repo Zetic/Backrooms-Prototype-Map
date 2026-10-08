@@ -23,6 +23,7 @@
  *               world reads the pair as one directed edge down (no ladder,
  *               no rope).
  *
+ *   CLAIM.topOf(b)                         how high its tallest room reaches over its ground floor
  *   CLAIM.stairTop(b)                      its top stairwell and the sides it faces
  *   CLAIM.pillarFloor(b, rise?)            the height a pillar's first landing goes to
  *   CLAIM.raiseStair(b, { z, side, reach, width })
@@ -81,6 +82,15 @@
    * top floor + `rise` and its top storey's ceiling + slab. null without a
    * stairwell. The world and the lab use the same rule.
    */
+  /** how high a template's tallest room reaches over its ground floor: a floor
+   * standing over it must be at least this (and its slab) higher, or the
+   * template could only fit under it by losing height */
+  CLAIM.topOf = function topOf(b) {
+    if (!b || b.error) return 0;
+    const level = (lv) => ((b.levels || []).find((l) => l.index === (lv || 0)) || (b.levels || [])[0] || { elevation: 0 }).elevation;
+    return round(Math.max(0, ...b.rooms.map((r) => level(r.level) + (r.floor || 0) + (r.ceiling || 2.5))));
+  };
+
   CLAIM.PILLAR = { rise: 3.3 };
   CLAIM.pillarFloor = function pillarFloor(b, rise) {
     const st = CLAIM.stairTop(b), E = BR.ELEV;

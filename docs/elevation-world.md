@@ -34,7 +34,7 @@ that. See [Layered ownership](#layered-ownership-claims-raised-floors-and-pits).
   the active band and its two neighbors, joined wherever a growth's climb
   arrives in the cell.
 - Way ↑ centres the view on where the nearest growth that reaches the band
-  above starts (its house or its stair site); Way ↓ on where the nearest climb
+  above starts (its house); Way ↓ on where the nearest climb
   from the band below arrives in this one. Both search outward ring by ring of
   cells, up to three cells away.
 - Raised floors are painted with the ground at detail zoom, each at its own
@@ -43,7 +43,7 @@ that. See [Layered ownership](#layered-ownership-claims-raised-floors-and-pits).
   <filler>`, its level and how far it is from where its level is entered;
   hovering the ground under it says a growth stands over this ground, at what
   height, and where this site's own ceiling now is. Hovering a pillar's site
-  (the house lot or the stair site) lists the growth's floors and whether it
+  (the house lot) lists the growth's floors and whether it
   reaches the band above; hovering a landing site says which climb comes up
   into it.
 - In the band above, a climb from below is painted through the opening its
@@ -69,12 +69,13 @@ outline in both directions. Clicking the footprint reveals its other landing.
 | --- | --- | --- |
 | Reference spacing | 16 m | Fits existing tall halls and slabs |
 | Ordinary envelope | Reference −1.5 m to +14.5 m | Room/slab ownership: a sunken floor down to −1.25 m (plus its slab) up to a 14 m street ceiling; 16 m in all, so bands never overlap |
-| Growth origins | A cell with a house that seeds growth (75% of those that could), and one stair cell per block of 4 × 4 cells | At most one growth per cell |
-| Growth cells | Its origin cell, and the cells round it with no origin of their own whose top-priority origin neighbour it is | Cells and the old regions are no border to a district |
-| Levels | First floor one flight over the house's top storey (+6.5 m two-storey, +9.5 m townhouse) or +4.5-6.5 m over a stair site; then legs of 3-6.5 m on the half metre, the top floor at most +11.75 m | Every level keeps 2.75 m under the one above or the band's ceiling |
-| Floors per level | 1-4 sites, 1,200 m² at most, over plain ground or the level below | A district of its biome (houseroom) |
-| Steering | Every block's stair cell, and half the house growths, always climb on and try to arrive; the rest climb each level by chance (50%) | At least one way up tried per block, spread over the world |
-| Landing sites | 40% of a band's plain sites, by the seed | Kept for arrivals from below: no growth of their own band stands over them |
+| Growth origins | One cell per block of 2 × 2 cells, by the seed; its ground plan places a growth house (two-storey or townhouse) whose stair carries on up | At most one growth per cell, and every pillar a house |
+| Growth cells | Every cell belongs to the nearest origin among its own and the neighbouring blocks' (ties by the seed) | Needs no cell plan; cells and the old regions are no border to a district |
+| Levels | First floor one flight over the house's top storey (+6.5 m two-storey, +9.5 m townhouse); then legs of 3-6.5 m on the half metre, the top floor at most +11.75 m | Every level keeps 2.75 m under the one above or the band's ceiling |
+| Floors per level | 2-6 sites, 2,000 m² at most, over plain ground or the level below | A district of its biome (houseroom) |
+| Ground under a floor | A plain site with nothing over its slab: a filler tagged `tall` is built and checked, an untagged one needs 4.5 m | Tall rooms are grown round, never cut down |
+| Steering | Three growths in four always climb on and try to arrive; the rest climb each level by chance (50%) | Ways up spread over the world |
+| Landing sites | The next band's plain sites within 36 m of a growth house below, less the next band's own growth houses' sites | Kept for arrivals from below: no growth of their own band stands over them |
 | Ground claim | Reference −1.5 m up to the slab of the floor standing on it, else +14.5 m; less a climb's opening in a landing site | A ground site keeps its own floor; only its ceiling is capped |
 | Raised claim | Its floor −0.25 m (its slab) to the next floor's slab, or reference +14.5 m; plus the climb it carries, to its landing's ceiling | Meets the claims below and above exactly at the slabs, never overlapping them |
 | Pit | 2 × 2 m, at least 3 m of fall, one per growth at most | A drilled one-way drop from a first-level floor into the ground site under it |
@@ -93,28 +94,33 @@ above's floor, in a landing site built round it.
 `BR.GROWTH.plan` ([src/growth.js](../src/growth.js)), cached and pure.
 `growthAt(n, i, j)` is the growth that may use a cell (its owner's, by
 `GROWTH.owner`), and `raisedSites(n, i, j)` the floors of it standing in that
-cell. Planning reads cell plans (two cells round the origin, to settle who owns
-what) and raw builds (`World.buildRaw`, uncached and unhooked) only, never a
-finished build, so a growth is the same in any order.
+cell. Planning reads cell plans and raw builds (`World.buildRaw`, uncached and
+unhooked) only, never a finished build, so a growth is the same in any order.
+`growthReady(n, i, j)` says whether a cell's growths are planned yet and
+`prepareGrowth` plans them, so the map can plan a few within each frame.
 
-- **Origins.** `GROWTH.candidate` says whether a cell is one: the houses in it
-  that seed growth (step 2's rule: anchor archetype, `seedsGrowth`, a stair that
-  can carry a flight up with 3 m of headroom left), and whether it is its
-  block's stair cell (`GROWTH.stairCell`, one per 4 × 4 cells, by the seed).
-  Each origin has a priority from the seed. `GROWTH.owner` gives a cell to
-  itself when it is an origin, else to its top-priority origin neighbour, so
-  growths never share a cell and a district spreads into the cells round its
-  origin, across any cell or region border.
-- **Pillars.** A house carries its stair on up to a landing at its lot edge
-  (claims.js, as in step 2). Failing that, a stair cell takes a plain ground
-  site whose own filler can take a stair, ramp or ladder up
-  (`E.connectionVariant` with an exact rise) to +4.5-6.5 m: its stair pillar.
-  The landing opens on a free side onto the growth's first floor, which stands
-  over the rest of that site.
+- **Origins.** `GROWTH.isOrigin` picks one cell per block of 2 × 2 cells by
+  the seed alone. The world passes `plants` to each band's World, and the
+  ground plan of an origin cell places a growth house first (`poi.js`: an
+  archetype with `grows`, facing north or east, towards the middle of the
+  cell), kept only when `GROWTH.raises` says its stair can carry a flight up
+  with 3 m of headroom left; the house is marked `grows`. `GROWTH.candidate`
+  gives an origin its priority from the seed, and `GROWTH.owner` gives every
+  cell to the nearest origin among the 3 × 3 blocks round it, so growths
+  never share a cell and ownership needs no cell plan.
+- **Pillars.** The house carries its stair on up to a landing at its lot edge
+  (claims.js, as in step 2). Failing the planted house, another house in the
+  cell whose stair can carry on up is tried. The landing opens on a free side
+  onto the growth's first floor.
+- **Ground.** A floor stands only over a plain filler site (`GROWTH.growable`):
+  no POI, no lot, not a landing site, and nothing it would cut. A filler tagged
+  `tall` (a hall with a gallery) is built and stands under the floor only when
+  no ceiling rises above the floor's slab (`keepsUnder`, `CLAIM.topOf`); an
+  untagged one needs 4.5 m. Otherwise the district grows round it.
 - **Levels.** `GROWTH.schedule(z1, rng, steered)` gives the floors: legs of
   3-6.5 m on the half metre, the top floor a storey under the band's ceiling
   and within one leg of the next band's floor (+9.5 to +11.75 m). Each level
-  grows breadth first over 1-4 sites: the first, then plain ground and the
+  grows breadth first over 2-6 sites (2,000 m² at most): the first, then plain ground and the
   level below's floors sharing at least 5 m of edge. Every floor is a district
   site of the biome (`GROWTH.raisedSite`: a biome filler with the biome's rooms,
   every ceiling capped under the level above), and a floor that cannot be built
@@ -127,24 +133,24 @@ finished build, so a growth is the same in any order.
   the landing's doorway. No climb stands over another: each next floor leaves
   the climb's footprint out.
 - **Arrival.** From the top level, a last leg climbs to the next band's floor
-  inside one of that band's landing sites in the same cell (`GROWTH.landingSite`:
-  40% of plain sites, which no growth of their own band ever uses, so planning
-  band n never waits on band n + 1's growth). The climb keeps a metre inside the
+  inside one of the landing sites that band keeps for the growth
+  (`GROWTH.kept`: its plain sites within 36 m of the growth house, where the
+  top floors stand, less the sites of its own growth houses' doors; no growth
+  of their own band ever uses them, so planning band n never waits on band
+  n + 1's growth). The climb keeps a metre inside the
   landing site; the landing site is rebuilt on its rects less the climb's
   footprint, with its own doors and one onto the landing (`afterBuild` swaps the
   build in). Where it means to arrive, the top level grows toward landing sites
   and the leg below it is put under them.
-- **Steering.** Every block's stair cell, and half the house growths, are
-  steered: they always plan every level and the arrival. The rest climb each
+- **Steering.** Three growths in four, by the seed, are steered: they always plan every level and the arrival. The rest climb each
   level, and arrive, with a 50% chance. A steered growth that cannot arrive
   simply ends; there is no fallback plot.
 
 Raised floors have ids `b<n>|<i>,<j>:raised<level>.<k>` (the cell they stand
 in) and owners `growth:<n>:<i>,<j>:<level>.<k>`; their doors and climbs carry
 ids `b<n>|<i>,<j>:x..`, `:l<level>` and `:up` minted on the origin cell, with
-the `cells` of both ends. A stair pillar's ground build and the floors that
-carry a climb are spatial blueprints (absolute heights) already; seams are not
-rolled against a stair pillar's ground build.
+the `cells` of both ends. The floors that carry a climb are spatial
+blueprints (absolute heights) already.
 
 Ground zero keeps the original seed; other bands derive their seeds from the
 world seed and band index. Ordinary site IDs include the band, such as
@@ -178,7 +184,7 @@ so several owners can hold the same XY at different heights. A ground site's
 claim runs from the band's floor limit to `ceilingOf(site)`: the floor slab of
 the raised floor standing on it, or the band's ceiling limit where nothing
 does (`claimOf`; a landing site's claim leaves out the climb that comes up
-into it, and a stair pillar's adds the climb it carries). A raised floor's
+into it, ). A raised floor's
 claim runs from that same slab up to its `top`: the next level's slab where a
 floor stands over it, else the band's ceiling limit; a floor carrying a climb
 adds the climb's footprint from its own slab to the landing's ceiling
@@ -260,8 +266,8 @@ absolute. Portal matching uses world XYZ.
 
 | Field | Meaning |
 | --- | --- |
-| `policy` | Reference spacing; `verticalJourneys: "grown"`; `layeredOwnership: "stacked-claims"`; `growth` (`pillars`, `block`, `steer`, `carry`, `landings`, `rise`, `share`, `sites`, `biomes`) |
-| `growths` | Each growth using a cell of the region: id, band, origin, pillar (`house` or `stair`), biome, steered, cells, levels (floor height and sites), legs (type, rise, connection), its arrival (band, floor it leaves, landing site, type, rise, connection) and pit |
+| `policy` | Reference spacing; `verticalJourneys: "grown"`; `layeredOwnership: "stacked-claims"`; `growth` (`pillars`, `block`, `steer`, `carry`, `landings` in metres, `rise`, `sites`, `area`, `tall`, `biomes`) |
+| `growths` | Each growth using a cell of the region: id, band, origin, pillar (`house`), biome, steered, cells, levels (floor height and sites), legs (type, rise, connection), its arrival (band, floor it leaves, landing site, type, rise, connection) and pit |
 | `pits` | Each drilled drop: id, the nodes it goes from and to, its world rectangle and its fall |
 | `bands` | Requested reference IDs and elevations |
 | `slices` | Per-band cell ownership and connection plans, not viewing slices; each site carries its `floorZ` and capped `ceilingZ`, and `raised[]` lists the floors standing in the cell with their `growth`, `level`, floor height, `ceilingZ` (their claim's top), `biome` and `hop`; `connections` adds the growth's doors and climbs with an end in the cell |
@@ -278,14 +284,14 @@ headroom. Export rejects missing internal endpoints and mismatched connections.
 Ghosts and occupancy add no traversal edges. A climb between bands is matched
 only when both its bands are asked for (`…:up` connections); otherwise its
 doorway is a vertical frontier. Over a growth's cells and bands 0 and 1, the
-graph walks from the house (or stair site) on the ground up through every level
+graph walks from the house on the ground up through every level
 to the landing site on band 1's floor, and back.
 
 ```js
 const world = new BR.BandWorld(7);
-const G = world.growth(0, 2, -2);              // a townhouse's growth, arriving in band 1
-const data = world.exportRegion(1, -3, 2, -2, [0, 1]);
-const graph = world.graph(1, -3, 2, -2, [0, 1]);
+const G = world.growth(0, 0, 2);               // a townhouse's growth, arriving in band 1
+const data = world.exportRegion(0, 2, 1, 2, [0, 1]);
+const graph = world.graph(0, 2, 1, 2, [0, 1]);
 const way = world.nearestWay('up', 0, 0);       // { growth, at, band }
 ```
 
@@ -294,19 +300,21 @@ const way = world.nearestWay('up', 0, 0);       // { growth, at, band }
 The suite checks exact cell tiling and one ground network per band cell with no
 journey plots, floors inside the envelope of the band they are in, exact
 portal matching and invalid inputs. For growth (`tests/band-world.test.js`):
-a known house growth (seed 7, cell (2, −2)) with its stair carried up, its
+a known townhouse growth (seed 7, cell (0, 2)) with its stair carried up, its
 floors over capped ground, three owners stacked in one column with no claims
 overlapping in 3D, a pit that is forward-only, an exact climb to band 1's
 floor into a landing site built round it, and a walk from the ground to band 1
-and back; a known stair cell (seed 7, (−1, −1)) with a ground stair, two
-floors, no shafts and the same walk; a growth whose floors stand in three cells
-with its doors matched across the borders; the ground plan identical with
-growth disabled; identical canonical exports and growths in fresh and evicting
+and back; a known two-storey growth (seed 7, (0, 1)) with a leg up from its
+first level, no shafts and the same walk; a growth whose floors stand in two
+cells with its doors matched across the border; the ground plan identical with
+growth disabled, but for the house an origin cell places; identical canonical exports and growths in fresh and evicting
 worlds in any order, with every layout fitting its claim; the level schedule;
 and, over a window of cells, every growth's rules (own cells, floors over plain
 ground or the floor below, its biome's pool, inside its claims, exact legs, no
-shafts, arrivals into landing sites only, one stair cell a block, most blocks
-with a way up). `tests/claims.test.js` checks the claim mechanics and
+shafts, arrivals into landing sites only, one origin a block and planted
+houses only there, most growths steered and arriving, most blocks with a way
+up, under a third of plain sites kept for landings), and that the tall fillers
+are tagged and never grown over. `tests/claims.test.js` checks the claim mechanics and
 `tests/journeys.test.js` the journey generator the lab still offers. Cutaway
 tests exercise arbitrary/negative heights, overlapping floors, floor holes,
 tall rooms, full-width diagonal paths, selected-only ghosts and bounded caches;

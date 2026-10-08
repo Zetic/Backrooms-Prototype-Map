@@ -127,12 +127,20 @@ or T wall).
 
 **Floors at other heights.** A filler can carry `floors` (the same patterns a
 template recipe uses, `src/tpl/floors.js`), laid on what it built: the pillar,
-loop, ragged, office and scattered-pillar halls sometimes get a gallery along
+loop, office and scattered-pillar halls sometimes get a gallery along
 a straight stretch of wall (the hall becomes double height, an undercroft
 below, a stair up a side wall), and the office, ragged, scattered-pillar and
 pillar halls sometimes a sunken floor with steps down into it. A gallery adds
 a level to the filler's `levels`; a sunken floor is a room with a negative
 `floor`. See [docs/elevation.md](elevation.md), milestone 3.
+
+A filler that can be taller than 4.5 m (today exactly those that can take a
+gallery) carries `tall: true`. Growth reads it as a cheap first check: a
+growth's floor stands over a tagged site only when that site, built as it is,
+keeps every ceiling under the floor, and grows round it otherwise
+([docs/growth.md](growth.md), step 3b). `tests/band-world.test.js` checks that
+the tags match the gallery fillers and that every other filler stays under
+4.5 m.
 
 The old world-first fill's Backrooms zones and knobs were the starting
 point for the first eight; the rest come from the reference maps in the

@@ -6,7 +6,8 @@
  *                         POI buildings), every floor first, then every wall, so
  *                         neighbours never paint over each other's walls
  *   plan    (0.12-1 px/m) the cell plans alone, nothing built: each site a
- *                         flat tone, lots and POIs picked out
+ *                         flat tone, lots and POIs picked out, every growth's
+ *                         floors over them (planned a few a frame)
  *   far     (< 0.12 px/m) a raster of the biome (openness) and POI density
  *
  * Cells a filler leaves unbuilt stay the dark background: the solid mass
@@ -31,18 +32,42 @@
 
   // --------------------------------------------------------------- tile painters
   /** detail: blueprints of every site meeting the tile; false if some were not built in time */
+  /**
+   * Plan what the growths over cells [x0, y0, x1, y1] need (band-world.js), a
+   * growth at a time while the frame's budget lasts: the cells whose growths
+   * are planned, or null when every one is (or the world grows nothing).
+   */
+  function growthsReady(W, x0, y0, x1, y1, deadline) {
+    if (!W.growthReady) return null;
+    const C = BR.WORLD_CFG.cell, out = new Set();
+    let all = true;
+    for (let i = Math.floor(x0 / C); i <= Math.floor(x1 / C); i++) for (let j = Math.floor(y0 / C); j <= Math.floor(y1 / C); j++) {
+      if (!W.growthReady(W.band, i, j) && now() < deadline) W.prepareGrowth(W.band, i, j);
+      if (W.growthReady(W.band, i, j)) out.add(i + ',' + j); else all = false;
+    }
+    return all ? null : out;
+  }
+  const inCells = (cells, rect) => {
+    if (!cells) return true;
+    const C = BR.WORLD_CFG.cell;
+    return cells.has(Math.floor(rect[0] / C) + ',' + Math.floor(rect[1] / C));
+  };
+
   function paintDetail(g, W, x0, y0, S, tz, deadline, opts) {
     const sites = W.sitesIn(x0 - 0.5, y0 - 0.5, x0 + S + 0.5, y0 + S + 0.5), ready = [];
+    // the growths over the tile's cells, planned a few a frame: a cell whose
+    // growth is still to plan is drawn as a draft and the tile again later
+    const planned = growthsReady(W, x0 - 0.5, y0 - 0.5, x0 + S + 0.5, y0 + S + 0.5, deadline);
     // claims stacked over the ground (band-world.js): drawn with the rest, at
     // their own heights, so the cut height alone decides what you see
-    const raised = W.raisedIn ? W.raisedIn(x0 - 0.5, y0 - 0.5, x0 + S + 0.5, y0 + S + 0.5).sort((a, b) => a.floorZ - b.floorZ).map((rs) => W.raisedBuild(rs)) : [];
+    const raised = W.raisedIn ? W.raisedIn(x0 - 0.5, y0 - 0.5, x0 + S + 0.5, y0 + S + 0.5, !!planned).sort((a, b) => a.floorZ - b.floorZ).map((rs) => W.raisedBuild(rs)) : [];
     // a climb from the band below arriving here: the floor it climbs from,
     // seen only through the opening its landing site leaves round it
-    const arrivals = W.arrivalsIn ? W.arrivalsIn(x0 - 0.5, y0 - 0.5, x0 + S + 0.5, y0 + S + 0.5).map((A) => ({ r: W.raisedBuild(A.site), box: A.arrival.box })) : [];
-    let complete = true;
+    const arrivals = W.arrivalsIn ? W.arrivalsIn(x0 - 0.5, y0 - 0.5, x0 + S + 0.5, y0 + S + 0.5, !!planned).map((A) => ({ r: W.raisedBuild(A.site), box: A.arrival.box })) : [];
+    let complete = !planned;
     g.fillStyle = BG; g.fillRect(0, 0, S * tz, S * tz);
     for (const s of sites) {
-      if (W.hasBuild(s) || now() < deadline) ready.push(W.build(s));
+      if (W.hasBuild(s) || (now() < deadline && inCells(planned, s.bbox))) ready.push(W.build(s));
       else { complete = false; paintPlanSite(g, s, x0, y0, tz); }
     }
     // seams (seams.js): each shared wall drawn once, and what the seam rules
@@ -107,17 +132,25 @@
       for (const s of W.cell(i, j).sites) sites.push(s);
     }
     for (const s of sites) paintPlanSite(g, s, x0, y0, tz);
-    if (W.raisedIn) {
-      g.fillStyle = PLAN.raised;
-      // (only branches already planned: the plan view never plans one)
-      for (const rs of W.raisedIn(x0, y0, x0 + S, y0 + S, true)) for (const q of rs.rects)
-        g.fillRect((q[0] - x0) * tz, (q[1] - y0) * tz, (q[2] - q[0]) * tz, (q[3] - q[1]) * tz);
-      // where a climb from the band below comes up (only those already planned)
-      g.fillStyle = PLAN.arrival;
-      if (W.arrivalsIn) for (const A of W.arrivalsIn(x0, y0, x0 + S, y0 + S, true)) {
-        const q = A.arrival.box;
-        g.fillRect((q[0] - x0) * tz, (q[1] - y0) * tz, Math.max(2, (q[2] - q[0]) * tz), Math.max(2, (q[3] - q[1]) * tz));
+    if (W.footprintAt) {
+      // every growth over the tile, and every climb from the band below that
+      // comes up in it, planned a few a frame (what is drawn of one outlives
+      // the growth itself in the world's caches)
+      const seen = new Set(), floors = [], ups = [];
+      for (let i = Math.floor(x0 / C); i <= Math.floor((x0 + S) / C); i++) for (let j = Math.floor(y0 / C); j <= Math.floor((y0 + S) / C); j++) {
+        for (const [n, out] of [[W.band, floors], [W.band - 1, ups]]) {
+          const f = W.footprintAt(n, i, j, now() < deadline);
+          if (!f) { complete = false; continue; }
+          if (!seen.has(f)) { seen.add(f); out.push(f); }
+        }
       }
+      const meets = (q) => q[0] < x0 + S && q[2] > x0 && q[1] < y0 + S && q[3] > y0;
+      g.fillStyle = PLAN.raised;
+      for (const f of floors) for (const rs of f.floors) for (const q of rs.rects) if (meets(q))
+        g.fillRect((q[0] - x0) * tz, (q[1] - y0) * tz, (q[2] - q[0]) * tz, (q[3] - q[1]) * tz);
+      // where a climb from the band below comes up
+      g.fillStyle = PLAN.arrival;
+      for (const f of ups) { const q = f.arrival; if (q && meets(q)) g.fillRect((q[0] - x0) * tz, (q[1] - y0) * tz, Math.max(2, (q[2] - q[0]) * tz), Math.max(2, (q[3] - q[1]) * tz)); }
     }
     if (tz >= 0.3) {
       g.strokeStyle = PLAN.line; g.lineWidth = 1;
