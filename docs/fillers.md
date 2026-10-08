@@ -119,9 +119,13 @@ applied to the other fillers.
 They are the whole pool of the `houseroom` biome ([docs/growth.md](growth.md),
 step 4). Each lays one to three hallways (joined by a cross hallway) and packs
 rooms along both sides, each with a door onto the hallway; a hallway may end
-in a room, and leftover solid pockets become closets, pantries, utility rooms
-or offices off the room beside them. Room counts scale with the site's area
-(one kitchen, a bathroom for every two or three bedrooms). Their rooms take
+in a room, and leftover solid pockets become closets, pantries or storage
+rooms off the room beside them. Each floor holds one home's rooms whatever its
+size (one living room, kitchen, dining and family room, one master bedroom, up
+to four bedrooms, a bathroom plus one for every three bedrooms); what the home
+does not need stays solid, and no room is squeezed thinner than its type. A
+growth picks which of the three a site is by its level and distance
+(`biomes.js`). Their rooms take
 the catalogue's names, zones and ceilings and are tagged `house` rather than
 `backrooms`, so they draw in the house colours, and a filler's own room
 types can carry a `label` for their names. The engine's joining corridors

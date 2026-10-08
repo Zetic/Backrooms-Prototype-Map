@@ -13,7 +13,7 @@ state of each build step. Implementation detail lives in
 | 3 | Recursive growth: pillars from branches, a per-region budget and plan, steering toward the next band; today's journey plot becomes the fallback | Done: PR #26 (see below). The journey plot is removed from the world rather than kept as a fallback (owner's call) |
 | 3b | Denser growth: an origin in every 2 × 2 block placed by the ground plan, bigger branches, tall rooms grown round, a smaller landing reserve, every growth on the zoomed-out map, planning spread over frames | Done: PR #27 (see below) |
 | 4 | Houseroom variety: house rooms, literally: hallways, bedrooms, living rooms and whole houses, not generic layouts that read as a house | Done: PR #28 (see below) |
-| 4b | One home per growth: a level's sites take roles (living floor, upstairs hall, bedroom wings) and each floor has one home's rooms, not one per site and more with size | In progress (see below) |
+| 4b | One home per growth: a level's sites take roles (living floor, upstairs hall, bedroom wings) and each floor has one home's rooms, not one per site and more with size | Done: this step (see below) |
 | 5 | Emergent connections: pits that drill down to the next exposed volume first, then holes rolled on shared walls; drilled walls after | Pits between a branch and the ground exist (milestone 5) |
 | 6 | Linking growths: branches of the same biome that come close join up, and districts cross region borders at planned points | |
 
@@ -175,7 +175,7 @@ ensuite and hallway beside the stairwell; in the middle a living-rooms floor
 (living room, kitchen, family room, dining, pantry, foyer, mudroom, offices)
 with a ladder on up to band 1; on the right a cottage standing in a floor.*
 
-**Step 4b, in progress.** The owner's report after step 4: one floor had
+**Step 4b as built.** The owner's report after step 4: one floor had
 about nine living rooms, three kitchens and nine bathrooms to five bedrooms,
 and a bathroom over a thin "living" strip. Each of a level's 2-6 sites was a
 whole house floor of its own, with caps that grew with its area. The fix gives
