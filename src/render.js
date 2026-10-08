@@ -94,21 +94,45 @@
       }
       TPL.drawBuilding(g, b, o);
     };
-    // floors, then walls, then the tags of stairs, ramps and ladders over both
-    // (a raised floor last within each pass: it stands over the ground's)
-    for (const layer of W.floorZ !== undefined ? ['floors', 'walls', 'labels'] : ['floors', 'walls']) {
-      for (const r of ready.concat(raised)) {
+    // floors, then walls, then the tags of stairs, ramps and ladders over both,
+    // one layer of claims at a time from the ground up: each raised floor at or
+    // under the cut first blanks its whole claim (its slab, solid where its
+    // filler leaves cells unbuilt; open only at a pit), so nothing of what lies
+    // under it, a wall, a column or a floor, shows through or over it
+    const cutZ = Number.isFinite(opts.cutZ) ? opts.cutZ : W.floorZ;
+    const tiers = [{ list: ready, cover: null }];
+    for (const r of raised) {
+      const z = r.site.floorZ, last = tiers[tiers.length - 1];
+      if (last.z === z) { last.list.push(r); continue; }
+      tiers.push({ z, list: [r], cover: W.floorZ !== undefined && z <= cutZ + 1e-6 ? [] : null });
+    }
+    for (const t of tiers) if (t.cover) for (const r of t.list) {
+      const o = r.fillerOrigin, pits = (r.filler.holes || []).filter((h) => h.kind === 'pit' && h.face === 'floor')
+        .map((h) => [h.rect[0] + o[0], h.rect[1] + o[1], h.rect[2] + o[0], h.rect[3] + o[1]]);
+      t.cover.push(...pits.reduce((rs, q) => rs.flatMap((a) => BR.TG.rsub(a, q)), r.site.rects));
+    }
+    const draw = (list, layer) => {
+      for (const r of list) {
         // (a filler's floors are labelled when it has more than one height: a gallery, a sunken floor)
         if (r.filler) blueprint(r.filler, r.fillerOrigin, layer, lab && (opts.focus === r.site.id || r.filler.levels.length > 1 || !!r.filler.stairs), r.site.id);
         for (const B of r.buildings) blueprint(B.b, B.origin, layer, lab, r.site.id + '/' + B.poi.id);
       }
-      for (const { r, box } of arrivals) {
-        g.save(); g.beginPath(); g.rect((box[0] - x0) * tz, (box[1] - y0) * tz, (box[2] - box[0]) * tz, (box[3] - box[1]) * tz); g.clip();
-        blueprint(r.filler, r.fillerOrigin, layer, lab, r.site.id);
-        g.restore();
+    };
+    const layers = W.floorZ !== undefined ? ['floors', 'walls', 'labels'] : ['floors', 'walls'];
+    tiers.forEach((t, k) => {
+      if (t.cover) { g.fillStyle = BG; for (const q of t.cover) g.fillRect((q[0] - x0) * tz, (q[1] - y0) * tz, (q[2] - q[0]) * tz, (q[3] - q[1]) * tz); }
+      for (const layer of layers) {
+        draw(t.list, layer);
+        // the ground's seams (doors and windows on its shared walls) with its walls, under any raised floor
+        if (k === 0 && layer === 'walls' && seams.size) TPL.drawSeamOpenings(g, [...seams.values()], { scale: tz, ox: -x0 * tz, oy: -y0 * tz });
       }
+    });
+    // a climb from the band below, through its landing site's opening (never grown over)
+    for (const layer of layers) for (const { r, box } of arrivals) {
+      g.save(); g.beginPath(); g.rect((box[0] - x0) * tz, (box[1] - y0) * tz, (box[2] - box[0]) * tz, (box[3] - box[1]) * tz); g.clip();
+      blueprint(r.filler, r.fillerOrigin, layer, lab, r.site.id);
+      g.restore();
     }
-    if (seams.size) TPL.drawSeamOpenings(g, [...seams.values()], { scale: tz, ox: -x0 * tz, oy: -y0 * tz });
     return complete;
   }
 

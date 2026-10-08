@@ -33,7 +33,7 @@ data is milestone 6.
   packages. `index.html` is the map, `workbench.html` the template workshop,
   `elevation.html` the elevation lab. Serve the folder statically to inspect
   (`python3 -m http.server 8765`).
-- `main` holds everything up to growth step 3b (PR #27). Growth step 4 is on
+- `main` holds everything up to growth step 4 (PR #28). The map layering fix is on
   `claude/fast-test-runs-l53vww` (the branch name is reused).
   The branches `claude/world-journeys`, `claude/kept-stairs`,
   `claude/house-branch` and `claude/recursive-growth` are merged and can be
@@ -60,6 +60,7 @@ data is milestone 6.
 | [#26](https://github.com/Zetic/Backrooms-Prototype-Map/pull/26) | Growth step 3: recursive growth between the bands; journey plots removed from the world |
 | [#27](https://github.com/Zetic/Backrooms-Prototype-Map/pull/27) | Growth step 3b: an origin per 2 × 2 block with its house planted by the ground plan, bigger branches, tall rooms grown round, a smaller landing reserve, every growth on the zoomed-out map |
 | [#28](https://github.com/Zetic/Backrooms-Prototype-Map/pull/28) | Growth step 4: house rooms in branches (house hallways, bedrooms, living rooms) and whole houses standing in branch floors |
+| [#29](https://github.com/Zetic/Backrooms-Prototype-Map/pull/29) | Map: claims painted layer by layer, so nothing under a raised floor is drawn over it; deeper floors darker |
 
 ## What the user wants
 
@@ -348,6 +349,15 @@ over, every growth on the zoomed-out map, no freeze while planning.
   step 3), about 7 sites a growth. The remaining failures are mostly a site
   past the landing door that is a POI or too small.
 
+**Map layering across claims** (`src/render.js`). A map tile paints its
+claims one layer at a time from the ground up: the ground's floors, walls,
+seams and tags, then each raised floor at or under the cut, which first blanks
+its whole claim (solid where its filler leaves cells unbuilt, open only at a
+pit). Before, every claim's floors were painted, then every claim's walls, so
+the ground's walls and columns were drawn over the floors above it, and a dimmed
+raised floor let the ground show through. Floors further under the cut are
+darker (5% a metre, at most 45%; it was 2.5%, at most 28%).
+
 **Growth step 4, house rooms** (`src/tpl/fillers/house.js`, `src/biomes.js`,
 `src/growth.js`; [docs/growth.md](docs/growth.md)). The user's ask: "literal
 house themed rooms, so house hallways, living rooms, more houses", not rooms
@@ -406,8 +416,6 @@ that merely read like a house.
 - The houseroom pool is three house fillers and five house archetypes:
   literal houses, nothing strange yet (no attics, crawlspaces or wrong-way
   stairs).
-- On the map, a ground filler's columns (cross pillars) are drawn over raised
-  floors standing above it at the cut height; this predates step 4.
 - A raised site that cannot be built is dropped with its subtree; a parent
   that fails only because of a child's door is dropped too (rather than the
   child). In practice none fails: over 300 cells, 0 of 51 raised sites.
