@@ -33,7 +33,7 @@ data is milestone 6.
   packages. `index.html` is the map, `workbench.html` the template workshop,
   `elevation.html` the elevation lab. Serve the folder statically to inspect
   (`python3 -m http.server 8765`).
-- `main` holds everything up to growth step 3b (PR #27). Growth step 4 is on
+- `main` holds everything up to growth step 4 (PR #28). The map layering fix is on
   `claude/fast-test-runs-l53vww` (the branch name is reused).
   The branches `claude/world-journeys`, `claude/kept-stairs`,
   `claude/house-branch` and `claude/recursive-growth` are merged and can be
@@ -60,6 +60,7 @@ data is milestone 6.
 | [#26](https://github.com/Zetic/Backrooms-Prototype-Map/pull/26) | Growth step 3: recursive growth between the bands; journey plots removed from the world |
 | [#27](https://github.com/Zetic/Backrooms-Prototype-Map/pull/27) | Growth step 3b: an origin per 2 × 2 block with its house planted by the ground plan, bigger branches, tall rooms grown round, a smaller landing reserve, every growth on the zoomed-out map |
 | [#28](https://github.com/Zetic/Backrooms-Prototype-Map/pull/28) | Growth step 4: house rooms in branches (house hallways, bedrooms, living rooms) and whole houses standing in branch floors |
+| [#29](https://github.com/Zetic/Backrooms-Prototype-Map/pull/29) | Map: claims painted layer by layer, so nothing under a raised floor is drawn over it; deeper floors darker |
 
 ## What the user wants
 
