@@ -238,6 +238,31 @@
     return b;
   }
 
+  /**
+   * Keep a template under a cap: every room's ceiling at most `cap` metres
+   * above the template's ground floor (something else owns the space above,
+   * band-world.js). Floors stay where they are; only ceilings come down, and
+   * the template's own stairs are laid out again under them. Changes `b` in
+   * place. false if a room would be left under 2.2 m, or a stair it had no
+   * longer fits: the caller builds it again without its extra floors.
+   */
+  function capCeilings(b, cap) {
+    if (!b || b.error || b.schema === E.SCHEMA) return !b || !b.error;
+    const level = (lv) => (b.levels.find((l) => l.index === (lv || 0)) || b.levels[0]).elevation;
+    let changed = false;
+    for (const r of b.rooms) {
+      const z = level(r.level) + (r.floor || 0), room = Math.floor((cap - z) * 20 + EPS) / 20;
+      if ((r.ceiling || 2.5) <= room + EPS) continue;
+      if (room < 2.2 - EPS) return false;
+      r.ceiling = round(room); changed = true;
+    }
+    if (!changed) return true;
+    for (const l of b.levels) if (l.height !== undefined) l.height = round(Math.min(l.height, cap - l.elevation));
+    const had = b.stairs ? b.stairs.links.length : 0;
+    if (had) { bakeStairs(b); if (!b.stairs || b.stairs.links.length < had) return false; }
+    return true;
+  }
+
   const resolvable = (source) => (source.verticals || []).filter((v) => !v.dead && Array.isArray(v.rooms) && v.rooms.length >= 2);
   /**
    * Each pair of rooms a source vertical joins (consecutive storeys of a
@@ -419,12 +444,19 @@
         }
       }
     }
+    // a pit (band-world.js) drills through two blueprints: each lists it in
+    // `drops` and owns its own cutout
+    const drops = new Set((b.drops || []).map((d) => d.id));
     for (const h of b.holes) {
-      const s = surfaces.get(h.surface);
-      if (!s || !['floor', 'ceiling'].includes(h.face) || !b.connectors.some((c) => c.id === h.connector)) { bad(h.id + ' has invalid ownership'); continue; }
+      const s = surfaces.get(h.surface), drilled = drops.has(h.connector);
+      if (!s || !['floor', 'ceiling'].includes(h.face) || (!drilled && !b.connectors.some((c) => c.id === h.connector))) { bad(h.id + ' has invalid ownership'); continue; }
       for (const p of [[h.rect[0], h.rect[1]], [h.rect[2], h.rect[3]]]) if (!inside(s.rects, p)) bad(h.id + ' cutout outside surface');
       // an unselected zone cuts nothing: every cutout belongs to a selected connector
-      if (!b.connectors.some((c) => c.id === h.connector && c.state === 'connected')) bad(h.id + ' cut by an unselected connection');
+      if (!drilled && !b.connectors.some((c) => c.id === h.connector && c.state === 'connected')) bad(h.id + ' cut by an unselected connection');
+    }
+    for (const d of b.drops || []) {
+      const s = surfaces.get(d.surface), face = d.role === 'top' ? 'floor' : 'ceiling';
+      if (!s || !['top', 'bottom'].includes(d.role) || !b.holes.some((h) => h.connector === d.id && h.surface === d.surface && h.face === face)) bad(d.id + ' drop has no ' + face + ' cutout');
     }
     for (const c of b.connectors.filter((c) => c.kind === 'ladder')) if (!b.holes.some((h) => h.connector === c.id && h.face === 'floor') || !b.holes.some((h) => h.connector === c.id && h.face === 'ceiling')) bad(c.id + ' lacks explicit floor/ceiling cutouts');
     for (const e of b.navigation.edges) {
@@ -445,5 +477,5 @@
     return { errors: [...new Set(errors)], warnings: [...new Set(warnings)] };
   }
 
-  Object.assign(E, { stairsKey, bakeStairs, keptStairs, liftConnector, exitOrder, mainFloor, arrivalsOn, prepare, ladderVariant, refresh, capabilities, validate, reachable, ReservationIndex, volumeOverlap, reservationsOf, prism, addRoomWalls, addHoles, floorPoint, inside, overlap });
+  Object.assign(E, { stairsKey, bakeStairs, keptStairs, liftConnector, capCeilings, exitOrder, mainFloor, arrivalsOn, prepare, ladderVariant, refresh, capabilities, validate, reachable, ReservationIndex, volumeOverlap, reservationsOf, prism, addRoomWalls, addHoles, floorPoint, inside, overlap });
 })(typeof window !== 'undefined' ? window : globalThis);

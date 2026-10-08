@@ -96,6 +96,24 @@ assert.deepEqual(BR.ELEV.validate(b()).errors,[]);
 $('seed').value='-1';$('seed').dispatch('change');
 assert.equal(b(),null);assert($('export').disabled);assert.equal($('error').style.display,'block');
 $('seed').value='7';$('seed').dispatch('change');assert(b());
+// a stair carried on up (claims.js): how a raised branch is entered. The
+// landing sits a storey above the house's roof with a door out to its lot.
+$('template').value='template:two_storey';$('template').dispatch('change');
+$('connection').value='none';$('connection').dispatch('change');
+const storeys=b().levels.length;
+$('raise').checked=true;$('raise').dispatch('change');
+assert(b(),'a two-storey house can carry its stair on up: '+$('error').textContent);
+assert.equal(b().levels.length,storeys+1,'one more floor, and only one');
+const landing=b().rooms.find((r)=>(r.tags||[]).includes('raised'));
+assert(landing&&landing.floorZ===6.5&&landing.ceilingZ===8.9,'the landing stands at the branch floor');
+assert(b().connectors.some((c)=>c.to==='s:'+landing.id&&c.kind==='stair'),'the house own stair climbs to it');
+assert(b().portals.some((p)=>p.room===landing.id&&(p.tags||[]).includes('raised branch')),'with a door out of it');
+assert.deepEqual(BR.ELEV.validate(b()).errors,[]);
+assert(location.hash.includes('raise=1'));
+$('template').value='template:closet';$('template').dispatch('change');
+assert.equal(b(),null);assert(/carry on up/.test($('error').textContent),'a template with no stairwell says so: '+$('error').textContent);
+$('raise').checked=false;$('raise').dispatch('change');
+$('connection').value='up';$('connection').dispatch('change');
 // a journey: templates stacked from band 0 to band 1, its route the profile
 $('template').value='journey:ramps';$('template').dispatch('change');
 assert.equal(b().kind,'journey');assert.equal(b().source.style,'ramps');assert.equal(Number($('width').value),48);

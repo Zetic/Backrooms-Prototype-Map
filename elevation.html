@@ -74,11 +74,12 @@
       <label><input id="ghost" type="checkbox" checked> Ghost upper / other floors</label>
 
       <label><input id="labels" type="checkbox" checked> Room labels</label>
+      <label><input id="raise" type="checkbox"> Carry its stair on up (a raised landing)</label>
     </div>
     <div id="capabilities" class="small"></div>
     <button id="export" type="button">Download elevation JSON</button>
     <div id="status" class="small" role="status" aria-live="polite"></div>
-    <p id="note" class="muted small">Connection zones are where a template can climb or descend. Each template prefers some types; a type that does not fit falls through to the next, down to the ladder every template has. A connected variant adds a real landing, its cutouts and a reservation that follows the slope. A journey stacks such climbs: different templates, one above another, from one band's floor to the next band's 16 m up, with a floor to cross between each climb.</p>
+    <p id="note" class="muted small">Carrying a stair on up is how a raised branch is entered in the world (claims.js): a two-storey house's stairwell climbs one more flight to a landing above its roof, run out to the edge of its lot with a door there. Connection zones are where a template can climb or descend. Each template prefers some types; a type that does not fit falls through to the next, down to the ladder every template has. A connected variant adds a real landing, its cutouts and a reservation that follows the slope. A journey stacks such climbs: different templates, one above another, from one band's floor to the next band's 16 m up, with a floor to cross between each climb.</p>
   </aside>
   <section id="workspace" aria-label="Elevation inspection">
     <div id="floorbar"><label>View<select id="mode"><option value="cutaway">Cutaway</option><option value="exact">Exact floor</option></select></label><label>Local floor<select id="floor" aria-label="Floor elevation"></select></label><span id="summary"></span></div>
@@ -123,6 +124,7 @@
 <script src="src/tpl/elevation.js"></script>
 <script src="src/tpl/connections.js"></script>
 <script src="src/journeys.js"></script>
+<script src="src/claims.js"></script>
 <script src="src/tpl/elevation-view.js"></script>
 <script src="src/elevation-lab.js"></script>
 </body>

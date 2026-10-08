@@ -6,10 +6,14 @@ person) picking the project up. The durable design and milestones live in
 [docs/elevation-world.md](docs/elevation-world.md). Read both before changing
 vertical generation.
 
-Milestones 1 to 4 of the elevation plan are done, plus a follow-up that puts a
+Milestones 1 to 5 of the elevation plan are done, plus a follow-up that puts a
 template's own stairs on the map, and a tooling milestone, **fast test runs**
-(a parallel runner with quick and full modes, and CI; see below). The next
-milestone is milestone 5, an Unreal consumer of the exported data.
+(a parallel runner with quick and full modes, and CI; see below). Milestone 5,
+**layered ownership**, is the first step of the growth design (the design doc
+is a Claude artifact in the project thread, not in the repo): a column can hold
+several owners stacked at different heights, with a hand-placed raised branch
+over the ground and a drilled pit back down. Growing and steering branches is
+the work after it; the Unreal consumer of the exported data is milestone 6.
 
 ## Repository state
 
@@ -84,9 +88,10 @@ radii and exact connection adapters.
 | Kept stairs (#22) | Laid out once at generation and kept on the template (`b.stairs = { key, links }`); `prepare` adopts them while the geometry fingerprint matches; the map draws them |
 | Journeys (M4) | `src/journeys.js`: per band pair per 512 m region, a territory holding a stack of different fillers climbing 16 m, each climb a stair, ramp or ladder with an exact rise. Styles: mixed, stairs, ramps, ladders |
 | World | `BR.BandWorld`: independently seeded horizontal bands, joined by journeys. Plans are pure functions of (seed, region, band pair); generation order and cache eviction change nothing |
-| World export | `br.world-elevation/0.1`: layouts, reservations, navigation, exact portal matches, `policy.verticalJourneys: 'composed'`, a `journeys` summary, `verticalFrontier` for journey doors onto an unexported band |
-| Map | Continuous cutaway by height, band switching; a template's stairs at their width with their heights (click one to move the cut to where it arrives); sunken floors at their depth; journey territories teal at plan zoom; *Journey ↓ / ↑* buttons; hover names a journey's bands, style and floors |
-| Lab | Any template or filler with direction/type/rise; zones view; a journey per style with its climbs, floors and route profile |
+| Layered ownership (M5) | `src/claims.js`: claims with height ranges in one column, ceilings capped under a claim above, a house's stairwell carried up to a raised landing, and pits found and drilled between two claims. `band-world.js` plans one hand-placed raised branch per cell at +6.5 m (two plain filler sites) and one pit down into the ground |
+| World export | `br.world-elevation/0.2`: layouts, reservations, navigation, exact portal matches, `policy.verticalJourneys: 'composed'`, `policy.layeredOwnership: 'stacked-claims'`, a `journeys` summary, per-slice `raised[]` with each site's `floorZ`/capped `ceilingZ`, a top-level `pits[]`, `verticalFrontier` for journey doors onto an unexported band |
+| Map | Raised branches painted with the ground at their own height (the ground showing through their pits), hover telling you what stands over what; continuous cutaway by height, band switching; a template's stairs at their width with their heights (click one to move the cut to where it arrives); sunken floors at their depth; journey territories teal at plan zoom; *Journey ↓ / ↑* buttons; hover names a journey's bands, style and floors |
+| Lab | Any template or filler with direction/type/rise; zones view; "Carry its stair on up" for the raised landing a branch is entered from; a journey per style with its climbs, floors and route profile |
 | Workbench | Every template and filler, a tab per floor, real stairs drawn |
 
 ## Essential spatial rules
@@ -111,6 +116,11 @@ radii and exact connection adapters.
 9. Map painting never adapts a blueprint (no `prepare`, no zone searches per
    draw). It reads kept stairs instead. Keep this boundary: it is what keeps
    the map fast.
+10. One column can hold several owners, each with a bottom and a top. Claims
+   may touch at a slab (a ground claim's top is the raised floor's slab) but
+   never overlap, and a claim is never shortened to make room: the blueprint
+   is rejected instead. Capping a ceiling is the only change a claim above
+   makes to the ground below it.
 
 ## How each milestone works (short)
 
@@ -167,6 +177,36 @@ draw connection tags in a last pass, after every wall.
   mixed about two-thirds stairs. A journey takes 0.2-0.3 s to build on
   average, up to about 0.9 s.
 
+**Milestone 5, layered ownership** (`src/claims.js`, `src/band-world.js`).
+- `reservationPlan` emits one claim per site: ground `[floorLimit − slab,
+  ceilingOf(site)]`, raised `[branchFloor − slab, ceilingLimit]`. `ceilingOf`
+  returns the branch's floor slab where one stands over the site.
+- Planning must not need a build and building must not need the plan:
+  `World.buildRaw` builds a site uncached and without the hook (for the
+  planner), and every build-time change happens in the new `afterBuild` hook
+  (capping ceilings, swapping the anchor house for its landing build, marking
+  the ground filler with the pit's lower half). The pit's lower cutout and its
+  shaft are added in `spatial()`, after `prepare` (which wipes holes and voids
+  on a template-schema blueprint).
+- `CLAIM.stairTop` / `raiseStair` carry a template's own top stair one flight
+  further: a level, a `stairwell` room tagged `raised` with its walls, a door
+  snapped to the half metre and a portal tagged `raised branch`, the landing
+  appended to the stair's own vertical, then `bakeStairs` again. It refuses
+  less than 3 m of climb, a ceiling already above the landing, or a run that
+  does not fit.
+- `CLAIM.pitSpot` / `markDrop` / `drill`: a 2 × 2 m square clear of walls,
+  columns, holes, connector reservations and other drops, with a clear floor at
+  least 3 m below and nothing crossing the shaft; `drill` is idempotent and
+  reserves the shaft as a void and a volume on the lower claim. Both halves
+  carry a `drop` with one id and rectangle; `graph()` pairs them into one
+  directed `forward` edge of kind `pit` and no undirected edge, so the drop is
+  one way. No ladder, no rope.
+- Known place for the proof: seed 31337, band 0, cell (−3, 2). The anchor lot
+  is `b0|-3,2:68` (side E, reach 2.5 m), the raised sites stand over
+  `b0|-3,2:71` and `b0|-3,2:47`, and the pit `pit:branch:0:-3,2:0` falls 6.5 m
+  at [−265.5, 381.5, −263.5, 383.5]. Seeds 7, 99, 12345 and 4242 also have
+  branches (1-3 per 36 cells, several with pits).
+
 ## Known limits
 
 - One journey per band pair per region, always exactly one band tall; no
@@ -184,6 +224,16 @@ draw connection tags in a last pass, after every wall.
   gallery and one sunken floor per building; no mezzanines open on several
   sides, split levels or composites with storeys of their own.
 - Seams (shared walls between blueprints) are not computed against journeys.
+- A raised branch is hand-placed, not grown: one per cell at most, always two
+  plain filler sites at +6.5 m, entered only from a yard lot's stairwell, and
+  it never covers a lot or a POI. It does not steer, link to another branch or
+  to a journey, and nothing picks the fillers on it by biome. About 1 to 3
+  cells in 36 have one.
+- A pit needs 3 m of fall, a clear 2 × 2 m square on both floors and a clear
+  shaft between them, so a branch often has none. Drilled walls (the
+  horizontal counterpart) do not exist yet.
+- Only a ceiling is capped under a claim: a ground room that would need a
+  shorter ceiling than 2.2 m refuses the cap, and the branch moves on.
 - The world's streaming check (under 5 ms a site) runs at 2-5 ms, closer to
   its limit when files run in parallel. It now takes the best of up to three
   passes and fails only over 6.25 ms (full mode), so a busy machine no longer
@@ -202,7 +252,8 @@ draw connection tags in a last pass, after every wall.
 | `src/tpl/floors.js` | Sunken floors and galleries |
 | `src/tpl/elevation-view.js` | Cutaway, connection drawing, kept-stair parts, route profile |
 | `src/journeys.js` | Journeys |
-| `src/band-world.js` | Bands, journey plans and slices, ownership, spatial graph, world export |
+| `src/claims.js` | Layered ownership: capped ceilings, a stair carried up to a raised landing, pits found and drilled |
+| `src/band-world.js` | Bands, journey plans and slices, raised branches and their pits, stacked claims, spatial graph, world export |
 | `src/render.js`, `index.html` | Map tiles and interaction |
 | `src/elevation-lab.js`, `elevation.html`; `workbench.html` | Lab; workbench |
 
@@ -216,12 +267,12 @@ node tests/floors.test.js --full     # one file on its own
 ```
 
 Quick mode runs every check on 2 world seeds and smaller samples; full mode is
-the whole suite as it always was (5 world seeds, full samples, 375 checks).
+the whole suite as it always was (5 world seeds, full samples, 392 checks).
 Run quick after each change and full before a PR. GitHub Actions runs full on
 every PR to `main`. See "Fast test runs" below for how it works.
 
 For vertical work start with `tests/elevation.test.js`, `connections.test.js`,
-`floors.test.js`, `journeys.test.js`, `band-world.test.js`, `cutaway.test.js`,
+`floors.test.js`, `journeys.test.js`, `claims.test.js`, `band-world.test.js`, `cutaway.test.js`,
 `elevation-ui.test.js`, `band-render.test.js` and `ui-smoke.test.js`. The UI
 tests run the real page controllers with stub DOM and canvas; they are not
 browser layout QA, so also look at the pages (Playwright with the
@@ -234,9 +285,9 @@ geometry and behaviour, not field assignments.
   milestone, committed as Claude (`git -c user.name="Claude" -c
   user.email="noreply@anthropic.com" commit`), commit messages ending with the
   session's attribution lines.
-- Pull requests opened with the REST API (`gh api
-  repos/Zetic/Backrooms-Prototype-Map/pulls -X POST ...`); GraphQL is blocked.
-  PR bodies end with the Claude Code attribution.
+- Pull requests opened with the GitHub MCP tools (`mcp__github__*`): no `gh`,
+  `hub` or raw API in this session. PR bodies end with the Claude Code
+  attribution.
 - The user is often away: make reasonable calls, report them plainly, and stop
   only for decisions that cannot be undone.
 - For big changes, an independent review agent checks the diff before the PR.
@@ -281,14 +332,15 @@ Measured on 2026-10-08 on a 4-core cloud machine (2 cores emulated with
 
 | Run | 4 cores | 2 cores |
 | --- | --- | --- |
-| Before: every file one after another (375 checks) | 149 s | 176 s |
-| Quick, `node tests/run-all.js` (258 checks) | 46 s | 85 s |
-| Full, `node tests/run-all.js --full` (375 checks) | 76 s | 141 s |
+| Before this tooling, every file one after another (375 checks then) | 149 s | 176 s |
+| Quick, `node tests/run-all.js` (275 checks) | 48 s | 92 s |
+| Full, `node tests/run-all.js --full` (392 checks) | 82 s | 155 s |
 
-Each run was made twice in a row (quick) or once (full) with no failure and no
-timing warning. The slowest files in quick mode are band-world (about 25 s
-when sharing the machine) and the two world seeds (about 20 s each). The
-quick target of about 60 s on 2 cores is not met: see the next paragraph.
+Each run was made with no failure and no timing warning; the quick and full
+numbers were re-measured with milestone 5's checks in them. The slowest files
+in quick mode are band-world (about 32 s when sharing the machine) and the two
+world seeds (about 20 s each). The quick target of about 60 s on 2 cores is not
+met: see the next paragraph.
 
 **What still costs time.** Node does a lot of its work on background threads
 (TurboFan compiles optimised code concurrently): a world run uses about twice
@@ -303,7 +355,24 @@ about 30%, but the tests run with V8's defaults, as the browser does.)
 
 ## Next
 
-1. **Milestone 5: an Unreal consumer proof.** The export is now one connected
+1. **Grow the branches** (the next step of the growth design, after layered
+   ownership). The mechanics are in place; what is missing is a planner that
+   decides where branches go instead of one hand-placed per cell:
+   - A branch should grow from a semi-spine (a pillar of fillers off a POI),
+     spread over the sites it can reach at its height, and stop on a budget
+     rather than on a fixed count of two sites.
+   - Steering: a branch should prefer to grow away from the spine it started
+     from, and a second branch at another height should be able to stand over
+     the first (the claims already allow it; nothing plans it).
+   - Biome pools: which fillers may stand on a branch (the "house biome" the
+     user described), instead of the ordinary filler pool with no floors.
+   - Linking: a branch meeting another branch or a journey, through a seam, a
+     drilled wall or a pit. Pits are in; drilled walls are the next emergent
+     connection.
+   - Keep the rules this milestone established: whole sites only, claims that
+     touch but never overlap, the ground plan unchanged, and a plan that is a
+     pure function of (seed, band, cell).
+2. **Milestone 6: an Unreal consumer proof.** The export is now one connected
    multi-band network, so it is ready to be consumed.
    - First, an engine-neutral reference builder in this repo: read a
      `br.world-elevation` export and emit simple geometry (glTF or OBJ):
@@ -317,7 +386,7 @@ about 30%, but the tests run with V8's defaults, as the browser does.)
      `TPL.CAT.CONNECTIONS`).
    - Freeze what the consumer relies on: version the world export
      (`br.world-elevation/0.2`) once the consumer reads it.
-2. **Journey polish**, in rough order of value:
+3. **Journey polish**, in rough order of value:
    - Remove the map stall: build journeys off the paint path (a Web Worker, or
      build when the cell is planned while the map is idle).
    - Show a journey's route on the map when hovered or selected (the lab's
@@ -327,6 +396,6 @@ about 30%, but the tests run with V8's defaults, as the browser does.)
    - Density and style by district or biome instead of one per region and a
      fixed weighting; consider journeys spanning two bands.
    - Merge the double wall at landing exits into one shared wall.
-3. **More vertical variety inside templates**: galleries on jogged walls,
+4. **More vertical variety inside templates**: galleries on jogged walls,
    mezzanines open on several sides, split-level houses, composites with
    storeys, curved stairs or ramps for curved fillers.

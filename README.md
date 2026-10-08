@@ -102,12 +102,22 @@ the last, joined by stairs, ramps or ladders, with a floor to cross between
 each climb and the next. Some journeys lean to ramps, some to ladders, some
 to stairs; the largest share (4 in 9) take each floor's own preference.
 
+A column can also hold two owners at once (milestone 5): where a cell has a
+house whose stairwell can carry on up, a raised branch of a couple of fillers
+stands at +6.5 m over the ground sites next to it. The ground keeps its own
+floor with its ceiling capped under the branch, the two claims meet at the
+branch's floor slab, and a pit drilled through that floor drops into the site
+below — one way only, with no ladder and no rope.
+
 Open [the elevation lab](elevation.html) to inspect actual floors, continuous
 cutaway heights and the connection zones of every template and filler: where a
 ladder, stair or ramp fits up or down, and a connected variant of any of them
 (the template's preferred type by default, the ladder as fallback) with its
 landing, cutouts and slope-following reservation. Exact local floor inspection,
 ghosting, route profiles and `br.elevation/0.2` JSON export remain available.
+"Carry its stair on up" climbs a two-storey house's stairwell one more flight to
+a landing above its roof, with a door out at the edge of its lot: the way into a
+raised branch, inspectable on any template that has a stair of its own.
 The workbench detail panel opens the same template in the lab. The main map
 uses band controls, a continuous cut height, and template-specific inspection.
 [Elevation world planning, reservations and export](docs/elevation-world.md).
@@ -126,7 +136,7 @@ uses band controls, a continuous cut height, and template-specific inspection.
 | Journey ↓ / Journey ↑ | Centre the view on the nearest journey down or up from the active band |
 | Cutaway height | Highest floor below the cut at each XY; lower floors shaded by depth |
 | Click a template | Its actual floor choices, focused upper-floor ghosting and JSON export |
-| Hover | The site's template, size, connections, biome and build time; the POI, its setting and its doors; a journey's bands, style and floors |
+| Hover | The site's template, size, connections, biome and build time; the POI, its setting and its doors; a journey's bands, style and floors; a raised branch with its pit, or the ground under one with its capped ceiling |
 
 The URL hash keeps the seed, position, zoom, band, cut height and toggles, for example
 `#seed=31337&x=20&y=70&z=9&graph=1`.
@@ -145,7 +155,8 @@ The URL hash keeps the seed, position, zoom, band, cut height and toggles, for e
 | `tpl/connections.js` | Connection zones (ladder, stair, ramp), template preferences, slope-following reservations, `connectionVariant`, and `linkFloors` (a template's own stairs between its floors) |
 | `tpl/floors.js` | Floor patterns on a finished building: sunken floors with steps, galleries over an undercroft |
 | `journeys.js` | Vertical journeys: different fillers stacked from one band's floor to the next, joined by connection variants with exact rises |
-| `band-world.js` | Deterministic reference-band networks, journey plans across band pairs, spatial reservations, exact portal matching and canonical world export |
+| `claims.js` | Layered ownership mechanics: capping a ceiling under a claim above, carrying a stair up to a raised landing, and finding and drilling a pit between two claims |
+| `band-world.js` | Deterministic reference-band networks, journey plans across band pairs, hand-placed raised branches and their pits, stacked spatial claims, exact portal matching and canonical world export |
 
 ```js
 const W = new BR.World(31337);
@@ -164,7 +175,7 @@ node tests/run-all.js --full    # full: before pushing or opening a PR (CI runs 
 Run the **quick** mode while you work: it runs every check, on 2 world seeds
 and smaller samples where a check samples many seeds or sizes. Run the
 **full** mode before a PR: all 5 world seeds and the full samples, every check
-the suite has (375). GitHub Actions runs the full mode on every pull request to
+the suite has (392). GitHub Actions runs the full mode on every pull request to
 `main` (`.github/workflows/tests.yml`) and shows the result on the PR.
 
 Test files run in parallel, one per core and slowest first (`--jobs N` to
@@ -176,9 +187,9 @@ the best of up to three passes: in quick mode they only report a slow pass
 (`WARN`), in full mode they fail when even the best is over budget by more than
 25%.
 
-Measured on 2026-10-08 on a 4-core cloud machine: quick 46 s, full 76 s; held
-to 2 cores, quick 85 s and full 141 s. The old one-file-at-a-time run of the
-full suite took 149 s and 176 s there.
+Measured on 2026-10-08 on a 4-core cloud machine: quick 48 s, full 82 s; held
+to 2 cores, quick 92 s and full 155 s. The old one-file-at-a-time run of the
+full suite took 149 s and 176 s there, with 17 checks fewer.
 
 The runner checks:
 
@@ -220,6 +231,13 @@ The runner checks:
   neighbouring bands become one network, whichever band is generated first and
   whatever the caches drop; a journey that cannot be built leaves an ordinary
   filler behind the same doors.
+- **Layered ownership.** A ceiling capped under a claim above keeps its room
+  usable, or the cap is refused; a stair carried on up reaches a landing with
+  its door on the grid; a pit's shaft is clear of everything on both sides and
+  drilling it twice changes nothing. In the world no two claims overlap in 3D,
+  a ground claim and the raised claim over it meet exactly at the branch's
+  floor slab, the ground plan is the same with layering off, the branch is
+  walkable from the house and back, and a pit only goes down.
 - **Fillers.** Every filler keeps the contract on any site shape and honours
   every connection. The pool leans enclosed, and fillers are fast.
 - **The world, on five seeds (two in quick mode).** Sites tile every cell exactly. Connections are
@@ -236,4 +254,3 @@ The runner checks:
   all-template connection potential, and the lab's actual controller with a
   minimal DOM/canvas adapter.
 
-There is no CI yet; run the checks before pushing.

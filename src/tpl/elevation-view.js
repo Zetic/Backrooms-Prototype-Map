@@ -204,6 +204,30 @@
       }
     }
   }
+  /**
+   * Pits (claims.js): a square drilled straight down, never climbed. In the
+   * floor you look at it is a dark square outlined in blue (what is below);
+   * from the room underneath, the way it is open overhead is dashed and
+   * faint. A pit has no route to draw: nothing goes up it.
+   */
+  function drawPits(g, b, o, plan, X, Y, S) {
+    for (const d of (b.drops || []).slice().sort((p, q) => (p.id + p.role).localeCompare(q.id + q.role))) {
+      const room = b.rooms.find((r) => 's:' + r.id === d.surface);
+      if (!room) continue;
+      const z = roomZ(b, room, o.baseZ), top = d.role === 'top';
+      const seen = top ? z <= o.cutZ + EPS : z <= o.cutZ + EPS && o.cutZ < z + (d.fall || 0) - EPS;
+      if (!seen) continue;
+      if (o.layer !== 'labels') {
+        g.save(); poly(g, rectPts(d.rect), X, Y);
+        if (top) { g.fillStyle = INK.hatch; g.fill(); g.setLineDash([]); } else { g.globalAlpha *= 0.5; g.setLineDash([3, 3]); }
+        g.strokeStyle = top ? INK.below : INK.above; g.lineWidth = Math.max(1, S * 0.06); g.stroke();
+        g.restore();
+      }
+      if (o.layer === 'floors' || (o.deferLabels && o.layer !== 'labels') || S < 5) continue;
+      const r = d.rect;
+      tag(g, (top ? '↓ pit ' + zLabel(-(d.fall || 0)).replace('-', '') : '↑ pit above'), X((r[0] + r[2]) / 2), Y(r[1]) - 4, 'center', top ? INK.below : INK.above);
+    }
+  }
   /** unselected opportunities (connection zones), for inspection: dashed areas, one label each */
   function drawZones(g, b, o, X, Y, S) {
     // the zones of the storey in view: from the highest floor at or below the
@@ -234,7 +258,7 @@
     if (o.exact) { const records = floorRecords(b, o.baseZ).filter((r) => Math.abs(r.floorZ - height) < EPS); if (records.length) { plan.groups.push({ level: records[0].level, floorZ: height, records, occluders: union(records.flatMap((r) => r.holes)) }); plan.visible.push(...records); } }
     g.save();
     // the connections' tags alone, over everything else drawn (map tiles draw them after every wall)
-    if (o.layer === 'labels') { drawConnections(g, b, { ...o, cutZ: height }, plan, X, Y, S); g.restore(); return plan; }
+    if (o.layer === 'labels') { drawConnections(g, b, { ...o, cutZ: height }, plan, X, Y, S); drawPits(g, b, { ...o, cutZ: height }, plan, X, Y, S); g.restore(); return plan; }
     if (o.ghost) for (const z of floorElevations(b, o.baseZ)) {
       if (o.exact ? z === height : z <= height + EPS) continue;
       const r = b.rooms.find((r) => roomZ(b, r, o.baseZ) === z); g.save(); g.globalAlpha *= 0.08;
@@ -261,7 +285,9 @@
       g.restore();
     }
     if (o.zones && o.layer !== 'floors') drawZones(g, b, { ...o, cutZ: height }, X, Y, S);
-    drawConnections(g, b, { ...o, cutZ: height }, plan, X, Y, S); g.restore(); return plan;
+    drawConnections(g, b, { ...o, cutZ: height }, plan, X, Y, S);
+    drawPits(g, b, { ...o, cutZ: height }, plan, X, Y, S);
+    g.restore(); return plan;
   }
   function draw(g, b, o) {
     o = o || {}; const home = b.bands && b.bands[0].elevation;
@@ -296,5 +322,5 @@
     g.textAlign = 'right'; g.fillText('Arrival · ' + Math.round(length) + ' m along route', right, height - 13);
     g.restore();
   }
-  Object.assign(E, { draw, drawProfile, profilePoints, drawCutaway, cutawayPlan, hitCutaway, floorElevations, roomZ, connectionAreas, connectionAt, cutawayParts: partsOf, zLabel, invalidateView: (b) => { viewCache.delete(b); partsCache.delete(b); } });
+  Object.assign(E, { draw, drawProfile, profilePoints, drawCutaway, cutawayPlan, hitCutaway, floorElevations, roomZ, connectionAreas, connectionAt, cutawayParts: partsOf, zLabel, drawPits, invalidateView: (b) => { viewCache.delete(b); partsCache.delete(b); } });
 })(typeof window !== "undefined" ? window : globalThis);

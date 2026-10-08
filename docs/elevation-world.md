@@ -9,6 +9,11 @@ bands are one network. Every other template keeps its up/down potential:
 exported layouts list their connection zones (ladder, stair, ramp),
 unselected, and the lab builds connected variants of any of them.
 
+A world column can hold several owners stacked at different heights
+(milestone 5): a ground site keeps its own floor with its ceiling capped, and a
+**raised branch** above it owns everything from its floor slab up to the band's
+ceiling. See [Layered ownership](#layered-ownership-claims-raised-branches-and-pits).
+
 ## Inspect the map
 
 - Band −/+ and the band menu inspect another horizontal network at the same XY.
@@ -30,6 +35,12 @@ unselected, and the lab builds connected variants of any of them.
   its bands, style and floors. At detail zoom the cutaway shows the journey's
   floor at the cut height: slide the cut to climb it, or switch band to see its
   top.
+- A raised branch is painted with the ground at detail zoom, at its own floor
+  height: below its floor it shows nothing, at or above it the ground below
+  shows through its pit. Hovering it names it `raised branch · <filler>` and
+  gives the pit's drop; hovering the ground under it says a claim stands over
+  this ground, at what height, and where this site's own ceiling now is. At plan
+  zoom its footprint is tinted.
 - Connection graph shows horizontal site connectivity in the active band.
 
 Seed, XY/zoom, band, cut height and display toggles stay in the URL, for example
@@ -51,6 +62,10 @@ outline in both directions. Clicking the footprint reveals its other landing.
 | Ordinary envelope | Reference −1.5 m to +14.5 m | Room/slab ownership: a sunken floor down to −1.25 m (plus its slab) up to a 14 m street ceiling; 16 m in all, so bands never overlap |
 | World vertical journeys | One per band pair per 512 m region (4 × 4 cells) | A territory of 40-56 × 32-48 m in one cell; even pairs in the region's west half, odd pairs in its east half; three doors onto each band |
 | Journey envelope | Lower reference −1.5 m to upper reference +14.5 m | The whole territory, through both bands |
+| Ground claim | Reference −1.5 m up to the raised floor slab above it, else +14.5 m | A ground site keeps its own floor; only its ceiling is capped |
+| Raised branch | One per cell at most, two filler sites, floor at reference +6.5 m | Hand-placed for now: proof that a column can hold two owners |
+| Raised claim | Branch floor −0.25 m (its slab) to reference +14.5 m | Meets the ground claim exactly at the slab, never overlapping it |
+| Pit | 2 × 2 m, at least 3 m of fall, one per branch at most | A drilled one-way drop from the branch into the ground site |
 | Export limit | 64 band cells | Bounds synchronous inspection |
 
 These are initial policies, not required story heights. World blueprints keep
@@ -109,18 +124,84 @@ by actual floor intervals, at most eight per blueprint; sliding between floors
 reuses the visibility plan. Tile caches include height, band, selection and
 ghost settings, including coarser detail fallbacks, and retain at most 260 tiles.
 
+## Layered ownership: claims, raised branches and pits
+
+A claim is one owner's height range over a set of rectangles:
+`{ owner, kind, rects, z0, z1 }`. `reservationPlan` emits one per site, so two
+owners can hold the same XY at different heights. A ground site's claim runs
+from the band's floor limit to `ceilingOf(site)`: the floor slab of the raised
+claim above it, or the band's ceiling limit where nothing stands over it. A
+raised branch's claim runs from that same slab up to the band's ceiling limit.
+The two meet exactly at the slab (6.25 m for a floor at +6.5 m); touching is
+legal, overlapping is not, and a blueprint exceeding its own claim is rejected
+rather than shortened.
+
+![A raised branch over the ground, on the map](raised-branch.png)
+
+*The map at seed 31337, cell (−3, 2) of band 0: the ground at 0 m, and the same
+place at +6.5 m with the branch over it.*
+
+`BR.CLAIM` ([src/claims.js](../src/claims.js)) holds the mechanics, shared by
+the world and the elevation lab:
+
+- `stairTop(b)` finds the highest room of a real stair of the blueprint's own,
+  when it is on the template's top floor, with the sides whose walls are
+  exterior.
+- `raiseStair(b, { z, side, reach, … })` carries that stair on up: it extends
+  the stairwell on one exterior side, adds a level and a `stairwell` room tagged
+  `raised` with its four walls, a door snapped to the half metre and a portal
+  tagged `raised branch`, appends the landing to the stair's own vertical, and
+  rebakes. It refuses a landing with less than 3 m of climb or no room for the
+  run, and returns the new blueprint, the landing and the door's world line.
+- `pitSpot`, `markDrop` and `drill` place and cut a pit (below).
+
+`planBranch(n, i, j)` plans the branch for a cell from the seed alone: the first
+yard lot in id order whose `stairTop` can carry up to +6.5 m, the side and reach
+that reach the lot's edge, then the first plain filler site across that door and
+a second sharing at least 5 m of edge with it. The raised sites are those whole
+filler sites (ids `b<n>|<i>,<j>:raised<k>`, owners `branch:<n>:<i>,<j>:<k>`),
+with their own connections minted between them and to the landing. A raised
+filler is picked exactly as a ground one is, but with no extra floors, and it
+must fit the claim envelope and build every minted connection.
+
+Building stays separate from planning: `World.buildRaw` builds a site without
+the cache or the hook, so the planner can measure a ground build, and every
+build-time change happens in `afterBuild` — capping ceilings with
+`E.capCeilings` (which refuses a cap that would leave a room under 2.2 m),
+swapping the anchor house for its landing build, and marking the ground filler
+with the pit's lower half.
+
+A pit is drilled, not authored: templates cut no openings in their own roofs.
+`pitSpot` scans the branch's floors on a half-metre grid for a clear 2 × 2 m
+square with a clear floor at least 3 m below it and nothing crossing the shaft
+between them. `drill` cuts a `floor` hole above and a `ceiling` hole below, both
+of kind `pit` and owned by the drop's id, and reserves the shaft as a void and a
+volume on the lower claim, so no later blueprint fills it. Both blueprints carry
+a `drop` record with the same id and rectangle and a `role` of `top` or
+`bottom`; the graph pairs them into a single directed `forward` edge of kind
+`pit` and emits no undirected edge, so nothing walks back up. A pit has no
+ladder and no rope: it drops the player into what is below.
+
+Layering adds nothing to the ground plan. A branch covers only whole plain
+filler sites, never a lot or a POI, `cell.sites` is never touched, and the
+anchor house only gains rooms above its own top floor, so its footprint, doors
+and yard are unchanged. The suite plans a cell with claims disabled and with
+them enabled and compares both.
+
 ## Spatial graph and export
 
-The experimental schema remains **`br.world-elevation/0.1`**, metres, XY
-horizontal and Z up. Blueprint XY coordinates are local to the supplied world
-`origin`; Z values are already absolute. Portal matching uses world XYZ.
+The experimental schema is now **`br.world-elevation/0.2`**, metres, XY
+horizontal and Z up (0.1 carried neither claims nor pits). Blueprint XY
+coordinates are local to the supplied world `origin`; Z values are already
+absolute. Portal matching uses world XYZ.
 
 | Field | Meaning |
 | --- | --- |
-| `policy` | Reference spacing; `verticalJourneys: "composed"`, `journeysPerRegion`, `regionCells` |
+| `policy` | Reference spacing; `verticalJourneys: "composed"`, `journeysPerRegion`, `regionCells`; `layeredOwnership: "stacked-claims"`, `raisedBranches: "hand-placed"`, `branchFloor` |
 | `journeys` | Each journey whose territory is in the region: id, origin, bands, style, and its stages (filler, height, leg) |
+| `pits` | Each drilled drop: id, the nodes it goes from and to, its world rectangle and its fall |
 | `bands` | Requested reference IDs and elevations |
-| `slices` | Per-band cell ownership and horizontal connection plans, not viewing slices |
+| `slices` | Per-band cell ownership and horizontal connection plans, not viewing slices; each site carries its `floorZ` and capped `ceilingZ`, and `raised[]` lists the cell's raised sites with their floor height |
 | `layouts` | Owner, reservation owner, XY origin and complete elevation blueprint |
 | `reservations` | World XYZ envelopes |
 | `navigation` | Authoritative surface nodes and directed traversal edges |
@@ -152,7 +233,14 @@ evicting worlds whichever band comes first, cell plans that build no journey,
 the stand-in for a journey that cannot be built, canonical exports after
 reverse generation and eviction, physical geometry fitting planned envelopes,
 vertical frontiers, exact portal matching, and invalid inputs.
-`tests/journeys.test.js` checks the journeys themselves.
+`tests/journeys.test.js` checks the journeys themselves and
+`tests/claims.test.js` the claim mechanics: a capped ceiling that keeps its
+room usable and one that is refused, a stair carried up onto a new landing with
+its door on the grid, a pit's shaft clear of everything on both sides, and
+drilling twice changing nothing. The band-world suite adds the claims over the
+world: no two claims overlapping in 3D, ground claim and raised claim meeting
+at the slab, a cell plan identical with claims disabled, one walkable network
+into the branch and back, and a pit that is forward-only.
 Cutaway tests exercise arbitrary/negative heights, overlapping floors, floor
 holes, tall rooms, full-width diagonal paths, selected-only ghosts and bounded
 caches. Actual map/lab controllers run with DOM/canvas adapters. The rendering
@@ -160,6 +248,8 @@ preview was produced and pixel-checked with a native canvas; it is not browser
 layout QA.
 
 Connection zones and slope-following reservations (milestone 2), template
-floors with their own stairs (milestone 3) and journeys between the bands
-(milestone 4) are in place. The [implementation plan](elevation.md) sets the
-next milestone: an Unreal consumer that rebuilds this data.
+floors with their own stairs (milestone 3), journeys between the bands
+(milestone 4) and layered ownership with a hand-placed raised branch and a
+drilled pit (milestone 5) are in place. Growing branches on their own, steering
+them, biome pools and linking two branches are the work after this, and an
+Unreal consumer that rebuilds the data stays on the plan.

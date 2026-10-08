@@ -27,7 +27,7 @@ if (!(jobs >= 1)) { console.error('--jobs needs a number of at least 1'); proces
 // [file, args, title, cost]: cost is the file's rough time in seconds in full
 // mode, used only to start the slowest files first
 const SEEDS = full ? ['31337', '7', '12345', '99', '4242'] : ['31337', '7'];
-const ALL = ['templates', 'catalogue', 'neighborhood', 'park', 'fillers', 'architectural', 'elevation', 'connections', 'floors', 'journeys', 'cutaway', 'elevation-ui', 'band-world', 'band-render', 'seams', 'world', 'ui-smoke'];
+const ALL = ['templates', 'catalogue', 'neighborhood', 'park', 'fillers', 'architectural', 'elevation', 'connections', 'floors', 'journeys', 'claims', 'cutaway', 'elevation-ui', 'band-world', 'band-render', 'seams', 'world', 'ui-smoke'];
 const FILES = [
   ['templates', [], 'templates', 5],
   ['catalogue', [], 'catalogue (every room and zone, alone; pools)', 2],
@@ -39,9 +39,10 @@ const FILES = [
   ['connections', [], 'connection zones (ladders, stairs, ramps, slope reservations)', 3],
   ['floors', [], 'floors at their own heights (storeys, sunken floors, galleries, template stairs)', 15],
   ['journeys', [], 'vertical journeys (templates stacked between two bands)', 5],
+  ['claims', [], 'layered ownership (capped ceilings, a stair carried up, pits)', 6],
   ['cutaway', [], 'cutaway visibility and full-width connection footprints', 0.1],
   ['elevation-ui', [], 'elevation lab controller', 2],
-  ['band-world', [], 'elevation world (ownership, matching, topology and eviction)', 18],
+  ['band-world', [], 'elevation world (ownership, matching, topology and eviction)', 26],
   ['band-render', [], 'elevation map tiles, height and selection caches', 3],
   ['seams', [], 'seams (shared walls between blueprints)', 6],
   ...SEEDS.map((seed) => ['world', [seed], 'world: seed ' + seed, 11]),
@@ -92,5 +93,5 @@ Promise.all(Array.from({ length: Math.min(jobs, FILES.length) }, worker)).then((
   if (failed.length) {
     console.log('FAILED: ' + failed.map((r) => r.title).join('; '));
     process.exitCode = 1;
-  } else console.log(only.length ? 'All selected files passed.' : `All template, catalogue, neighborhood, park, filler, architectural geometry, elevation, connection zone, floor, journey, band-world, tile renderer, seam, world (${SEEDS.length} seeds) and page checks passed.`);
+  } else console.log(only.length ? 'All selected files passed.' : `All template, catalogue, neighborhood, park, filler, architectural geometry, elevation, connection zone, floor, journey, claim, band-world, tile renderer, seam, world (${SEEDS.length} seeds) and page checks passed.`);
 });

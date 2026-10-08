@@ -128,6 +128,7 @@
 <script src="src/tpl/elevation.js"></script>
 <script src="src/tpl/connections.js"></script>
 <script src="src/journeys.js"></script>
+<script src="src/claims.js"></script>
 <script src="src/tpl/elevation-view.js"></script>
 <script src="src/poi.js"></script>
 <script src="src/world.js"></script>
@@ -230,8 +231,12 @@
       const hit = hitTemplate(s, x, y, false);
       if (hit && hit.room) {
         const z = hit.room.floorZ, room = hit.room.room;
-        html += '<br>' + esc(room.name) + ' · floor ' + BR.ELEV.zLabel(z) + ' · clear height ' + room.ceiling + ' m · ' + Math.max(0, state.cutZ - z).toFixed(2) + ' m below cut';
+        html += '<br>' + (hit.raised ? '<b>raised branch</b> · ' : '') + esc(room.name) + ' · floor ' + BR.ELEV.zLabel(z) + ' · clear height ' + room.ceiling + ' m · ' + Math.max(0, state.cutZ - z).toFixed(2) + ' m below cut';
+        const pit = (hit.b.drops || []).find((d) => d.role === 'top' && x - hit.origin[0] >= d.rect[0] && x - hit.origin[0] < d.rect[2] && y - hit.origin[1] >= d.rect[1] && y - hit.origin[1] < d.rect[3]);
+        if (pit) html += '<br><b>pit</b> · drops ' + pit.fall.toFixed(2) + ' m into what is below, no way back up';
       } else html += '<br>No walkable floor below this cut here';
+      const over = world.raisedAt && world.raisedAt(x, y);
+      if (over && (!hit || !hit.raised)) html += '<br>a claim stands over this ground: its floor is at ' + BR.ELEV.zLabel(over.floorZ) + ', this site keeps its own below ' + BR.ELEV.zLabel(world.ceilingOf(s));
     }
     const P = world.poiAt(x, y);
     if (P) {
@@ -348,9 +353,17 @@
   }
   function clearSelection() { selectedTemplate = null; $('selection').hidden = true; dirty = true; }
   function hitTemplate(s, x, y, build) {
-    if (!world.hasBuild(s) && !build) return null;
-    const r = world.build(s), candidates = r.buildings.slice().reverse().map((B) => ({ b: B.b, origin: B.origin, key: s.id + '/' + B.poi.id, name: B.poi.name }));
-    if (r.filler) candidates.push({ b: r.filler, origin: r.fillerOrigin, key: s.id, name: r.filler.name });
+    const candidates = [];
+    // a claim stacked over this ground comes first: at a cut below its floor
+    // it simply has nothing here, and the ground site answers instead
+    const rs = world.raisedAt && world.raisedAt(x, y);
+    if (rs) { const rr = world.raisedBuild(rs); candidates.push({ b: rr.filler, origin: rr.fillerOrigin, key: rs.id, name: 'raised branch · ' + rr.filler.name, raised: rs }); }
+    if (!world.hasBuild(s) && !build) { if (!candidates.length) return null; }
+    else {
+      const r = world.build(s);
+      for (const B of r.buildings.slice().reverse()) candidates.push({ b: B.b, origin: B.origin, key: s.id + '/' + B.poi.id, name: B.poi.name });
+      if (r.filler) candidates.push({ b: r.filler, origin: r.fillerOrigin, key: s.id, name: r.filler.name });
+    }
     for (const c of candidates) {
       c.baseZ = c.b.schema === BR.ELEV.SCHEMA ? 0 : world.floorZ;
       c.room = BR.ELEV.hitCutaway(c.b, x - c.origin[0], y - c.origin[1], state.cutZ, c.baseZ);
