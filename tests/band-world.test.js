@@ -33,7 +33,9 @@ for (const seed of [7,99,31337]) {
     const g = w.graph(-1,0,-1,0,[n]);
     same(g.issues,[]); same(g.unresolved,[]);
     assert.equal(components(g.nodes,g.edges).sizes.length,1);
-    assert(g.navigation.nodes.every((s)=>s.floorZ===n*16));
+    // templates keep their own floors (storeys, galleries, sunken floors) inside the band's envelope
+    assert(g.navigation.nodes.some((s)=>s.floorZ===n*16));
+    assert(g.navigation.nodes.every((s)=>s.floorZ>=n*16+BR.BAND_CFG.floorLimit&&s.ceilingZ<=n*16+BR.BAND_CFG.ceilingLimit));
   }
   const g = w.graph(-1,0,-1,0,[-1,0,1]);
   same(g.issues,[]); assert.equal(components(g.nodes,g.edges).sizes.length,3);

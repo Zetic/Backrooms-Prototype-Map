@@ -224,8 +224,14 @@ const B = [-1, -1, 1, 1];
   check('a 1 m walker gets to every floor cell of every site from its connections', unwalked.length === 0, unwalked.slice(0, 3).join(', '));
   check('the fill leans enclosed and every pool filler appears', feel.enclosed > (feel.mixed + feel.open) && Object.keys(fillers).length >= 7,
     Object.entries(fillers).map(([k, v]) => k + ' ' + v).join(', '));
-  const avg = ms / n;
-  check('sites build fast enough to stream (under 5 ms on average)', avg < 5, `${avg.toFixed(2)} ms per site`);
+  // streaming cost is what a running map pays: time a second pass over the same
+  // cells in a fresh world, once the code is warm (the first pass above also
+  // pays for compiling it, and swings with the machine)
+  const cold = ms / n, Wt = new BR.World(seed);
+  let warm = 0, m = 0;
+  for (let i = B[0]; i <= B[2]; i++) for (let j = B[1]; j <= B[3]; j++) for (const s of Wt.cell(i, j).sites) { warm += Wt.build(s).ms; m++; }
+  const avg = warm / m;
+  check('sites build fast enough to stream (under 5 ms on average)', avg < 5, `${avg.toFixed(2)} ms per site (first pass ${cold.toFixed(2)})`);
 }
 
 // ---- 6. one connected world

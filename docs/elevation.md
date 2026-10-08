@@ -1,7 +1,8 @@
 # Elevation implementation plan
 
-Updated 2026-10-07 with milestone 2, simple connection zones. Milestone 1 was
-merged in [PR #16](https://github.com/Zetic/Backrooms-Prototype-Map/pull/16).
+Updated 2026-10-07 with milestone 3, template floors. Milestone 2 (connection
+zones) was merged in [PR #18](https://github.com/Zetic/Backrooms-Prototype-Map/pull/18),
+milestone 1 in [PR #16](https://github.com/Zetic/Backrooms-Prototype-Map/pull/16).
 For the next agent's repository entry points and implementation context, read
 [the handoff](../CONTEXT.md).
 
@@ -73,7 +74,7 @@ openings, levels, footprints, and room graph, and adds:
 | `bands[]` | Stable reference IDs and elevations |
 | `rooms[].floorZ, ceilingZ, band` | Explicit vertical bounds; `ceiling` remains clear height |
 | `surfaces[]` | Flat floor footprints, room ownership, elevation, ceiling, slab thickness |
-| `connectors[]` | Endpoint surfaces, XYZ landings and path, kind, shape, width, clearance, slope, rise, direction, `zone`, and `reservations[]` (one or more prisms) |
+| `connectors[]` | Endpoint surfaces, XYZ landings and path, kind, shape, width, clearance, slope, rise, direction, `zone`, and `reservations[]` (one or more prisms). The template's own stairs carry `internal: true` and the `vertical` they were built from |
 | `holes[]` | Explicit floor/ceiling cutouts required by a hatch or shaft |
 | `volumes[]` | Occupied or reserved prisms, including traversal allowances and protected voids |
 | `bandTerritories[]` | Sections of the shared reservation at reference elevations; these are occupancy, not walkable-floor masks |
@@ -81,6 +82,15 @@ openings, levels, footprints, and room graph, and adds:
 | `connectionZones[]` | Available stair/ramp/ladder areas with endpoints and heights; see below |
 | `navigation` | Surface graph with explicit connector references and direction |
 | `route[]` | Authored XYZ main journey, for inspection and downstream use |
+
+The source template (`br.building`) says which floors it has: `levels[]` (each
+with an elevation; a gallery adds a level of its own), a room's `level`, and an
+optional `floor` offset from it (a sunken floor is `floor: -0.6`). Its
+`verticals[]` say which rooms a stair joins - storeys of a stairwell, a floor
+and the sunken floor beside it, a hall and its gallery - with hints for the
+elevation layer (`shape`, `types`, `walled`, `local`). The adapter turns each
+into a real stair (see milestone 3); one that fits nowhere stays an abstract,
+unresolved link with a warning, never a faked path.
 
 `levels[]` in this export group actual floor elevations for local inspection.
 They are neither world bands nor compulsory story numbers. A compact internal
@@ -178,7 +188,7 @@ the atrium generator, world placement policy and associated previews are removed
 | Connection zones (ladder, stair, ramp) on every template | Implemented in milestone 2; exported as `connectionZones[]` |
 | Generated local vertical connections | Ladder, straight/switchback stair and ramp variants, chosen by template preference and fit; selected in the elevation lab |
 | Slope-following reservations | Implemented: one prism per 0.5 m of flight; space under the high end stays free |
-| New authored multi-floor layouts and broad local floor variation | Milestone 3; existing source-template levels are preserved |
+| Template floors | Milestone 3: two- and three-storey houses, sunken floors, galleries over an undercroft; the template's own stairs are real connectors |
 | World connections between reference bands | None after atrium removal; bands are separate horizontal networks. Exports carry the zones, unselected |
 
 Old abstract stair annotations in source templates are not proof of a physical
@@ -281,16 +291,83 @@ or failed validation entirely, when a wing was reachable only through a second
 door, or a yard lot was assembled in pieces. Reachability now starts at every
 portal (each door is a way in), not only the main entrance.
 
-### Milestone 3 — Template floors and authored vertical patterns
+### Milestone 3 — Template floors and authored vertical patterns (implemented)
 
-Evolve existing templates to have real local floors at their own heights.
-Author multi-floor templates where the pattern matters: a house can give its
-floors different purposes. Include depressed floors, pits, mezzanines, compact
-stacks and offset exits. Keep every template's optional up/down fallback.
+Templates now have real floors at their own heights, joined by the same
+stairs the connection zones use, and every template keeps its optional ladder
+up and down.
 
-A three-floor house can end around +8 m and accept a different template above
-it. Height does not require repeating the same theme through a whole stack.
-Keep each authored pattern inspectable in the workshop/lab.
+![Template floors in the elevation lab](template-floors.png)
+
+*From the lab: a two-storey house at 0 m and at +3.2 m (the switchback in its
+stairwell, a sunken living room, the exit up leaving from the master bedroom);
+a pillar hall with a gallery at +3.35 m over an undercroft, its stair up the
+west wall and a ramp on up from the gallery; a suburban house and a ragged
+hall with sunken floors.*
+
+**Storeys** (`storeys` on a house recipe; the House engine's `stack` plan).
+The `two_storey` house has two floors; the `townhouse` has three, the top one
+smaller. A stair core runs up one side: the foyer in front, a stairwell of
+2 m by 4.5 m on the outer wall, a hallway beside it. The same stairwell and
+hallway repeat on every floor; upstairs the hallway also spans the foyer.
+Public rooms are below, bedrooms above, the master suite and a study on a
+third floor. Storeys are 3.2 m then 3 m; a room under another floor keeps its
+ceiling 0.3 m under it (its slab included), so the house tops out about
++8.7 m. A garage stays single-storey. They appear in the world at a low weight
+(about 1 house in 10).
+
+**Template stairs** (`linkFloors` in `connections.js`). Each pair of rooms a
+source `vertical` joins gets a real stair from the lower floor to the higher
+one, with no landing room of its own: it starts on the lower floor and arrives
+on the higher one. Its rise is exactly the difference. It cuts the lower
+ceiling and the higher floor only where its space passes through them, and
+reserves its slope piece by piece. A 4.5 m stairwell holds a switchback per
+storey; in a stack, the next flight runs over the cutout the last one made,
+so a flight needs the room's footprint but not intact floor. The fitter keeps
+every doorway clear of the flights and every floor walkable from its doors to
+the landings. A short rise gets the run, in half metres, that keeps the
+slope in range. The tower test shows an old abstract stair becoming two real
+switchbacks in a 2 by 4.5 m core, and staying abstract (with a warning) in a
+2 by 2.5 m core where nothing fits.
+
+**Floor patterns** (`tpl/floors.js`, `floors` on a recipe or filler). A
+pattern runs on the finished building, whatever its engine, and splits a room:
+
+| Pattern | What it builds | Where |
+| --- | --- | --- |
+| Sunken floor | Part of a room drops 0.3-1.25 m, open all round its edge, a metre of floor left round it; same ceiling plane; straight steps down that fit inside it | Living rooms (suburban, two-storey houses), office, ragged, scattered and pillar halls; the park's pit (wrongness) becomes a real one |
+| Gallery | A 2.5-4 m deep floor at +3.25-3.75 m along the longest straight stretch of a hall's real wall, with a rail on its open edge; the hall becomes double height; the undercroft below keeps the doors, columns and headroom; a straight stair climbs a side wall to it | Pillar, loop, ragged, office and scattered-pillar halls |
+
+A pattern is kept only if the elevation layer can build its stair, every
+other stair of the building is still built, and the building still validates
+(without the elevation layer loaded, no pattern is applied, so a building
+never depends on which modules a page loads). A gallery's rail keeps a `gaps`
+entry where its stair arrives, for a later furnishing pass. Proving patterns
+costs generation time: a hall or park that tries one builds in about 10-30 ms
+instead of 5-10 ms. Halls whose walls jog round piers every few metres
+(cross-pillar, gallery) have no straight stretch long enough and get none.
+Templates built inside a composite (a neighborhood's houses, a park's
+building) keep the floor they are built on: their spec turns patterns off.
+
+**Exits up and down** leave from the top or bottom storey (floors within
+1.5 m count as one storey: the main floor before a sunken floor beside it)
+and keep away from where the template's own stair arrives, so a later
+journey has to cross the floor. A gallery hall's way up leaves from the
+gallery.
+
+**Inspection.** The lab and the map cutaway show every floor; the workbench
+has a tab per floor and draws the real stairs (solid where they start,
+outlined where they arrive) with sunken floors labelled by their depth. Map
+painting still never adapts a blueprint.
+
+**World.** A band's site envelope now runs from -1.5 m (a sunken floor to
+-1.25 m, plus its slab) to +14.5 m: the same 16 m, so bands still never
+overlap.
+
+Not yet: mezzanines open to more than one side, split-level houses (a whole
+storey half a level up), pits without steps (a drop you cannot climb out of),
+stairs that leave a room through a doorway, and composites with storeys of
+their own.
 
 ### Milestone 4 — World journeys composed from templates
 
@@ -316,7 +393,8 @@ prototype's schematic cutaway and the consumer's rendering/generation system.
 
 ## Current usage
 
-Open [the elevation lab](../elevation.html). It starts with the circular hall's
+Open [the elevation lab](../elevation.html) to see a template's floors and stairs (try
+`two_storey`, `townhouse`, `pillar_hall`). It starts with the circular hall's
 upward connection. Every template and filler can be selected, and the workbench
 detail panel opens the same template, seed and size there. Choose a direction,
 a type (auto, ladder, stair, ramp) and optionally an exact rise. “Potential only
@@ -334,6 +412,17 @@ BR.ELEV.validate(up); // { errors, warnings }
 const ledger = new BR.ELEV.ReservationIndex();
 ledger.reserve(up.fillId, up.volumes); // atomic claim, one prism per half metre of flight
 BR.ELEV.drawCutaway(ctx, up, { cutZ: 0, scale: 20 });
+```
+
+A template's own floors come with it:
+
+```js
+const house = BR.TPL.generate({ archetype: 'two_storey', seed: 3 });
+house.levels;                                  // [{ elevation: 0 }, { elevation: 3.2 }]
+const p = BR.ELEV.prepare(house);              // its stairwell's switchback, built
+p.connectors.filter((c) => c.internal);        // [{ kind: 'stair', shape: 'switchback', rise: 3.2, ... }]
+const hall = BR.FILL.generate({ filler: 'pillar_hall', seed: 3, site: { w: 26, h: 24 } });
+hall.meta.floors;                              // [{ pattern: 'gallery', at: 3.65, side: 'N', ... }]
 ```
 
 `BR.ELEV.ladderVariant` remains for the compact fallback. Blueprints exported
@@ -368,7 +457,8 @@ a solid surface.
 - Reference-band spacing and variation between districts.
 - Frequency of local elevation changes and major journeys.
 - Minimum horizontal exploration between consecutive vertical departures.
-- Which templates receive authored floors first (milestone 3).
+- How often templates should have floors of their own, and which halls might
+  take a gallery on a jogged wall.
 - Whether more zones should allow routes (today only lawns), and preferences
   per district or journey influence rather than per template.
 - Default rises for standalone variants once the world planner sets real ones.

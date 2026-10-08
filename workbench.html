@@ -183,6 +183,7 @@
 <script src="src/tpl/grid.js"></script>
 <script src="src/tpl/framework.js"></script>
 <script src="src/tpl/catalogue.js"></script>
+<script src="src/tpl/floors.js"></script>
 <script src="src/tpl/house.js"></script>
 <script src="src/tpl/room.js"></script>
 <script src="src/tpl/composite.js"></script>
@@ -203,6 +204,8 @@
 <script src="src/tpl/fillers/architectural.js"></script>
 <script src="src/tpl/lot.js"></script>
 <script src="src/seams.js"></script>
+<script src="src/tpl/elevation.js"></script>
+<script src="src/tpl/connections.js"></script>
 <script src="src/tpl/render2d.js"></script>
 <script>
 (function () {
@@ -713,7 +716,7 @@
     for (const btn of $('dlevels').children) btn.addEventListener('click', () => { level = +btn.dataset.l; drawDetail(); });
     if (!b || b.error) { g.fillStyle = '#e0705f'; g.font = (14 * dpr) + 'px sans-serif'; g.fillText(b ? b.error : '', 20 * dpr, 30 * dpr); return; }
     if (!view) { const F = [0, 0, b.site.w, b.site.h], s = Math.min((cv.width - 60 * dpr) / F[2], (cv.height - 60 * dpr) / F[3]); view = { s, ox: (cv.width - F[2] * s) / 2, oy: (cv.height - F[3] * s) / 2 }; }
-    drawAny(g, b, drawOpts({ scale: view.s, ox: view.ox, oy: view.oy, highlight: hoverRoom, level, dims: state.dims || view.s > 30 }));
+    drawAny(g, b, drawOpts({ scale: view.s, ox: view.ox, oy: view.oy, highlight: hoverRoom, level, dims: state.dims || view.s > 30, stairs: true }));
     const bar = b.site.w < 5 ? 1 : 5;
     g.fillStyle = 'rgba(255,255,255,0.6)'; g.fillRect(16 * dpr, cv.height - 18 * dpr, bar * view.s, 3 * dpr);
     g.font = (11 * dpr) + 'px sans-serif'; g.fillText(bar + ' m', 16 * dpr, cv.height - 24 * dpr);

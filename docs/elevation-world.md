@@ -40,12 +40,14 @@ outline in both directions. Clicking the footprint reveals its other landing.
 | Policy | Value | Purpose |
 | --- | --- | --- |
 | Reference spacing | 16 m | Fits existing tall halls and slabs |
-| Ordinary envelope | Reference −0.25 m to +15.5 m | Conservative room/slab ownership |
+| Ordinary envelope | Reference −1.5 m to +14.5 m | Room/slab ownership: a sunken floor down to −1.25 m (plus its slab) up to a 14 m street ceiling; 16 m in all, so bands never overlap |
 | World vertical journeys | None | Atrium retired; replacements are later milestones |
 | Export limit | 64 band cells | Bounds synchronous inspection |
 
-These are initial policies, not required story heights. Current ordinary world
-blueprints keep their original local floors. Broader local floor variation,
+These are initial policies, not required story heights. World blueprints keep
+their own floors: houses of two and three storeys (to about +8.7 m), galleries,
+sunken floors, each joined by its own real stair inside the band (their
+navigation edges stay inside one band's network). Broader local floor variation,
 shared multi-band footprints and composed vertical journeys are future work.
 
 Ground zero keeps the original seed; other bands derive their seeds from the
@@ -111,6 +113,7 @@ caches. Actual map/lab controllers run with DOM/canvas adapters. The rendering
 preview was produced and pixel-checked with a native canvas; it is not browser
 layout QA.
 
-Connection zones and slope-following reservations (milestone 2) are in place.
+Connection zones and slope-following reservations (milestone 2) and template
+floors with their own stairs (milestone 3) are in place.
 The [implementation plan](elevation.md) sets the next milestones: authored
 template floors, then world journeys composed from different templates' zones.

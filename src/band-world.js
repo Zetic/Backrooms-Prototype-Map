@@ -3,7 +3,9 @@
 (function (root) {
   'use strict';
   const BR = root.BR, E = BR.ELEV, C = BR.WORLD_CFG.cell;
-  const CFG = { spacing: 16, ceilingLimit: 15.5, limits: { bands: 4 } };
+  // a site's envelope: from its lowest allowed floor (a sunken floor, floorLimit)
+  // less its slab, to ceilingLimit - one band spacing in all, so bands never overlap
+  const CFG = { spacing: 16, floorLimit: -1.25, ceilingLimit: 14.5, limits: { bands: 4 } };
   const clone = (x) => JSON.parse(JSON.stringify(x));
   const bandId = (n) => 'band:' + n;
   const assertBand = (n) => { if (!Number.isInteger(n) || Math.abs(n) > 10000) throw new Error('band must be an integer between -10000 and 10000'); return n; };
@@ -87,7 +89,7 @@
       if (!r.spatial) {
         const adapt = (b, id) => {
           const a = E.prepare(b, { fillId: id, deferCapabilities: true });
-          if (a.surfaces.some((v) => v.floorZ < 0 || v.ceilingZ > CFG.ceilingLimit)) throw new Error(id + ' exceeds its planned band envelope');
+          if (a.surfaces.some((v) => v.floorZ < CFG.floorLimit - 1e-9 || v.ceilingZ > CFG.ceilingLimit)) throw new Error(id + ' exceeds its planned band envelope');
           return placeBlueprint(a, s.band * CFG.spacing, s.band, s.band);
         };
         const t = clock();
@@ -115,7 +117,7 @@
       for (let n = bandMin; n <= bandMax; n++) for (const s of this.cell(i, j, n).sites) {
         const owner = s.owner || s.id;
         if (owners.has(owner)) continue; owners.add(owner);
-        const v = { id: owner + ':envelope', kind: 'site-envelope', rects: s.rects, z0: n * CFG.spacing - E.SLAB, z1: n * CFG.spacing + CFG.ceilingLimit };
+        const v = { id: owner + ':envelope', kind: 'site-envelope', rects: s.rects, z0: n * CFG.spacing + CFG.floorLimit - E.SLAB, z1: n * CFG.spacing + CFG.ceilingLimit };
         const r = index.reserve(owner, [v]);
         if (!r.ok) throw new Error(owner + ' reservation overlaps ' + r.conflicts[0].owner);
       }

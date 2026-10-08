@@ -77,25 +77,37 @@
         pieces.push({ u0: Math.min(a, b), u1: Math.max(a, b), v0, v1, z0: Math.min(ha, hb), z1: Math.max(ha, hb), part, from: ha, to: hb });
       }
     };
+    // a run in half metres: rounded up to the design slope, unless that leaves
+    // the type's slope range (a short rise), then the nearest run that keeps it
+    const runFor = (r) => {
+      const up = Math.max(G, up05(r / R.design)), down = Math.max(G, up - G), ok = (L) => !R.slope || (r / L >= R.slope[0] - EPS && r / L <= R.slope[1] + EPS);
+      return ok(up) ? up : ok(down) ? down : up;
+    };
     if (shape === 'straight') {
-      const L = up05(rise / R.design);
+      const L = runFor(rise);
       pieces.push({ u0: 0, u1: e, v0: 0, v1: w, z0: 0, z1: 0, part: 'entry', from: 0, to: 0 });
       step(e, e + L, 0, w, 0, dz, 'flight');
       return { len: e + L + e, W: w, run: L, pieces, landing: [e + L, 0, e + L + e, w], arrival: { u: e + L, v0: 0, v1: w },
         path: [[e / 2, w / 2, 0], [e, w / 2, 0], [e + L, w / 2, dz], [e + L + e / 2, w / 2, dz]] };
     }
     // switchback: two flights side by side, a turn landing at half height
-    const L = up05(rise / R.design / 2), zm = round(dz / 2);
+    const L = runFor(rise / 2), zm = round(dz / 2);
     pieces.push({ u0: 0, u1: e, v0: 0, v1: w, z0: 0, z1: 0, part: 'entry', from: 0, to: 0 });
     step(e, e + L, 0, w, 0, zm, 'flight');
     pieces.push({ u0: e + L, u1: e + L + w, v0: 0, v1: 2 * w, z0: zm, z1: zm, part: 'turn', from: zm, to: zm });
     step(e + L, e, w, 2 * w, zm, dz, 'flight');
     return { len: e + L + w, W: 2 * w, run: 2 * L, pieces, landing: [0, w, e, 2 * w], arrival: { u: e, v0: w, v1: 2 * w },
       path: [[e / 2, w / 2, 0], [e, w / 2, 0], [e + L, w / 2, zm], [e + L + w / 2, w / 2, zm], [e + L + w / 2, 1.5 * w, zm], [e + L, 1.5 * w, zm], [e, 1.5 * w, dz], [e / 2, 1.5 * w, dz]] };
-    void s;
   }
-  /** placement: (ox, oy) is where u = 0, v = 0 sits; axis 'h' runs along x, 'v' along y; sign which way */
-  const toXY = (pl, u, v) => (pl.axis === 'h' ? [pl.ox + pl.sign * u, pl.oy + v] : [pl.ox + v, pl.oy + pl.sign * u]);
+  /**
+   * placement: (ox, oy) is where u = 0, v = 0 sits; axis 'h' runs along x, 'v'
+   * along y; sign which way. flip mirrors the route across its width (vw), so
+   * a switchback's lanes can sit either way round.
+   */
+  const toXY = (pl, u, v) => {
+    const w = pl.flip ? pl.vw - v : v;
+    return pl.axis === 'h' ? [pl.ox + pl.sign * u, pl.oy + w] : [pl.ox + w, pl.oy + pl.sign * u];
+  };
   function toRect(pl, q) {
     const a = toXY(pl, q[0], q[1]), b = toXY(pl, q[2], q[3]);
     return [round(Math.min(a[0], b[0])), round(Math.min(a[1], b[1])), round(Math.max(a[0], b[0])), round(Math.max(a[1], b[1]))];
@@ -118,8 +130,11 @@
     const partitions = b.walls.filter((w) => w.kind === 'partition' && (w.rooms || []).includes(s.room)).map((w) => [Math.min(w.a[0], w.b[0]), Math.min(w.a[1], w.b[1]), Math.max(w.a[0], w.b[0]), Math.max(w.a[1], w.b[1])]);
     // a metre clear inside every way into the room: doors, openings, open boundaries
     const doors = [], inRoom = (p) => s.rects.some((q) => p[0] > q[0] && p[0] < q[2] && p[1] > q[1] && p[1] < q[3]);
+    // an open boundary is a way in only between floors at one height; a sunken
+    // floor's edge or a gallery's rail is a drop
+    const level = (w) => { const [p, q] = (w.rooms || []).map((id) => b.rooms.find((r) => r.id === id)); return p && q && Math.abs((p.floorZ || 0) - (q.floorZ || 0)) < EPS; };
     const gaps = b.openings.filter((o) => (o.rooms || []).includes(s.room) && !['window', 'false'].includes(o.kind) && (o.floorZ === undefined || o.floorZ === s.floorZ)).map((o) => [o.a, o.b])
-      .concat(b.walls.filter((w) => w.kind === 'open' && (w.rooms || []).includes(s.room)).map((w) => [w.a, w.b]));
+      .concat(b.walls.filter((w) => w.kind === 'open' && (w.rooms || []).includes(s.room) && level(w)).map((w) => [w.a, w.b]));
     for (const [a, c] of gaps) {
       const horiz = Math.abs(a[1] - c[1]) < EPS, m = [(a[0] + c[0]) / 2, (a[1] + c[1]) / 2];
       const d = horiz ? (inRoom([m[0], m[1] + 0.25]) ? 1 : -1) : (inRoom([m[0] + 0.25, m[1]]) ? 1 : -1);
@@ -138,15 +153,18 @@
     };
     return { s, room, bb, W, H, cell, at, solid, keep, partitions, doors, walled };
   }
-  /** can a 1 m walker still reach every way in, and the route's entry, on what is left of the floor? */
-  function walkable(g, blocked, entry) {
+  /**
+   * can a 1 m walker still reach every way in, and the route's entry, on what
+   * is left of the floor? goalRects replaces the doors-and-entry goals.
+   */
+  function walkable(g, blocked, entry, goalRects) {
     const { W, H, bb } = g, free = g.cell.slice();
     const mark = (q) => { for (let y = q[1]; y < q[3] - EPS; y += G) for (let x = q[0]; x < q[2] - EPS; x += G) { const [i, j] = g.at(x, y); if (i >= 0 && j >= 0 && i < W && j < H) free[j * W + i] = 0; } };
     for (const q of blocked.concat(g.solid)) mark(q);
     const stand = (i, j) => i >= 0 && j >= 0 && i + 1 < W && j + 1 < H && free[j * W + i] && free[j * W + i + 1] && free[(j + 1) * W + i] && free[(j + 1) * W + i + 1];
     const seen = new Uint8Array(W * H);
     const touches = (q) => { const out = []; for (let j = 0; j + 1 < H; j++) for (let i = 0; i + 1 < W; i++) { const x = bb[0] + i * G, y = bb[1] + j * G; if (x < q[2] - EPS && x + 1 > q[0] + EPS && y < q[3] - EPS && y + 1 > q[1] + EPS && stand(i, j)) out.push(j * W + i); } return out; };
-    const goals = g.doors.concat([entry]).map(touches);
+    const goals = (goalRects || g.doors.concat([entry])).map(touches);
     if (goals.some((l) => !l.length)) return false;
     const todo = [goals[0][0]]; seen[goals[0][0]] = 1;
     while (todo.length) {
@@ -212,7 +230,9 @@
       const blocked = P.filter((p) => p.part !== 'entry' && p.part !== 'landing' && p.z0 < host.floorZ + R.clearance - EPS && p.z1 > host.floorZ - E.SLAB + EPS).map((p) => p.rect);
       if (blocked.concat(all.slice(0, 1)).some((r) => g.doors.some((d) => overlap(d, r)))) continue;
       const c = [(foot[0][0] + dest[2]) / 2, (foot[0][1] + dest[3]) / 2];
-      const score = g.doors.length ? Math.min(...g.doors.map((d) => Math.hypot(c[0] - (d[0] + d[2]) / 2, c[1] - (d[1] + d[3]) / 2))) : 0;
+      // away from the doors, and from where the template's own stairs arrive
+      const away = g.doors.map((d) => [(d[0] + d[2]) / 2, (d[1] + d[3]) / 2]).concat(E.arrivalsOn ? E.arrivalsOn(b, host) : []);
+      const score = away.length ? Math.min(...away.map((p) => Math.hypot(c[0] - p[0], c[1] - p[1]))) : 0;
       cands.push({ pl, lay, P, blocked, entry: all[0], dest, score });
     }
     cands.sort((a, c) => c.score - a.score);
@@ -255,10 +275,11 @@
           surface: s.id, room: s.room, rects: [lad.landing.slice()], hatch: lad.hatch.slice(), entry: lad.at.slice(), exit: [lad.at[0], lad.at[1], round(lad.at[2] + (dir === 'up' ? 8 : -8))],
           floorZ: s.floorZ, targetZ: round(s.floorZ + (dir === 'up' ? 8 : -8)), rise: 8, width: CAT.CONNECTIONS.ladder.width, clearance: CAT.CONNECTIONS.ladder.clearance, destination: lad.landing.slice() });
       }
-      // the floors a route may leave from: the top floor going up, the bottom going down
-      const ext = dir === 'up' ? Math.max(...b.surfaces.map((s) => s.floorZ)) : Math.min(...b.surfaces.map((s) => s.floorZ));
-      const hosts = b.surfaces.filter((s) => Math.abs(s.floorZ - ext) < EPS && !String(s.room).startsWith('elev:'))
-        .sort((p, q) => TG.rectsArea(q.rects) - TG.rectsArea(p.rects) || p.id.localeCompare(q.id)).slice(0, 5);
+      // the floors a route may leave from: the top storey going up, the bottom
+      // one going down (its main floor before a sunken floor beside it), largest first
+      const zs = b.surfaces.map((s) => s.floorZ), ext = dir === 'up' ? Math.max(...zs) : Math.min(...zs), main = E.mainFloor(b);
+      const hosts = b.surfaces.filter((s) => Math.abs(s.floorZ - ext) <= E.STOREY + EPS && !String(s.room).startsWith('elev:'))
+        .sort((p, q) => main(q) - main(p) || TG.rectsArea(q.rects) - TG.rectsArea(p.rects) || p.id.localeCompare(q.id)).slice(0, 5);
       const grids = new Map();
       for (const type of ['stair', 'ramp']) {
         if (o.types && !o.types.includes(type)) continue;
@@ -277,6 +298,141 @@
     }
     Object.defineProperty(zones, 'notes', { value: notes, enumerable: false });
     return zones;
+  }
+
+  // ------------------------------------------------------------ floors of one template
+  /** does a rect lie on a grid's floor cells, clear of the given rects? */
+  function covers(g, r, avoid) {
+    // the half-metre cells under the rect, by index (no arrays made per cell)
+    const i0 = Math.floor((r[0] - g.bb[0]) / G + EPS), j0 = Math.floor((r[1] - g.bb[1]) / G + EPS);
+    const i1 = Math.ceil((r[2] - g.bb[0]) / G - EPS), j1 = Math.ceil((r[3] - g.bb[1]) / G - EPS);
+    if (i0 < 0 || j0 < 0 || i1 > g.W || j1 > g.H) return false;
+    for (let j = j0; j < j1; j++) for (let i = i0; i < i1; i++) if (!g.cell[j * g.W + i]) return false;
+    if (avoid) for (const q of avoid) if (overlap(q, r)) return false;
+    return true;
+  }
+  /** the part of a rect over a surface's floor, as half-metre cells in a raster over its bbox */
+  function cutCells(ras, bb, s, r) {
+    for (let y = r[1]; y < r[3] - EPS; y += G) for (let x = r[0]; x < r[2] - EPS; x += G) {
+      if (!s.rects.some((q) => x + G / 2 > q[0] && x + G / 2 < q[2] && y + G / 2 > q[1] && y + G / 2 < q[3])) continue;
+      ras.set(Math.round((x - bb[0]) / G), Math.round((y - bb[1]) / G), 1);
+    }
+  }
+  /** an axis-aligned segment running along a wall line (not merely crossing it) */
+  function alongWall(w, a, c) {
+    const h = Math.abs(a[1] - c[1]) < EPS, wh = Math.abs(w.a[1] - w.b[1]) < EPS;
+    if (h !== wh) return false;
+    if (h) return Math.abs(w.a[1] - a[1]) < EPS && Math.min(Math.max(w.a[0], w.b[0]), Math.max(a[0], c[0])) - Math.max(Math.min(w.a[0], w.b[0]), Math.min(a[0], c[0])) > EPS;
+    return Math.abs(w.a[0] - a[0]) < EPS && Math.min(Math.max(w.a[1], w.b[1]), Math.max(a[1], c[1])) - Math.max(Math.min(w.a[1], w.b[1]), Math.min(a[1], c[1])) > EPS;
+  }
+
+  /**
+   * A stair or ramp between two floors the template already has: a stacked
+   * stairwell between storeys, steps down into a sunken floor, a flight up to
+   * a gallery. Unlike a zone it builds no landing room: it starts on the lower
+   * floor and arrives on the higher one, and cuts the lower ceiling and the
+   * higher floor only where its space passes through them. The rise is exactly
+   * the difference between the two floors.
+   *
+   * opts: { types (tried in order; default stair then ramp), shape (tried
+   * first), walled (a flight must run along a real wall), id }. Returns
+   * { connector, holes } or null; `why` (if given) collects the refusals.
+   */
+  function linkFloors(b, lowId, highId, opts, why) {
+    const o = opts || {}, notes = why || [];
+    const low = b.surfaces.find((s) => s.id === lowId), high = b.surfaces.find((s) => s.id === highId);
+    if (!low || !high) { notes.push('no such floors'); return null; }
+    const dz = round(high.floorZ - low.floorZ);
+    if (dz <= EPS) { notes.push(high.id + ' is not above ' + low.id); return null; }
+    const gl = hostGrid(b, low), gh = hostGrid(b, high);
+    const others = b.surfaces.filter((s) => s.id !== low.id && s.id !== high.id).map((s) => E.prism(s.rects, s.floorZ - s.slab, s.ceilingZ));
+    const claimed = b.connectors.flatMap((c) => E.reservationsOf(c));
+    // a flight needs the room's footprint, not intact floor: in a stacked
+    // stairwell the next flight runs above the cutout the last one made
+    const cols = (b.columns || []).filter((c) => c.room === low.room).map((c) => c.rect);
+    // other routes' landings on either floor stay reachable
+    const ends = (s) => b.connectors.flatMap((c) => c.landings.filter((p, k) => (k ? c.to : c.from) === s.id).map((p) => [p[0] - 0.25, p[1] - 0.25, p[0] + 0.25, p[1] + 0.25]));
+    const endsLow = ends(low), endsHigh = ends(high);
+    const id = o.id || 'link:' + low.room + ':' + high.room;
+    // a zone that is the whole of the lower floor (a sunken pit) is where the
+    // steps lead: they may stand on it. Other zones stay clear of routes.
+    const lowZones = (b.zones || []).filter((z) => z.room === low.room), whole = lowZones.length === 1 && Math.abs(TG.rectsArea(lowZones[0].rects) - TG.rectsArea(low.rects)) < EPS;
+    const keepLow = whole ? [] : gl.keep, avoidEntry = gl.solid.concat(keepLow), avoidFlight = cols.concat(keepLow);
+    // test the smaller floor's end first: it rules out most placements
+    const entryFirst = TG.rectsArea(low.rects) <= TG.rectsArea(high.rects);
+    for (const type of o.types || ['stair', 'ramp']) {
+      const R = CAT.CONNECTIONS[type];
+      if (!R || type === 'ladder') continue;
+      if (low.ceilingZ - low.floorZ < R.clearance - EPS || high.ceilingZ - high.floorZ < R.clearance - EPS) { notes.push(type + ': too little headroom'); continue; }
+      for (const shape of o.shape ? [o.shape].concat(['straight', 'switchback'].filter((x) => x !== o.shape)) : ['straight', 'switchback']) {
+        const lay = layout(type, shape, dz), cands = [];
+        const sl = dz / lay.run;
+        if (R.slope && (sl < R.slope[0] - EPS || sl > R.slope[1] + EPS)) { notes.push(type + ' (' + shape + '): a ' + dz + ' m rise is outside its slope range'); continue; }
+        // slide the smaller floor's end (the entry, or the landing) over that
+        // floor, half a metre at a time, and place the route from it
+        const A = entryFirst ? [lay.pieces[0].u0, lay.pieces[0].v0, lay.pieces[0].u1, lay.pieces[0].v1] : lay.landing, ab = TG.bbox((entryFirst ? low : high).rects);
+        // a straight route is the same mirrored across its width: only a switchback's lanes swap
+        for (const axis of ['h', 'v']) for (const sign of [1, -1]) for (const flip of shape === 'switchback' ? [false, true] : [false]) {
+          const du = A[2] - A[0], dv = A[3] - A[1], [wx, wy] = axis === 'h' ? [du, dv] : [dv, du];
+          for (let Y0 = ab[1]; Y0 + wy <= ab[3] + EPS; Y0 += G) for (let X0 = ab[0]; X0 + wx <= ab[2] + EPS; X0 += G) {
+            // the origin that puts the anchor's corner at (X0, Y0)
+            const [U0, V0] = axis === 'h' ? [X0, Y0] : [Y0, X0];
+            const ou = sign > 0 ? U0 - A[0] : U0 + A[2], ov = flip ? V0 - lay.W + A[3] : V0 - A[1];
+            const pl = axis === 'h' ? { axis, sign, ox: round(ou), oy: round(ov), flip, vw: lay.W } : { axis, sign, ox: round(ov), oy: round(ou), flip, vw: lay.W };
+            // cheapest first: it starts on the lower floor and arrives on the higher one
+            const entry = toRect(pl, [lay.pieces[0].u0, lay.pieces[0].v0, lay.pieces[0].u1, lay.pieces[0].v1]), dest = toRect(pl, lay.landing);
+            if (entryFirst ? !covers(gl, entry, avoidEntry) || !covers(gh, dest, gh.solid) : !covers(gh, dest, gh.solid) || !covers(gl, entry, avoidEntry)) continue;
+            // then the piece the route arrives from, then the rest
+            const last = lay.pieces[lay.pieces.length - 1];
+            if (!covers(gl, toRect(pl, [last.u0, last.v0, last.u1, last.v1]), cols)) continue;
+            const all = lay.pieces.map((p) => toRect(pl, [p.u0, p.v0, p.u1, p.v1]));
+            if (!all.every((r) => covers(gl, r, avoidFlight) && !gl.partitions.some((q) => segHits(q, r)))) continue;
+            // it arrives over open floor or an open edge, never through a wall
+            const arr = [toXY(pl, lay.arrival.u, lay.arrival.v0), toXY(pl, lay.arrival.u, lay.arrival.v1)].map((p) => p.map(round));
+            if (b.walls.some((w) => w.kind !== 'open' && (w.rooms || []).some((r) => r === low.room || r === high.room) && alongWall(w, arr[0], arr[1]))) continue;
+            const P = prisms(pl, lay, low, dz, R.clearance);
+            // whatever rises past the lower ceiling stays inside the higher room
+            if (P.some((p) => p.z1 > low.ceilingZ + EPS && !covers(gh, p.rect))) continue;
+            const fb = TG.bbox(all), along = pl.axis === 'h';
+            const sides = along ? [[fb[0], fb[1], fb[2], fb[1], 0, -0.25], [fb[0], fb[3], fb[2], fb[3], 0, 0.25]] : [[fb[0], fb[1], fb[0], fb[3], -0.25, 0], [fb[2], fb[1], fb[2], fb[3], 0.25, 0]];
+            const walled = Math.max(...sides.map((q) => gl.walled(...q)));
+            if (o.walled && walled < 0.75) continue;
+            const cen = TG.rcenter(fb), far = gl.doors.length ? Math.min(...gl.doors.map((d) => Math.hypot(cen[0] - (d[0] + d[2]) / 2, cen[1] - (d[1] + d[3]) / 2))) : 0;
+            cands.push({ pl, all, dest, P, arr, score: walled * 10 + Math.min(far, 6) * 0.2 });
+          }
+        }
+        cands.sort((a, c) => c.score - a.score);
+        for (const k of cands.slice(0, 60)) {
+          // nothing else the template holds shares its space
+          if (others.some((v) => k.P.some((p) => E.volumeOverlap({ rects: [p.rect], z0: p.z0, z1: p.z1 }, v)))) continue;
+          if (claimed.some((v) => k.P.some((p) => E.volumeOverlap({ rects: [p.rect], z0: p.z0, z1: p.z1 }, v)))) continue;
+          // the lower floor: the low end of the flight blocks it; the space
+          // under the high end, with headroom to spare, stays usable
+          const blockedLow = k.P.filter((p) => p.part !== 'entry' && p.part !== 'landing' && p.z0 < low.floorZ + R.clearance - EPS && covers(gl, p.rect)).map((p) => p.rect);
+          if (blockedLow.some((r) => gl.doors.some((d) => overlap(d, r)))) continue;
+          if (!walkable(gl, blockedLow, null, gl.doors.concat([k.all[0]], endsLow))) continue;
+          // the higher floor: cut where the route's space passes up through it
+          const cutHigh = k.P.filter((p) => p.z0 < high.floorZ - EPS && p.z1 > high.floorZ - high.slab + EPS).map((p) => p.rect);
+          if (!walkable(gh, cutHigh, null, gh.doors.concat([k.dest], endsHigh))) continue;
+          // build it
+          const path = lay.path.map(([u, v, z]) => { const p = toXY(k.pl, u, v); return [round(p[0]), round(p[1]), round(low.floorZ + z)]; });
+          const c = { id, kind: type, shape, internal: true, from: low.id, to: high.id, state: 'connected', direction: 'both', width: R.width, clearance: R.clearance,
+            slope: round(dz / lay.run), rise: dz, landings: [path[0].slice(), path[path.length - 1].slice()], path,
+            reservations: k.P.map((p, n) => E.prism([p.rect], p.z0, p.z1, 'connector', 'volume:' + id + ':' + n)) };
+          const holes = [];
+          for (const [s, face, hit] of [[low, 'ceiling', (p) => p.z0 < low.ceilingZ - EPS && p.z1 > low.ceilingZ + EPS], [high, 'floor', (p) => p.z0 < high.floorZ - EPS && p.z1 > high.floorZ - high.slab + EPS]]) {
+            const bb = TG.bbox(s.rects), ras = new TG.Raster(Math.round((bb[2] - bb[0]) / G), Math.round((bb[3] - bb[1]) / G), 0);
+            for (const p of k.P) if (hit(p)) cutCells(ras, bb, s, p.rect);
+            TG.rectsWhere(ras, (v) => v === 1).forEach((q, n) => holes.push({ id: id + ':' + face + ':' + n, connector: id, surface: s.id, face, rect: [bb[0] + q[0] * G, bb[1] + q[1] * G, bb[0] + q[2] * G, bb[1] + q[3] * G].map(round) }));
+          }
+          // where it arrives over an open edge (a gallery's rail): the gap a rail keeps for it
+          c.arrival = k.arr.map((p) => p.slice());
+          return { connector: c, holes };
+        }
+        notes.push(type + ' (' + shape + '): no ' + round(lay.len) + ' × ' + round(lay.W) + ' m run from ' + low.id + ' arrives clear on ' + high.id);
+      }
+    }
+    return null;
   }
 
   // ------------------------------------------------------------ selecting a zone
@@ -355,5 +511,5 @@
     throw new Error('no ' + (o.type === 'auto' ? '' : o.type + ' ') + dir + ' connection fits this instance: ' + tried.join('; '));
   }
 
-  Object.assign(E, { findZones, connectionVariant, preferenceOf, riseFor, layoutRoute: layout, DEFAULT_PREFER });
+  Object.assign(E, { findZones, connectionVariant, linkFloors, preferenceOf, riseFor, layoutRoute: layout, DEFAULT_PREFER });
 })(typeof window !== 'undefined' ? window : globalThis);

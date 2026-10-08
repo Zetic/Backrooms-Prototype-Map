@@ -4,7 +4,7 @@ Snapshot: 2026-10-07. This is implementation context; the durable design and
 milestones live in [docs/elevation.md](docs/elevation.md). Read that document and
 [docs/elevation-world.md](docs/elevation-world.md) before changing vertical
 generation. It was first written for milestone 2 (closed PR #17) and is now
-refreshed with milestone 2 implemented; the next work is milestone 3.
+refreshed with milestone 3 implemented; the next work is milestone 4.
 
 ## Repository and starting point
 
@@ -12,11 +12,13 @@ refreshed with milestone 2 implemented; the next work is milestone 3.
 - Milestone 1, [PR #16](https://github.com/Zetic/Backrooms-Prototype-Map/pull/16),
   is merged. Its merge commit is `343ffdc5fb97cacb5896a0a0105ca1bc7d9c8495`;
   implementation commit is `37781f10e830fcbc5ea3956a624cbd82d8b8e48d`.
-- Milestone 2, simple connection zones, is on `claude/connection-zones`, based on
-  that merge. It includes this handoff: the user closed the documentation-only
-  PR #17 (`codex/verticality-handoff`) and PR #11 and asked for the fixes to land
-  with the milestone. Check current `main` and open PRs before starting: another
-  agent may advance the repository after this snapshot.
+- Milestone 2, simple connection zones, is merged in
+  [PR #18](https://github.com/Zetic/Backrooms-Prototype-Map/pull/18) (merge commit
+  `50d51ae`). It carried this handoff: the user closed the documentation-only
+  PR #17 and PR #11 and asked for the fixes to land with the milestone.
+- Milestone 3, template floors, is on `claude/template-floors`, based on that
+  merge. Check current `main` and open PRs before starting: another agent may
+  advance the repository after this snapshot.
 - Plain JavaScript, browser globals under `BR`, no build step or runtime package
   installation. Open `index.html` for the map, `workbench.html` for the template
   workshop, and `elevation.html` for the elevation lab. A local static server is
@@ -65,7 +67,8 @@ occupied width, rather than as thin diagonal lines.
 | [#14](https://github.com/Zetic/Backrooms-Prototype-Map/pull/14) | Added band-world planning and the former atrium exploration example |
 | [#15](https://github.com/Zetic/Backrooms-Prototype-Map/pull/15) | Tried to improve the atrium footprint/population; the resulting repetitive rooms did not satisfy the user |
 | [#16](https://github.com/Zetic/Backrooms-Prototype-Map/pull/16) | Implemented continuous cutaway/local-floor inspection and removed the atrium from generation and the lab |
-| `claude/connection-zones` | Milestone 2: connection zones, stair/ramp variants, slope-following reservations, the ladder-fallback fix, presentation in both directions |
+| [#18](https://github.com/Zetic/Backrooms-Prototype-Map/pull/18) | Milestone 2: connection zones, stair/ramp variants, slope-following reservations, the ladder-fallback fix, presentation in both directions |
+| `claude/template-floors` | Milestone 3: two- and three-storey houses, sunken floors, galleries, the template's own stairs built as real connectors |
 
 Keep the atrium retired. Its large reserved box, repeated
 same-size rooms and single theme across a tall stack were poor demonstrations
@@ -86,11 +89,12 @@ spline smoothing and the removed organic layouts should not return.
 | Local generation | `BR.ELEV.prepare(source)` adapts without mutating. `connectionVariant(source, {direction, type, rise})` builds a ladder, stair or ramp with a real landing, cutouts, navigation and reservations; `ladderVariant` is the compact fallback |
 | Connection zones | Every template/filler lists ladder zones, plus straight/switchback stair and ramp zones where its rooms fit them, both directions. Unselected zones change nothing |
 | Types and preferences | Rules in `TPL.CAT.CONNECTIONS` (width, slope range, headroom, landings). Templates set `vertical: { prefer: [...] }`; auto falls back down the list to the ladder. Lawns allow routes; other zones keep them off |
-| Existing template levels | Preserved at their actual elevations. Tall ceilings do not automatically create additional floors; legacy abstract links between differing floors remain unresolved |
+| Template floors | Houses of two and three storeys (`storeys`, the `stack` plan); floor patterns on a finished building (`tpl/floors.js`): sunken floors with steps, galleries over an undercroft. Rooms carry a `floor` offset; a gallery has a level of its own. Tall ceilings still do not create floors by themselves |
+| Template stairs | Every source `vertical` becomes a real stair (`linkFloors`): a switchback per storey in a stairwell, steps into a sunken floor, a straight stair up to a gallery. A link that fits nowhere stays abstract and unresolved, with a warning |
 | Main world | `BR.BandWorld` wraps independently seeded horizontal networks. There are no generated physical connections between bands. Exports carry every layout's zones, unselected |
-| World policy | Reference spacing 16 m; ordinary site envelope from band reference -0.25 m to +15.5 m. These are current planning policies, not universal floor heights |
+| World policy | Reference spacing 16 m; ordinary site envelope from band reference -1.5 m (a sunken floor to -1.25 m, plus slab) to +14.5 m. These are current planning policies, not universal floor heights |
 | Cutaway | Highest actual floor at or below the chosen height at each XY, uncovered lower floors shaded by depth, explicit floor holes reveal lower geometry |
-| Inspection | Continuous cut height plus exact local floor choices; the lab has type/rise controls, a zones view and table; the workbench detail panel links to the lab |
+| Inspection | Continuous cut height plus exact local floor choices; the lab has type/rise controls, a zones view (of the storey in view) and table; the workbench has a tab per floor, draws the real stairs and labels sunken floors, and links to the lab |
 | Route drawing | Stairs/ramps piece by piece at their width: solid in view, blue dashed hidden below, violet dashed above. Ladders are an outline and hatch. Far landings are outlined both ways |
 | Reservations | Atomic owner-level prism index with protected voids. Stairs/ramps reserve one prism per 0.5 m of flight from just under the walking surface to headroom |
 | World export | `br.world-elevation/0.1`, canonical ownership/reservations/navigation and exact matching of physical portals. Three exported bands currently contain three separate horizontal networks |
@@ -119,7 +123,11 @@ template, a house-floor generator, or evidence that world ramp chains exist.
 6. A ramp or stair reserves its slope and clearance locally, not its full
    bounding box. Structures beneath a high section are valid only where their
    whole volume and clearance fit; consumers read every prism in `reservations[]`.
-7. Template preferences never override physics. A type that does not fit is
+7. A floor pattern is kept only if its stair can be built and the building
+   still validates; a template's stair is never faked. Exits up and down leave
+   from the top or bottom storey and keep away from where its own stair
+   arrives, so a journey has to cross the floor.
+8. Template preferences never override physics. A type that does not fit is
    refused with its reason; nothing is moved, shrunk or rounded to make it fit,
    and an explicit rise is kept exactly or refused.
 
@@ -154,16 +162,54 @@ room, so narrow rooms with many doors often refuse ramps; zones are found per
 direction and are not coordinated (selecting up and down together is not
 offered); exports list zones but the world never selects one.
 
-## Next milestone: template floors and authored vertical patterns
+## Milestone 3 as implemented
 
-Milestone 3 from the design: give existing templates real local floors at
-their own heights where the pattern matters (a house's floors with different
-purposes, depressed floors, pits, mezzanines, compact stacks, offset exits),
-joined by the connection variants above rather than abstract stair links.
-Keep every template's optional up/down fallback and keep the patterns
-inspectable in the workbench/lab. World journeys joining bands by matching
-successive templates' zones are milestone 4; do not present a local
-demonstration as a world journey.
+- Houses (`src/tpl/house.js`, `planStack`): a stair core up one side (foyer,
+  2 m by 4.5 m stairwell on the outer wall, hallway beside it), repeated on every
+  storey; public rooms below, bedrooms above, the master suite on a third
+  floor with a smaller footprint. Storeys 3.2 m then 3 m; rooms under another
+  floor keep their ceiling under its slab. Ground-floor-only rules (portals,
+  the garage door, quick scores) are level-aware. `two_storey` (weight 0.9) and
+  `townhouse` (0.3) are about 1 house in 10 in the world.
+- `linkFloors(b, low, high, opts)` (`connections.js`) fits a stair between two
+  existing floors: entry on real floor, flights over the room's footprint (they
+  may run over an earlier flight's cutout), landing on the higher floor, never
+  through a wall, doorways clear, both floors walkable to every door and
+  landing. `prepare` runs it for every source `vertical`
+  (`elevation.js: resolveVerticals`). Short rises take the half-metre run that
+  keeps the slope in range.
+- Floor patterns (`src/tpl/floors.js`) split a room of a finished building:
+  `sink` (sunken floor, open edges, same ceiling plane) and `raise` (gallery
+  plus undercroft, walls moved and repeated on the gallery's level, rails on
+  open edges). Recipes opt in with `floors`; `buildable` proves each with the
+  elevation layer before keeping it (its stair and every other stair built,
+  the building valid; no elevation layer, no patterns). Composite children get
+  `floors: null`. A stair over a gallery rail is recorded in the rail's `gaps`.
+- `linkFloors` slides the smaller floor's end (entry or landing) over that floor
+  to place a route; keep that when changing it, it is what keeps pattern
+  proving to tens of milliseconds.
+- Open boundaries between floors at different heights are not ways in
+  (`hostGrid`): a pit edge or a gallery rail is a drop.
+- Envelope: `BAND_CFG.floorLimit` -1.25 m and `ceilingLimit` 14.5 m.
+
+Known limits: galleries need an 8 m straight stretch of wall, so halls with
+pier-jogged walls (cross-pillar, gallery) get none; one gallery and one sunken
+floor at most per building; the lab builds templates with no wrongness, so
+the park's sunken pit shows in the workbench (wrongness slider), not the lab;
+map painting draws a stairwell as an abstract tread mark (it never adapts).
+
+## Next milestone: world journeys composed from templates
+
+Milestone 4 from the design: build sparse vertical journeys between the
+world's bands by matching successive templates' connection zones, with
+horizontal exploration on every floor between arrival and the next
+departure. The pieces are ready: every template offers zones up and down from
+its top and bottom storeys, away from its own stairs; multi-storey templates
+climb a band's height internally. Plan related footprints and protected voids
+together across bands before generating neighbours, keep generation order and
+cache eviction from changing ownership, and replace `verticalJourneys: 'none'`
+in the world export. Do not repeat one template through a stack, and do not
+fill reservations with repetitive rooms (the retired atrium).
 
 ## Presentation issue from the milestone-1 review (fixed)
 
@@ -180,11 +226,13 @@ follows actual floors.
 | File | Responsibility |
 | --- | --- |
 | `src/world.js`, `src/poi.js` | Deterministic horizontal cell/site plans and POI placement/building |
-| `src/tpl/framework.js`, `src/tpl/grid.js` | Blueprint pipeline and 0.5 m geometry kit |
+| `src/tpl/framework.js`, `src/tpl/grid.js` | Blueprint pipeline (levels, verticals and their hints, floor patterns applied last) and 0.5 m geometry kit |
+| `src/tpl/house.js` | House engine, including the `stack` plan for houses of several storeys |
 | `src/tpl/catalogue.js`, `src/tpl/archetypes/` | Room/zone definitions and template recipes |
 | `src/tpl/fillers/`, `src/tpl/lot.js`, `src/tpl/composite.js` | Fill generation, lot integration and nested templates |
 | `src/tpl/elevation.js` | Adapter, capabilities, ladder variants, derived spatial contract, reservations and validation |
-| `src/tpl/connections.js` | Connection zones, stair/ramp layout, slope-following reservations, `connectionVariant` |
+| `src/tpl/connections.js` | Connection zones, stair/ramp layout, slope-following reservations, `connectionVariant`, `linkFloors` |
+| `src/tpl/floors.js` | Floor patterns on a finished building: sunken floors, galleries |
 | `src/tpl/elevation-view.js` | Cutaway plans/cache, floor visibility, connection/zone drawing and route profile |
 | `src/elevation-lab.js`, `elevation.html` | Direction/type/rise selection, height/exact-floor controls, capability/link/zone reports and export |
 | `src/band-world.js` | Band networks, placement offsets, ownership, portal graph and canonical world export |
@@ -208,13 +256,15 @@ Full regression command:
 node tests/run-all.js
 ```
 
-Milestone 2 passes the full suite, including five horizontal-world seeds, all 80
-template/filler families' up/down potential (778 generated physical variants in
-`tests/elevation.test.js`) and `tests/connections.test.js`.
+Milestone 3 passes the full suite (364 checks), including five horizontal-world
+seeds, every template/filler family's up/down potential
+(`tests/elevation.test.js`), `tests/connections.test.js` and
+`tests/floors.test.js` (storeys, sunken floors, galleries, template stairs,
+exits, the tower test, world placement and workbench drawing).
 Native canvas pixel checks and actual-map tile reuse were also checked. DOM and
 canvas adapters exercise controllers; they are not complete browser-layout QA.
 
-For vertical changes, begin with `tests/elevation.test.js`, `tests/connections.test.js`, `tests/cutaway.test.js`,
+For vertical changes, begin with `tests/elevation.test.js`, `tests/connections.test.js`, `tests/floors.test.js`, `tests/cutaway.test.js`,
 `tests/elevation-ui.test.js`, `tests/band-world.test.js` and
 `tests/band-render.test.js`. Use the full runner before publishing generation
 changes. Add meaningful cases for actual zones/types, endpoint failures and

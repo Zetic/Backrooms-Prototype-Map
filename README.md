@@ -87,6 +87,12 @@ Open `workbench.html` to:
 - edit recipes;
 - export the JSON.
 
+Templates have floors at their own heights: houses of two and three storeys
+(`two_storey`, `townhouse`) with a real stair in their stairwell, sunken
+living rooms and hall floors with steps down, and galleries along tall halls
+(`docs/elevation.md`, milestone 3). The workbench shows a tab per floor and
+draws the stairs.
+
 Open [the elevation lab](elevation.html) to inspect actual floors, continuous
 cutaway heights and the connection zones of every template and filler: where a
 ladder, stair or ramp fits up or down, and a connected variant of any of them
@@ -129,7 +135,8 @@ The URL hash keeps the seed, position, zoom, band, cut height and toggles, for e
 | `render.js` | The map: tile cache, detail / plan / far views, overlays |
 | `tpl/` | The template system: kit grid, framework, the shared catalogue of room and zone types (`catalogue.js`), House, Rooms and Zone engines, the composite pipeline (`composite.js`: templates built inside a template and merged into one blueprint) and the Neighborhood and Park engines, archetypes, fillers, lots (`lot.js`: settings, the yard, and the adapter that builds templates inside bigger ones), blueprint renderer |
 | `tpl/elevation.js`, `tpl/elevation-view.js`, `elevation-lab.js` | Stacked surfaces, reservations, ladder variants, validation, cutaway, JSON renderer and standalone lab |
-| `tpl/connections.js` | Connection zones (ladder, stair, ramp), template preferences, slope-following reservations, `connectionVariant` |
+| `tpl/connections.js` | Connection zones (ladder, stair, ramp), template preferences, slope-following reservations, `connectionVariant`, and `linkFloors` (a template's own stairs between its floors) |
+| `tpl/floors.js` | Floor patterns on a finished building: sunken floors with steps, galleries over an undercroft |
 | `band-world.js` | Deterministic reference-band networks, spatial reservations, exact portal matching and canonical world export |
 
 ```js
@@ -172,6 +179,12 @@ The runner checks:
   reserve space that follows the slope (a room fits under the high end, not the
   low). Preferences never override fit, explicit rises are exact, variants are
   deterministic, and the cutaway shows routes and far landings both ways.
+- **Floors at their own heights.** Houses of two and three storeys have one
+  stacked stairwell and a real switchback per storey; sunken floors have open
+  edges, the same ceiling and steps of exactly their depth; galleries stand
+  over an undercroft with headroom, reached by a stair up a side wall; every
+  template stair is built, or stays abstract with a warning where nothing
+  fits; exits up and down keep away from where those stairs arrive.
 - **Fillers.** Every filler keeps the contract on any site shape and honours
   every connection. The pool leans enclosed, and fillers are fast.
 - **The world, on five seeds.** Sites tile every cell exactly. Connections are

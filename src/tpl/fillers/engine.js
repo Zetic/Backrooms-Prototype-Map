@@ -1190,7 +1190,7 @@
       curves: cv.curves.map((c, k) => Object.assign({ id: 'c' + k, level: 0, kind: c.kind, room: id(c.room), pts: c.pts.map(mp), line: c.line.map(mp) },
         c.kind === 'arc' ? { center: mp(c.center), radius: m(c.radius), angles: c.angles } : {}))
     } : {};
-    return Object.assign({
+    const out = Object.assign({
       schema: FILL.SCHEMA, filler: F.id, name: F.name, feel: F.feel, seed, grid: G,
       site: { w: S.w, h: S.h, rects: S.rects },
       connections: J.portals.map((p) => ({ id: p.conn.id, side: p.conn.side, at: m(p.conn.s0), width: m(p.conn.s1 - p.conn.s0), line: m(p.conn.line), kind: p.conn.kind, route: p.conn.route })),
@@ -1203,6 +1203,8 @@
         partitions: P.partitions.length, columns: P.columns.length, curves: cv.curves.length
       }
     }, smooth);
+    // floors at other heights (tpl/floors.js): a gallery, a sunken floor
+    return F.floors && BR.FLOORS ? BR.FLOORS.apply(out, F.floors, seed, F.id) : out;
   }
 
   FILL.generate = generate;

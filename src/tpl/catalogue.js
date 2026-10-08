@@ -61,6 +61,11 @@
     hall: { zone: 'circulation', minW: 2, maxAsp: 99, ceil: [2.4, 2.5], tags: ['circulation'], label: 'hallway', lone: { pool: 'expected', weight: 0.5, site: { w: [1, 1.5], h: [5, 9] } } },
     corridor: { zone: 'circulation', minW: 2, maxAsp: 99, ceil: [2.4, 2.7], tags: ['circulation'], lone: { pool: 'expected', weight: 0.5, site: { w: [1.5, 2], h: [6, 12] }, exit: 0.6 } },
     vestibule: { zone: 'circulation', minW: 2, maxAsp: 4, ceil: [2.4, 2.7], tags: ['entry', 'circulation'], lone: { pool: 'expected', weight: 0.4, site: { w: [2, 3], h: [1.5, 2.5] }, exit: 0.8 } },
+    // floors at other heights (no lone templates: each exists only beside the floor it changes from)
+    stairwell: { zone: 'circulation', minW: 4, maxAsp: 3, ceil: [2.4, 2.6], tags: ['circulation', 'stair', 'vertical'] },
+    sunken: { zone: 'public', minW: 4, ceil: [2.5, 3], tags: ['sunken', 'floor change'], label: 'sunken floor' },
+    gallery: { zone: 'circulation', minW: 4, ceil: [2.2, 4], tags: ['gallery', 'mezzanine', 'overlook', 'floor change'] },
+    undercroft: { zone: 'circulation', minW: 4, ceil: [2.2, 3.5], tags: ['under gallery', 'circulation'], label: 'under the gallery' },
     // outdoors, indoors
     street: { zone: 'circulation', minW: 12, ceil: [9, 14], tags: ['street', 'road', 'outdoor', 'hall'], lone: { pool: 'weird', weight: 0.5, site: { w: [6, 7.5], h: [12, 20] }, door: 'opening', doorW: 3, exit: 1 } },
     front_yard: { zone: 'public', ceil: [9, 14], tags: ['yard', 'front yard', 'outdoor'], label: 'front yard', lone: { pool: 'weird', weight: 0.5, site: { w: [5, 7.5], h: [3, 6] }, door: 'opening', doorW: 2 } },
@@ -71,7 +76,9 @@
 
   // ------------------------------------------------------------ zones
   // routes: a stair or ramp may be built on this zone (lawn); every other zone
-  // is kept clear of them (paths, playgrounds, pads, seating, pits)
+  // is kept clear of them (paths, playgrounds, pads, seating, pits). A zone
+  // that is the whole of a sunken floor (the park's pit, once sunk) takes the
+  // steps down into it (connections.js, linkFloors).
   const ZONES = {
     lawn: { label: 'lawn', tags: ['grass', 'soft'], routes: true, lone: { pool: 'weird', weight: 0.6, site: { w: [4, 7.5], h: [4, 7.5] } } },
     path: { label: 'path', tags: ['tile', 'walkway'], lone: { pool: 'weird', weight: 0.4, site: { w: [2, 3], h: [6, 12] }, exit: 0.8 } },

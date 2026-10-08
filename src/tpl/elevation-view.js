@@ -181,7 +181,10 @@
   }
   /** unselected opportunities (connection zones), for inspection: dashed areas, one label each */
   function drawZones(g, b, o, X, Y, S) {
-    const zones = (b.connectionZones || []).filter((z) => z.state !== 'connected' && Math.abs(z.floorZ - o.cutZ) < EPS + (o.exact ? 0 : 1e9) && z.floorZ <= o.cutZ + EPS);
+    // the zones of the storey in view: from the highest floor at or below the
+    // cut, and floors within a storey of it (not those of the floors below)
+    const seen = (b.surfaces || []).map((x) => x.floorZ).filter((z) => z <= o.cutZ + EPS), top = seen.length ? Math.max(...seen) : o.cutZ;
+    const zones = (b.connectionZones || []).filter((z) => z.state !== 'connected' && Math.abs(z.floorZ - o.cutZ) < EPS + (o.exact ? 0 : 1e9) && z.floorZ <= o.cutZ + EPS && z.floorZ >= top - ((BR.ELEV && BR.ELEV.STOREY) || 1.5) - EPS);
     const placed = [];
     for (const z of zones) {
       g.save(); g.strokeStyle = z.direction === 'up' ? INK.above : INK.below; g.setLineDash([3, 3]); g.lineWidth = 1;

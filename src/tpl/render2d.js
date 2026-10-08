@@ -47,6 +47,25 @@
     return rm.zone || '_';
   }
 
+  /**
+   * The stairs the elevation layer builds from a building's verticals, cached
+   * per building: [{ c (connector), from, to (source levels) }]. Only drawn
+   * when asked (o.stairs): it adapts the blueprint, which map painting never does.
+   */
+  const stairCache = new WeakMap();
+  function builtStairs(b) {
+    const E = BR.ELEV;
+    if (!E || !E.prepare || !E.linkFloors || !(b.verticals || []).some((v) => !v.dead && (v.rooms || []).length > 1)) return [];
+    if (!stairCache.has(b)) {
+      let list = [];
+      try {
+        const p = E.prepare(b, { deferCapabilities: true }), lvOf = (sid) => { const r = b.rooms.find((x) => 's:' + x.id === sid); return r ? r.level || 0 : 0; };
+        list = p.connectors.filter((c) => c.internal).map((c) => ({ c, from: lvOf(c.from), to: lvOf(c.to) }));
+      } catch (err) { list = []; }
+      stairCache.set(b, list);
+    }
+    return stairCache.get(b);
+  }
   function drawBuilding(g, b, o) {
     o = o || {};
     const S = o.scale || 20, ox = o.ox || 0, oy = o.oy || 0, lv = o.level || 0;
@@ -104,8 +123,36 @@
     }
     if (floors) drawMarkings(g, b, lv, X, Y, S, TH);
     if (!walls) { g.restore(); return; }
-    // ---- verticals (stairs / lifts): a tread pattern in the room
+    // ---- verticals (stairs / lifts): a tread pattern in the room. Not where
+    // the elevation layer has built the real stair (drawn as a connector), nor
+    // for steps into a sunken floor or a gallery's stair, which have no room of
+    // their own to mark
+    const stairs = o.stairs ? builtStairs(b) : [];
+    const built = new Set((b.connectors || []).concat(stairs.map((x) => x.c)).map((c) => c.vertical).filter(Boolean));
+    // the real stairs (o.stairs): solid on the floor they start from, an outline
+    // where they arrive (the opening you look down into), each half metre a tread
+    for (const { c, from, to } of stairs) {
+      if (from !== lv && to !== lv) continue;
+      const pieces = (c.reservations || []).slice(0, -1).map((v) => v.rects[0]);
+      g.save();
+      g.lineWidth = Math.max(1, S * 0.04);
+      for (const r of pieces) {
+        if (from === lv) { g.fillStyle = '#b99f78'; g.fillRect(X(r[0]), Y(r[1]), (r[2] - r[0]) * S, (r[3] - r[1]) * S); g.strokeStyle = 'rgba(60,45,25,0.6)'; g.strokeRect(X(r[0]), Y(r[1]), (r[2] - r[0]) * S, (r[3] - r[1]) * S); }
+        else { g.setLineDash([4, 3]); g.strokeStyle = '#86acd0'; g.strokeRect(X(r[0]), Y(r[1]), (r[2] - r[0]) * S, (r[3] - r[1]) * S); }
+      }
+      // which way is up
+      const p0 = c.path[1], p1 = c.path[2];
+      if (from === lv && p0 && p1 && S >= 8) {
+        const mx = (p0[0] + p1[0]) / 2, my = (p0[1] + p1[1]) / 2, d = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) || 1, ux = (p1[0] - p0[0]) / d, uy = (p1[1] - p0[1]) / d;
+        g.setLineDash([]); g.strokeStyle = '#3a2f22'; g.beginPath();
+        g.moveTo(X(mx - ux * 0.4), Y(my - uy * 0.4)); g.lineTo(X(mx + ux * 0.4), Y(my + uy * 0.4));
+        g.lineTo(X(mx + ux * 0.15 - uy * 0.2), Y(my + uy * 0.15 + ux * 0.2)); g.moveTo(X(mx + ux * 0.4), Y(my + uy * 0.4)); g.lineTo(X(mx + ux * 0.15 + uy * 0.2), Y(my + uy * 0.15 - ux * 0.2));
+        g.stroke();
+      }
+      g.restore();
+    }
     for (const v of b.verticals || []) for (const rid of v.rooms) {
+      if (built.has(v.id) || v.local || (v.tags || []).includes('gallery stair')) break;
       const rm = rooms.get(rid);
       if (!rm || !onLv(rm)) continue;
       const r = bigRect(rm.rects), cx = (r[0] + r[2]) / 2, cy = (r[1] + r[3]) / 2;
@@ -177,6 +224,8 @@
         const wrong = (rm.tags || []).some((t) => t.indexOf('wrong:') === 0);
         const lines = [];
         if (o.dims) lines.push(rm.area.toFixed(1) + ' m²' + (rm.ceiling ? ' · ' + rm.ceiling + ' m' : ''));
+        // a floor at another height than its level (a sunken floor) says so
+        if (rm.floor) lines.unshift((rm.floor < 0 ? 'steps down ' : 'steps up ') + Math.abs(rm.floor).toFixed(2).replace(/0$/, '') + ' m');
         if (o.tags) { const tg = (rm.tags || []).filter((t) => t.indexOf('wrong:') !== 0).join(' · '); if (tg) lines.push(tg); }
         const fit = lines.filter((_, k) => h > fs * (2.3 + 1.1 * k));
         const y0 = cy - (fit.length * fs * 0.55);

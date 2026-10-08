@@ -13,7 +13,9 @@
 (function (root) {
   'use strict';
   const BR = root.BR, TG = BR.TG;
-  const E = BR.ELEV = { SCHEMA: 'br.elevation/0.2', LEGACY: ['br.elevation/0.1'], SLAB: 0.25 };
+  // STOREY: floors within this of each other count as one storey (a sunken
+  // floor or a raised platform beside the main floor)
+  const E = BR.ELEV = { SCHEMA: 'br.elevation/0.2', LEGACY: ['br.elevation/0.1'], SLAB: 0.25, STOREY: 1.5 };
   /** a connector's reserved prisms, whichever schema wrote it */
   const reservationsOf = (c) => c.reservations || (c.reservation ? [c.reservation] : []);
   const EPS = 1e-7, clone = (v) => JSON.parse(JSON.stringify(v));
@@ -48,14 +50,36 @@
   function floorPoint(b, surface, p) {
     return inside(surface.rects, p) && !(b.holes || []).some((h) => h.surface === surface.id && h.face === 'floor' && inside([h.rect], p));
   }
+  /**
+   * The surfaces an exit up or down may leave from, best first: the top (or
+   * bottom) storey - floors within 1.5 m of the extreme one - its main floor
+   * before a sunken floor or raised platform beside it, then the rest.
+   */
+  function exitOrder(b, dir) {
+    const zs = b.surfaces.map((s) => s.floorZ), ext = dir === 'up' ? Math.max(...zs) : Math.min(...zs);
+    const near = (s) => (Math.abs(s.floorZ - ext) <= E.STOREY + EPS ? 1 : 0), main = mainFloor(b);
+    return b.surfaces.slice().sort((a, c) => (near(c) - near(a)) || (near(a) ? main(c) - main(a) : (dir === 'up' ? c.floorZ - a.floorZ : a.floorZ - c.floorZ)) || a.id.localeCompare(c.id));
+  }
+  /**
+   * How much floor a surface's height has in all: the main floor of a storey
+   * is the height with the most (a sunken floor or raised platform beside it
+   * has less). Returns a function of a surface.
+   */
+  function mainFloor(b) {
+    const by = new Map();
+    for (const s of b.surfaces) { const k = round(s.floorZ); by.set(k, (by.get(k) || 0) + TG.rectsArea(s.rects)); }
+    return (s) => by.get(round(s.floorZ)) || 0;
+  }
+  /** where the template's own stairs arrive on this surface's floor: exits keep away from them */
+  const arrivalsOn = (b, s) => b.connectors.filter((c) => c.internal).flatMap((c) => c.landings).filter((p) => Math.abs(p[2] - s.floorZ) < EPS).map((p) => [p[0], p[1]]);
   function capabilities(b, opts) {
     const out = { up: { supported: true, selected: false, candidates: [] }, down: { supported: true, selected: false, candidates: [] } };
     for (const dir of ['up', 'down']) {
-      const order = b.surfaces.slice().sort((a, c) => (dir === 'up' ? c.floorZ - a.floorZ : a.floorZ - c.floorZ) || a.id.localeCompare(c.id));
+      const order = exitOrder(b, dir);
       for (const s of order) {
         if (s.ceilingZ - s.floorZ < 1.8 - EPS) continue;
         let best = null, score = -Infinity;
-        const doors = b.openings.filter((o) => (o.rooms || []).includes(s.room) && o.kind !== 'window' && o.kind !== 'false').map((o) => center([o.a[0], o.a[1], o.b[0], o.b[1]]));
+        const doors = b.openings.filter((o) => (o.rooms || []).includes(s.room) && o.kind !== 'window' && o.kind !== 'false').map((o) => center([o.a[0], o.a[1], o.b[0], o.b[1]])).concat(arrivalsOn(b, s));
         for (const r of s.rects) for (let y = r[1]; y + 1 <= r[3] + EPS; y += 0.5) for (let x = r[0]; x + 1 <= r[2] + EPS; x += 0.5) {
           const landing = [x, y, x + 1, y + 1];
           if ((b.columns || []).some((c) => c.room === s.room && overlap(landing, c.rect))) continue;
@@ -150,12 +174,52 @@
     b.fillId = o.fillId || 'fill:' + (source.archetype || source.filler) + ':' + source.seed;
     b.bands = [{ id: 'ground', elevation: base }];
     const old = source.levels || [{ index: 0, elevation: 0 }], z = (level) => round(base + (old.find((l) => l.index === (level || 0)) || old[0]).elevation);
-    for (const r of b.rooms) { r.floorZ = z(r.level); r.ceilingZ = round(r.floorZ + r.ceiling); r.band = 'ground'; }
+    // a room's `floor` is its offset from its level: a sunken floor below it
+    const rz = new Map();
+    for (const r of b.rooms) { r.floorZ = round(z(r.level) + (r.floor || 0)); r.ceilingZ = round(r.floorZ + r.ceiling); r.band = 'ground'; rz.set(r.id, r.floorZ); }
     for (const q of b.walls.concat(b.openings, b.zones || [], b.columns || [], b.curves || [], b.outline || [])) q.floorZ = z(q.level);
+    // zones and columns stand on their own room's floor
+    for (const q of (b.zones || []).concat(b.columns || [])) if (rz.has(q.room)) q.floorZ = rz.get(q.room);
     for (const w of b.walls) { const rm = b.rooms.find((r) => (w.rooms || []).includes(r.id)); w.ceilingZ = rm ? rm.ceilingZ : round(w.floorZ + 2.5); }
     b.connectors = []; b.holes = []; b.voids = []; b.route = [];
-    // Legacy abstract links are preserved, explicitly unresolved in navigation.
+    // The template's own stairs (`verticals`) become physical connections
+    // where they fit; any that cannot stay unresolved in navigation.
+    if (resolvable(source).length) { refresh(b, { deferCapabilities: true }); resolveVerticals(b, source); }
     return refresh(b, o);
+  }
+
+  const resolvable = (source) => (source.verticals || []).filter((v) => !v.dead && Array.isArray(v.rooms) && v.rooms.length >= 2);
+  /**
+   * Each pair of rooms a source vertical joins (consecutive storeys of a
+   * stairwell, a floor and the sunken floor beside it, a hall and its
+   * gallery) gets a real stair or ramp between their actual floors, with its
+   * cutouts and reservation, in place of the abstract link.
+   */
+  function resolveVerticals(b, source) {
+    if (!E.linkFloors) return;
+    for (const v of resolvable(source)) for (let k = 1; k < v.rooms.length; k++) {
+      const ra = b.rooms.find((r) => r.id === v.rooms[k - 1]), rc = b.rooms.find((r) => r.id === v.rooms[k]);
+      if (!ra || !rc || Math.abs(ra.floorZ - rc.floorZ) < EPS) continue;
+      const [lo, hi] = ra.floorZ < rc.floorZ ? [ra, rc] : [rc, ra];
+      const types = v.types || (v.kind === 'ramp' ? ['ramp', 'stair'] : ['stair', 'ramp']);
+      const got = E.linkFloors(b, 's:' + lo.id, 's:' + hi.id, { types, shape: v.shape, walled: v.walled, id: 'link:' + (v.id || 'v') + ':' + k });
+      if (!got) continue;
+      got.connector.vertical = v.id;
+      b.connectors.push(got.connector); b.holes.push(...got.holes);
+      // a stair arriving over a rail (a gallery's open edge): the rail keeps a gap for it
+      const arr = got.connector.arrival, h = arr && Math.abs(arr[0][1] - arr[1][1]) < EPS;
+      if (arr) for (const w of b.walls) {
+        if (w.kind !== 'open' || !(w.tags || []).includes('rail') || Math.abs(w.floorZ - hi.floorZ) > EPS || (Math.abs(w.a[1] - w.b[1]) < EPS) !== h) continue;
+        const k = h ? 1 : 0, along = h ? 0 : 1;
+        if (Math.abs(w.a[k] - arr[0][k]) > EPS) continue;
+        const lo2 = Math.max(Math.min(w.a[along], w.b[along]), Math.min(arr[0][along], arr[1][along])), hi2 = Math.min(Math.max(w.a[along], w.b[along]), Math.max(arr[0][along], arr[1][along]));
+        if (hi2 - lo2 > EPS) (w.gaps = w.gaps || []).push({ from: lo2, to: hi2, connector: got.connector.id });
+      }
+      const e = b.graph.edges.find((x) => !x[3] && ((x[0] === ra.id && x[1] === rc.id) || (x[0] === rc.id && x[1] === ra.id)));
+      if (e) e[3] = got.connector.id; else b.graph.edges.push([lo.id, hi.id, got.connector.kind, got.connector.id]);
+      // the next link sees this one's cutouts and space
+      refresh(b, { deferCapabilities: true });
+    }
   }
 
   function addHoles(b, connector, lower, upper, rect) {
@@ -324,5 +388,5 @@
     return { errors: [...new Set(errors)], warnings: [...new Set(warnings)] };
   }
 
-  Object.assign(E, { prepare, ladderVariant, refresh, capabilities, validate, reachable, ReservationIndex, volumeOverlap, reservationsOf, prism, addRoomWalls, addHoles, floorPoint, inside, overlap });
+  Object.assign(E, { exitOrder, mainFloor, arrivalsOn, prepare, ladderVariant, refresh, capabilities, validate, reachable, ReservationIndex, volumeOverlap, reservationsOf, prism, addRoomWalls, addHoles, floorPoint, inside, overlap });
 })(typeof window !== 'undefined' ? window : globalThis);

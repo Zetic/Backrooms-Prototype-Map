@@ -125,6 +125,15 @@ hand-drawn maps), `row` (rooms side by side in a strip), `slice`, `stub`,
 `plus` (a plus-shaped pillar) and `wallPiece` (a free-standing straight, L
 or T wall).
 
+**Floors at other heights.** A filler can carry `floors` (the same patterns a
+template recipe uses, `src/tpl/floors.js`), laid on what it built: the pillar,
+loop, ragged, office and scattered-pillar halls sometimes get a gallery along
+a straight stretch of wall (the hall becomes double height, an undercroft
+below, a stair up a side wall), and the office, ragged, scattered-pillar and
+pillar halls sometimes a sunken floor with steps down into it. A gallery adds
+a level to the filler's `levels`; a sunken floor is a room with a negative
+`floor`. See [docs/elevation.md](elevation.md), milestone 3.
+
 The old world-first fill's Backrooms zones and knobs were the starting
 point for the first eight; the rest come from the reference maps in the
 filler discussion of 2026-10-07.
