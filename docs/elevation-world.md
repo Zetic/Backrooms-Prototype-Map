@@ -93,7 +93,10 @@ another owner. Child POIs identify their containing site's `reservationOwner`.
 An ordinary blueprint exceeding its envelope is rejected rather than shortened.
 
 Map painting reads original blueprints with their band offset. It does not run
-spatial adaptation or connection-zone searches. `world.spatial(site)` caches
+spatial adaptation or connection-zone searches; a template's own stairs come
+kept on it from generation (`stairs`), so the cutaway draws them (to a
+gallery, between storeys, into a sunken floor) without adapting anything, and
+their tags are drawn after every wall of the tile. `world.spatial(site)` caches
 explicit-Z adaptation when navigation/export needs it. Exports materialize
 up/down capabilities and `connectionZones[]` (no cutouts or edges) and exclude
 wall-clock timing diagnostics. Placing a blueprint in a band shifts every

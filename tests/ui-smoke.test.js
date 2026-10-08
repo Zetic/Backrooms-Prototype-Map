@@ -90,9 +90,28 @@ check('world JSON export keeps spatial geometry and matched connections', export
 elements.get('band-down').dispatch('click'); flush();
 check('ground band resets to ground zero', window.__world().band === 0 && last.opts.cutZ === 0);
 check('retired atrium controls are absent', !elements.has('find-up') && !elements.has('find-down'));
+{
+  // a template's own stair (a gallery's, a storey's, steps into a sunken floor) is on the map: click it to climb to where it arrives
+  const w = window.__world(), C = BR.WORLD_CFG.cell;
+  let found = null;
+  for (let i = -1; i <= 1 && !found; i++) for (let j = -1; j <= 1 && !found; j++) for (const s of w.cell(i, j).sites) {
+    if (found || s.kind === 'transition') continue;
+    const r = w.build(s);
+    for (const [b, origin] of (r.filler ? [[r.filler, r.fillerOrigin]] : []).concat(r.buildings.map((B) => [B.b, B.origin]))) {
+      const kept = BR.ELEV.keptStairs(b);
+      if (kept && !found) { const c = kept[0].connector, p = c.path[Math.floor(c.path.length / 2)]; found = { c, at: [origin[0] + p[0], origin[1] + p[1]] }; }
+    }
+  }
+  elements.get('goto').value = found.at.join(','); elements.get('goto').dispatch('change'); flush();
+  elements.get('c').dispatch('pointerdown', { pointerId: 1, clientX: 450, clientY: 300 });
+  elements.get('c').dispatch('pointerup', { pointerId: 1, clientX: 450, clientY: 300 }); flush();
+  check('a template\'s own stair is on the map: clicking it moves the cut to where it arrives', window.__cutaway.selected && last.opts.cutZ === Math.max(found.c.landings[0][2], found.c.landings[1][2]), found.c.kind + ' to ' + last.opts.cutZ);
+  elements.get('clear-selection').click(); elements.get('height-reset').dispatch('click'); flush();
+}
+const from = [last.view.cx, last.view.cy];
 elements.get('journey-up').dispatch('click'); flush();
 {
-  const p = window.__world().nearestJourney('up', 0, 0);
+  const p = window.__world().nearestJourney('up', from[0], from[1]);
   check('the journey button centres the view on the nearest journey up', p && last.view.cx === (p.rect[0] + p.rect[2]) / 2 && last.view.cy === (p.rect[1] + p.rect[3]) / 2 && /Journey up to band 1/.test(elements.get('export-status').textContent));
   elements.get('c').dispatch('pointermove', { clientX: 450, clientY: 300 }); flush();
   check('hovering a journey names its bands, style and stages', /Journey<\/b> · band 0 ↔ band 1/.test(elements.get('info').innerHTML) && / → /.test(elements.get('info').innerHTML));

@@ -477,7 +477,14 @@
     if (!engine) throw new Error('unknown engine ' + arch.engine);
     // a composite engine builds other templates and merges them (tpl/composite.js)
     // floors at other heights (tpl/floors.js) are laid on the finished building
-    const floors = (b) => (arch.floors && BR.FLOORS && !b.error && spec.floors !== false ? BR.FLOORS.apply(b, arch.floors, spec.seed >>> 0, arch.id) : b);
+    // and its own stairs are laid out once and kept on it (elevation.js
+    // bakeStairs; a floor pattern keeps the ones it proved). Not for a child
+    // of a composite (spec.stairs false): its stairs are laid out in the whole
+    const floors = (b) => {
+      if (arch.floors && BR.FLOORS && !b.error && spec.floors !== false) BR.FLOORS.apply(b, arch.floors, spec.seed >>> 0, arch.id);
+      if (!b.error && !b.stairs && spec.stairs !== false && BR.ELEV && BR.ELEV.bakeStairs) BR.ELEV.bakeStairs(b);
+      return b;
+    };
     if (engine.composite) return floors(TPL.compose(spec, arch, engine));
     const seed = spec.seed >>> 0, ah = TG.hashStr(arch.id);
     const approach = spec.approach || 'S';

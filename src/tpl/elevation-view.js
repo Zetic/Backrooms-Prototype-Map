@@ -4,13 +4,36 @@
   const BR = root.BR, E = BR.ELEV, TG = BR.TG, EPS = 1e-7, viewCache = new WeakMap();
   const zLabel = (z) => (z > 0 ? '+' : '') + Math.round(z * 1000) / 1000 + ' m';
   const bigRect = (rs) => rs.reduce((a, b) => TG.rarea(b) > TG.rarea(a) ? b : a);
-  const roomZ = (b, r, base) => Number.isFinite(r.floorZ) ? r.floorZ : (base || 0) + (b.levels.find((l) => l.index === (r.level || 0)) || b.levels[0]).elevation;
+  // (a template's room: its level's height, plus its own `floor` offset - a sunken floor sits lower)
+  const roomZ = (b, r, base) => Number.isFinite(r.floorZ) ? r.floorZ : Math.round(((base || 0) + (b.levels.find((l) => l.index === (r.level || 0)) || b.levels[0]).elevation + (r.floor || 0)) * 1000) / 1000;
+  /**
+   * The connections a drawing shows, the cutouts they make and the floors they
+   * join: a spatial blueprint's own, or a template's kept stairs (b.stairs,
+   * elevation.js) lifted to its base height. Map painting never adapts a
+   * template, so this is how it shows the way up to a gallery, a storey or
+   * down into a sunken floor.
+   */
+  const partsCache = new WeakMap();
+  function partsOf(b, base) {
+    if (b.schema === E.SCHEMA || !b.stairs) return { connectors: b.connectors || [], holes: b.holes || [], surfaces: b.surfaces || [] };
+    base = base || 0;
+    let m = partsCache.get(b);
+    if (!m) { m = new Map(); partsCache.set(b, m); }
+    if (!m.has(base)) {
+      const links = E.keptStairs ? E.keptStairs(b) || [] : [];
+      m.set(base, { connectors: links.map((l) => E.liftConnector(l.connector, base)), holes: links.flatMap((l) => l.holes),
+        surfaces: links.length ? b.rooms.map((r) => ({ id: 's:' + r.id, rects: r.rects, floorZ: roomZ(b, r, base) })) : [] });
+      while (m.size > 4) m.delete(m.keys().next().value);
+    }
+    return m.get(base);
+  }
   const inRect = (r, x, y) => x >= r[0] && x < r[2] && y >= r[1] && y < r[3];
   const subtract = (rs, cuts) => cuts.reduce((rs, q) => rs.flatMap((r) => TG.rsub(r, q)), rs);
   function union(rs) { const out = []; for (const r of rs) out.push(...subtract([r], out)); return out; }
   function floorRecords(b, base) {
+    const all = partsOf(b, base).holes;
     return b.rooms.map((r) => {
-      const holes = (b.holes || []).filter((h) => h.surface === 's:' + r.id && h.face === 'floor').map((h) => h.rect);
+      const holes = all.filter((h) => h.surface === 's:' + r.id && h.face === 'floor').map((h) => h.rect);
       return { room: r, level: r.level || 0, floorZ: roomZ(b, r, base), rects: subtract(r.rects, holes), holes };
     });
   }
@@ -75,7 +98,7 @@
     for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const a = pts[i], b = pts[j]; if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside; }
     return inside;
   }
-  function connectionAt(b, x, y, height, ghost) { return (b.connectors || []).find((c) => (ghost || Math.min(...c.path.map((p) => p[2])) <= height + EPS) && connectionAreas(c, height).some((a) => pointInPolygon(a.pts, x, y))) || null; }
+  function connectionAt(b, x, y, height, ghost, base) { return partsOf(b, base).connectors.find((c) => (ghost || Math.min(...c.path.map((p) => p[2])) <= height + EPS) && connectionAreas(c, height).some((a) => pointInPolygon(a.pts, x, y))) || null; }
   function tag(g, text, x, y, align, color) {
     g.save(); g.font = '11px system-ui'; const w = g.measureText(text).width;
     const left = align === 'right' ? x-w : align === 'center' ? x-w/2 : x;
@@ -103,15 +126,17 @@
    * The far landing is outlined in both directions: violet above, blue below.
    */
   function drawConnections(g, b, o, plan, X, Y, S) {
-    for (const c of b.connectors || []) {
+    const parts = partsOf(b, o.baseZ);
+    for (const c of parts.connectors) {
       const zs = c.path.map((p) => p[2]), lo = Math.min(...zs), hi = Math.max(...zs);
       if (lo > o.cutZ + EPS && !o.ghost) continue;
       const far = c.landings[0][2] <= o.cutZ + EPS && c.landings[1][2] > o.cutZ + EPS ? 1 : c.landings[1][2] <= o.cutZ + EPS && c.landings[0][2] > o.cutZ + EPS ? 0
         : Math.abs(c.landings[0][2] - o.cutZ) <= Math.abs(c.landings[1][2] - o.cutZ) ? 1 : 0;
       const farZ = c.landings[far][2], farUp = farZ > c.landings[1 - far][2];
-      if (c.kind === 'ladder') {
+      // (layer 'labels': only the tags, drawn last over every blueprint's walls)
+      if (o.layer === 'labels') {} else if (c.kind === 'ladder') {
         if (o.layer === 'walls' || o.layer === undefined) {
-          const foot = reservedOf(c).flatMap((v) => v.rects), hole = (b.holes || []).find((h) => h.connector === c.id) || null;
+          const foot = reservedOf(c).flatMap((v) => v.rects), hole = parts.holes.find((h) => h.connector === c.id) || null;
           g.save(); g.strokeStyle = INK.edge; g.lineWidth = Math.max(1, S * 0.05);
           for (const r of foot) { poly(g, rectPts(r), X, Y); g.stroke(); }
           if (hole) {
@@ -150,9 +175,9 @@
         }
         g.restore();
       }
-      if (o.layer === 'floors') continue;
+      if (o.layer === 'floors' || (o.deferLabels && o.layer !== 'labels')) continue;
       // the far landing, in either direction
-      const dest = (b.surfaces || []).find((s) => s.id === (far ? c.to : c.from));
+      const dest = parts.surfaces.find((s) => s.id === (far ? c.to : c.from));
       if (dest && o.focus !== false && Math.abs(farZ - o.cutZ) > EPS) {
         g.save(); g.strokeStyle = farUp ? INK.above : INK.below; g.setLineDash([4, 3]); g.lineWidth = Math.max(1, S * 0.05);
         const inset = c.kind === 'ladder' ? 0.08 : 0;
@@ -208,12 +233,14 @@
     const plan = o.exact ? { groups: [], visible: [] } : cutawayPlan(b, height, o.baseZ);
     if (o.exact) { const records = floorRecords(b, o.baseZ).filter((r) => Math.abs(r.floorZ - height) < EPS); if (records.length) { plan.groups.push({ level: records[0].level, floorZ: height, records, occluders: union(records.flatMap((r) => r.holes)) }); plan.visible.push(...records); } }
     g.save();
+    // the connections' tags alone, over everything else drawn (map tiles draw them after every wall)
+    if (o.layer === 'labels') { drawConnections(g, b, { ...o, cutZ: height }, plan, X, Y, S); g.restore(); return plan; }
     if (o.ghost) for (const z of floorElevations(b, o.baseZ)) {
       if (o.exact ? z === height : z <= height + EPS) continue;
       const r = b.rooms.find((r) => roomZ(b, r, o.baseZ) === z); g.save(); g.globalAlpha *= 0.08;
       BR.TPL.drawBuilding(g, b, { ...o, level: r.level || 0, site: false, portals: false, labels: false }); g.restore();
     }
-    const avoid = (b.connectors || []).flatMap((c) => connectionAreas(c,height).map((a) => [Math.min(...a.pts.map((p)=>p[0])),Math.min(...a.pts.map((p)=>p[1])),Math.max(...a.pts.map((p)=>p[0])),Math.max(...a.pts.map((p)=>p[1]))]));
+    const avoid = partsOf(b, o.baseZ).connectors.flatMap((c) => connectionAreas(c,height).map((a) => [Math.min(...a.pts.map((p)=>p[0])),Math.min(...a.pts.map((p)=>p[1])),Math.max(...a.pts.map((p)=>p[0])),Math.max(...a.pts.map((p)=>p[1]))]));
     for (const group of plan.groups) {
       g.save(); exclude(g, b, group.occluders, X, Y, S);
       const opts = { ...o, labels: false, level: group.level, site: false, portals: o.portals !== false };
@@ -269,5 +296,5 @@
     g.textAlign = 'right'; g.fillText('Arrival · ' + Math.round(length) + ' m along route', right, height - 13);
     g.restore();
   }
-  Object.assign(E, { draw, drawProfile, profilePoints, drawCutaway, cutawayPlan, hitCutaway, floorElevations, roomZ, connectionAreas, connectionAt, zLabel, invalidateView: (b) => viewCache.delete(b) });
+  Object.assign(E, { draw, drawProfile, profilePoints, drawCutaway, cutawayPlan, hitCutaway, floorElevations, roomZ, connectionAreas, connectionAt, cutawayParts: partsOf, zLabel, invalidateView: (b) => { viewCache.delete(b); partsCache.delete(b); } });
 })(typeof window !== "undefined" ? window : globalThis);

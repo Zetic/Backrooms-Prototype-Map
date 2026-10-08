@@ -229,7 +229,50 @@ const surf = (p, id) => p.surfaces.find((s) => s.id === id);
   log.length = 0; T.drawBuilding(g, b, { scale: 20, level: 1, stairs: true });
   assert(log.some((l) => l[0] === 'set' && l[1] === 'strokeStyle' && l[2] === '#86acd0'), 'and outlined where it arrives');
   log.length = 0; T.drawBuilding(g, b, { scale: 20, level: 0 });
-  assert(!log.some((l) => l[0] === 'set' && l[1] === 'fillStyle' && l[2] === '#b99f78'), 'map painting does not build stairs');
-  ok('the world builds houses of several storeys within the band envelope; the workbench draws their real stairs, map painting does not');
+  assert(!log.some((l) => l[0] === 'set' && l[1] === 'fillStyle' && l[2] === '#b99f78'), 'a plain plan draws no flights');
+  // the map's cutaway draws the stairs kept on the house, without adapting it
+  const prepare = E.prepare; let adapted = 0;
+  E.prepare = (...a) => { adapted++; return prepare(...a); };
+  try {
+    log.length = 0; E.drawCutaway(g, b, { scale: 20, cutZ: 16, baseZ: 16 });
+    assert(log.some((l) => l[0] === 'set' && l[1] === 'fillStyle' && l[2] === '#b99f78'), 'the map shows the flight');
+    assert.equal(adapted, 0, 'map painting still never adapts a blueprint');
+  } finally { E.prepare = prepare; }
+  ok('the world builds houses of several storeys within the band envelope; the workbench and the map draw their real stairs');
+}
+
+// ---- 8. a template's stairs are laid out once, where it is generated, and kept on it
+{
+  let n = 0, links = 0;
+  const cases = [['two_storey', 'T'], ['townhouse', 'T'], ['park', 'T'], ['pillar_hall', 'F'], ['ragged_hall', 'F'], ['office', 'F'], ['loop_hall', 'F']];
+  for (const [id, kind] of cases) for (let s = 1; s <= 8; s++) {
+    const b = kind === 'T' ? T.generate({ archetype: id, seed: s * 7, wrongness: id === 'park' ? 0.6 : undefined }) : filler(id, s * 7);
+    if (b.error || !(b.verticals || []).some((v) => !v.dead && (v.rooms || []).length > 1)) continue;
+    n++;
+    const kept = E.keptStairs(b), p = E.prepare(b, { deferCapabilities: true });
+    assert(kept && kept.length === internal(p).length, id + '#' + s + ': every stair it builds is kept on it');
+    links += kept.length;
+    // the kept stairs are exactly what laying them out again gives: one source of truth
+    const bare = JSON.parse(JSON.stringify(b)); delete bare.stairs;
+    const q = E.prepare(bare, { deferCapabilities: true }), strip = (x) => JSON.stringify({ c: x.connectors, h: x.holes, w: x.walls, e: x.navigation.edges });
+    assert.equal(strip(p), strip(q), id + '#' + s + ': kept and laid out again agree');
+    assert(!('stairs' in p), 'an adapted blueprint has connectors, not kept stairs');
+    // at any height: a template prepared at +16 m has its kept stairs 16 m up
+    const up = E.prepare(b, { deferCapabilities: true, elevation: 16 });
+    assert.deepEqual(internal(up).map((c) => c.landings.map((l) => l[2] - 16)).flat().map((z) => Math.round(z * 1000)), internal(p).map((c) => c.landings.map((l) => l[2])).flat().map((z) => Math.round(z * 1000)));
+    // the map finds them on the template itself, at its band's height
+    const c = kept[0].connector, mid = c.path[Math.floor(c.path.length / 2)];
+    const hit = E.connectionAt(b, mid[0], mid[1], 16 + c.landings[1][2], false, 16);
+    assert(hit && Math.abs(hit.landings[1][2] - 16 - c.landings[1][2]) < EPS, id + '#' + s + ': the map finds the stair on the template');
+  }
+  assert(n >= 20 && links >= n, n + ' templates, ' + links + ' stairs');
+  // a template changed after it was generated: its kept stairs no longer stand, and are laid out again
+  const b = T.generate({ archetype: 'two_storey', seed: 3 }), moved = JSON.parse(JSON.stringify(b));
+  moved.rooms[0].rects[0][0] += 0.5;
+  assert(E.keptStairs(b) && !E.keptStairs(moved), 'a change to the geometry voids the kept stairs');
+  assert.equal(internal(E.prepare(moved, { deferCapabilities: true })).length, internal(E.prepare(b, { deferCapabilities: true })).length);
+  // a composite's child is generated with stairs: false (its stairs are laid out in the whole, where it ends up)
+  assert(!T.generate({ archetype: 'two_storey', seed: 3, stairs: false }).stairs && b.stairs);
+  ok(n + ' templates keep their ' + links + ' stairs from generation: what prepare uses, equal to laying them out again, at any height; a changed template lays them out again');
 }
 console.log('All floor checks passed.');
