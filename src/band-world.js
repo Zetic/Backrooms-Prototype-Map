@@ -201,7 +201,7 @@
         if (G.pit && G.pit.bottom.site === site.id && r.filler) BR.CLAIM.markDrop(r.filler, G.pit, G.pit.id, 'bottom');
         if (G.landing && site.id === G.anchor) {
           const host = r.buildings.find((x) => x.poi.id === G.poi);
-          if (host) { host.b = G.landing.b; host.conns[G.landing.portal] = G.landing.connection; }
+          if (host) { host.b = clone(G.landing.b); host.conns[G.landing.portal] = G.landing.connection; }
         }
       }
       const A = this.arrivalInto(site);

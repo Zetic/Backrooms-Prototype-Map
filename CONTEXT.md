@@ -370,7 +370,7 @@ node tests/floors.test.js --full     # one file on its own
 ```
 
 Quick mode runs every check on 2 world seeds and smaller samples; full mode is
-the whole suite as it always was (5 world seeds, full samples, 392 checks).
+the whole suite as it always was (5 world seeds, full samples, 397 checks).
 Run quick after each change and full before a PR. GitHub Actions runs full on
 every PR to `main`. See "Fast test runs" below for how it works.
 

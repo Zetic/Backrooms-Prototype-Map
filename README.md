@@ -181,7 +181,7 @@ node tests/run-all.js --full    # full: before pushing or opening a PR (CI runs 
 Run the **quick** mode while you work: it runs every check, on 2 world seeds
 and smaller samples where a check samples many seeds or sizes. Run the
 **full** mode before a PR: all 5 world seeds and the full samples, every check
-the suite has (392). GitHub Actions runs the full mode on every pull request to
+the suite has (397). GitHub Actions runs the full mode on every pull request to
 `main` (`.github/workflows/tests.yml`) and shows the result on the PR.
 
 Test files run in parallel, one per core and slowest first (`--jobs N` to

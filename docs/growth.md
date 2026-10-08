@@ -69,6 +69,20 @@ journey plots go.
   planned as before milestone 4), pits from the first level into the ground,
   biomes and their pools, the claims mechanics.
 
+![A stair growth from the ground to band 1, on the map](growth-climb.png)
+
+*Seed 7, the stair cell of block (−1, −1), the same 49 × 32 m at four
+heights. At 0 m one plain ground site takes a stair up 4.5 m. At +4.5 m the
+first level of house-room floors stands over the ground, with a stair 6.5 m on
+up from its far side and a pit back down. At +11 m the second level stands
+over the first and the last climb rises 5 m. On band 1 it lands in an
+ordinary ground site rebuilt round it.*
+
+*Checked after review:* planning never writes into a cell plan or a planned
+growth (the suite freezes both and builds and exports over them), a level that
+cannot be built after its leg was laid undoes that leg cleanly, and a climb's
+landing site comes out the same whichever band is built first.
+
 ---
 
 ## Summary

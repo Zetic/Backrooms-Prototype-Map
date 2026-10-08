@@ -257,6 +257,56 @@ console.log('ok   a block\'s stair cell: a ground stair up, two floors, no shaft
 }
 console.log('ok   growths, their claims and their exports are the same in fresh and evicting worlds, in any order');
 
+// Across the bands too. The site a climb lands in is rebuilt from the band
+// below's plan: built first, before anything of that band, in an evicting
+// world, it still gives the same two-band export. And nothing built or
+// exported afterwards writes into a planned growth or a cell plan (frozen,
+// a write would throw).
+{
+  const strip = (x) => JSON.parse(JSON.stringify(x, (k, v) => (k === 'ms' ? undefined : v)));
+  const G = w7.growth(0, STAIR.i, STAIR.j), [ci, cj] = G.arrival.cell;
+  const want = strip(w7.exportRegion(ci, cj, ci, cj, [0, 1]));
+  const b = new BR.BandWorld(STAIR.seed, { limits: { cells: 12, builds: 4 }, elevationLimits: { bands: 2, claims: 32, branches: 2, raised: 2 } });
+  b.setBand(1);
+  b.spatial(b.site(G.arrival.ground));
+  for (const s of b.cell(ci, cj, 1).sites) b.build(s);
+  same(strip(b.exportRegion(ci, cj, ci, cj, [0, 1])), want);
+  const freeze = (o, seen = new Set()) => { if (!o || typeof o !== 'object' || seen.has(o)) return; seen.add(o); Object.freeze(o); for (const k of Object.keys(o)) freeze(o[k], seen); };
+  const f = new BR.BandWorld(STAIR.seed), F = f.growth(0, STAIR.i, STAIR.j);
+  for (const [i, j] of F.cells.concat([F.arrival.cell])) for (const n of [0, 1]) { const c = f.cell(i, j, n); for (const s of c.sites) f.fillerOf(s); freeze(c); }
+  freeze(F);
+  const [i0, j0, i1, j1] = span(F.cells.concat([F.arrival.cell]));
+  same(f.exportRegion(i0, j0, i1, j1, [0, 1]).issues, []);
+}
+console.log('ok   a climb from the band below lands the same whichever band is built first, and building never writes into a plan');
+
+// A level that cannot be built after the leg up to it was laid: the growth
+// stops at the level below, that level's leg is undone (its floor rebuilt
+// without the climb, its claim back to the band's ceiling), and what is left
+// is as sound as any growth.
+{
+  const real = GROWTH.raisedSite;
+  GROWTH.raisedSite = (rs, leg) => (!leg && rs.level === 2 ? null : real(rs, leg));
+  try {
+    const w = new BR.BandWorld(STAIR.seed), G = w.growth(0, STAIR.i, STAIR.j);
+    assert(G && G.planned.length >= 2, 'it planned more than one level');
+    assert.equal(G.levels.length, 1, 'it stops at its first level');
+    same(G.legs, []); assert.equal(G.arrival, null, 'and does not arrive');
+    for (const rs of G.sites) {
+      assert.equal(rs.leg, null, rs.id + ' carries no leg');
+      assert.equal(rs.top, CL, rs.id + ' claims up to the band\'s ceiling again');
+      assert(!rs.b.portals.some((p) => p.connection === 'b0|' + STAIR.i + ',' + STAIR.j + ':l2'), rs.id + ' has no door onto the undone leg');
+    }
+    assert(!G.conns.some((cn) => /:l2$/.test(cn.id)), 'the undone leg is not a connection');
+    const [i0, j0, i1, j1] = span(G.cells), g = w.graph(i0, j0, i1, j1, [0]);
+    same(g.issues, []); same(g.unresolved, []);
+    claimsOf(w, G);
+    const start = g.navigation.nodes.find((n) => n.floorZ === 0 && n.id.startsWith(G.anchor + '/'));
+    assert(G.sites.every((rs) => [...walk(g, start.id)].some((id) => id.startsWith(rs.owner + '/') || id.startsWith(rs.id + '/'))), 'every floor left is reached from the ground');
+  } finally { GROWTH.raisedSite = real; }
+}
+console.log('ok   a level that cannot be built undoes the leg up to it');
+
 // The levels a growth climbs through: from its first floor, legs of 3-6.5 m
 // on the half metre, the last floor a storey under the band's ceiling and one
 // leg under the next band. A steered growth always plans to arrive.
