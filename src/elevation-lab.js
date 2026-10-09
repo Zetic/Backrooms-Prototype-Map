@@ -101,7 +101,7 @@
         const z = BR.CLAIM.pillarFloor(source), st = BR.CLAIM.stairTop(source);
         let got = null;
         // (the world's reach is where the lot edge is; here, whichever fits)
-        for (const sd of (st && st.sides) || []) { for (const reach of [2.5, 1, 4]) { got = BR.CLAIM.raiseStair(source, { z, side: sd, reach }); if (got) break; } if (got) break; }
+        for (const sd of (st && st.sides) || []) { for (const reach of [2.5, 1, 0.5, 4]) { got = BR.CLAIM.raiseStair(source, { z, side: sd, reach }); if (got) break; } if (got) break; }
         if (!got) throw new Error('This template has no stairwell on an outside wall whose stair could carry on up' + (z ? ' to ' + E.zLabel(z) : '') + '. A two-storey house or a townhouse does.');
         source = got.b;
       }

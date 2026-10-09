@@ -143,7 +143,7 @@
         const s1 = U(Math.max(horiz ? w.a[0] : w.a[1], horiz ? w.b[0] : w.b[1])) + (horiz ? P.at[0] : P.at[1]);
         const key = w.level + (horiz ? 'h' : 'v') + c;
         if (!childWalls.has(key)) childWalls.set(key, []);
-        childWalls.get(key).push({ s0, s1, kind: w.kind, rooms: w.rooms.map((id) => (id ? idMap[k].get(id) : OUT)) });
+        childWalls.get(key).push({ s0, s1, kind: w.kind, out: !!w.out, rooms: w.rooms.map((id) => (id ? idMap[k].get(id) : OUT)) });
       }
     });
     const openOwn = new Set();
@@ -165,6 +165,13 @@
           else kind = plan.open === true || openOwn.has(pairKey(s.a, s.b)) ? 'open' : 'interior';
         }
         const w = { id: res.walls.length, level: lv, kind, o: s.o, c: s.c, s0: s.s0, s1: s.s1, lo: s.a, hi: s.b };
+        // a part's outer wall that its template laid outside its rooms stays outside them
+        if (kind === 'exterior' || kind === 'facade') {
+          const own = [s.a, s.b].filter((x) => x >= 0 && res.rooms[x].part >= 0);
+          if (own.length === 1) for (const cw of childWalls.get(lv + s.o + s.c) || []) {
+            if (cw.out && cw.s0 <= s.s0 && s.s1 <= cw.s1 && cw.rooms.indexOf(own[0]) >= 0) { w.outLo = own[0] === s.b; break; }
+          }
+        }
         res.walls.push(w);
         const lk = lv + s.o + s.c;
         if (!byLine.has(lk)) byLine.set(lk, []);
@@ -315,11 +322,20 @@
         part: rm.part >= 0 ? 'u' + rm.part : null
       };
     });
-    const walls = res.walls.map((w) => ({
-      id: 'w' + w.id, level: w.level, kind: w.kind,
-      a: w.o === 'h' ? P(w.s0, w.c) : P(w.c, w.s0), b: w.o === 'h' ? P(w.s1, w.c) : P(w.c, w.s1),
-      rooms: [id(w.lo), id(w.hi)], thickness: THICK[w.kind] || 0
-    }));
+    const walls = res.walls.map((w) => {
+      const o = {
+        id: 'w' + w.id, level: w.level, kind: w.kind,
+        a: w.o === 'h' ? P(w.s0, w.c) : P(w.c, w.s0), b: w.o === 'h' ? P(w.s1, w.c) : P(w.c, w.s1),
+        rooms: [id(w.lo), id(w.hi)], thickness: THICK[w.kind] || 0
+      };
+      if (w.outLo !== undefined) {
+        // (as framework.js: the wall runs `thickness` from its line toward `out`)
+        const sg = w.outLo ? -1 : 1, mid = (w.s0 + w.s1) / 2;
+        const p0 = w.o === 'h' ? P(mid, w.c) : P(w.c, mid), p1 = w.o === 'h' ? P(mid, w.c + sg) : P(w.c + sg, mid);
+        o.out = [Math.round((p1[0] - p0[0]) / G), Math.round((p1[1] - p0[1]) / G)];
+      }
+      return o;
+    });
     const openings = res.openings.map((op) => {
       const w = res.walls[op.wall];
       const o = {

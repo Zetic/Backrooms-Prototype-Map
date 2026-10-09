@@ -71,8 +71,12 @@ for (const a of BR.TPL.listArchetypes()) {
   potentials++;
 }
 {
-  // the houses that broke the fallback before: wings reached through a second door
+  // the houses that broke the fallback before: wings reached through a second
+  // door. The house engine now joins every wing to its front door (`inside`),
+  // so they are made here with that off.
   let multi = 0;
+  const house = BR.TPL.engines.house, inside = house.inside;
+  house.inside = false;
   for (const id of ['ranch', 'bungalow', 'suburban']) for (let seed = 1; seed <= MODE.size(16, 40); seed++) {
     const source = BR.TPL.generate({ archetype: id, seed: seed * 31, approach: 'SENW'[seed % 4] });
     const main = source.portals.find((p) => p.main), adj = new Map(source.rooms.map((r) => [r.id, []]));
@@ -83,6 +87,7 @@ for (const a of BR.TPL.listArchetypes()) {
     multi++;
     for (const direction of ['up','down']) { good(E.ladderVariant(source, { direction })); variants++; }
   }
+  house.inside = inside;
   assert(multi >= 5, 'houses with a wing behind a second door are exercised: ' + multi);
 }
 {

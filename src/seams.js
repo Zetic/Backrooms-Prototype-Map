@@ -237,7 +237,8 @@
       const rollD = rng.f(), rollW = rng.f(), wD = D ? snap(rng.range(D.w[0], D.w[1])) : 0, wW = Wd ? snap(rng.range(Wd.w[0], Wd.w[1])) : 0;
       if (allowed(D) && rollD < D.p && (doors.get(dk) || 0) < (rule.doors === undefined ? 1 : rule.doors) && put('door', wD, D)) { doors.set(dk, (doors.get(dk) || 0) + 1); continue; }
       const hasWindow = opsOf(A).concat(opsOf(B)).some((op) => op.kind === 'window' && op.o === S.o && Math.abs(op.c - S.c) < EPS && op.s0 < S.s1 && op.s1 > S.s0);
-      if (allowed(Wd) && rollW < Wd.p && !hasWindow) put('window', wW, Wd);
+      // (windows are off for now: BR.TPL.WINDOWS, tpl/framework.js)
+      if (allowed(Wd) && rollW < Wd.p && !hasWindow && BR.TPL && BR.TPL.WINDOWS) put('window', wW, Wd);
     }
     for (const S of seams) { delete S._items; delete S.aSide; }
     return seams;

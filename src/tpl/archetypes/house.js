@@ -48,7 +48,7 @@
     garage: { p: 0.75, cars: [1, 2], forward: [0, 2] },
     backDoor: 0.6, sideDoor: 0.25,
     openPlan: 0.35,
-    hall: { w: [1, 1.2] },
+    hall: { w: [1.5, 1.5] },
     windows: 1,
     vertical: { prefer: ['stair', 'ladder'] },
     wrongness: 0.15
@@ -75,7 +75,7 @@
     garage: { p: 0.15, cars: [1, 1], forward: [0, 0] },
     backDoor: 0.7, sideDoor: 0.2,
     openPlan: 0.5,
-    hall: { w: [1, 1] },
+    hall: { w: [1.5, 1.5] },
     windows: 1,
     vertical: { prefer: ['stair', 'ladder'] },
     wrongness: 0.15
@@ -86,7 +86,7 @@
   TPL.registerArchetype({
     id: 'cottage', engine: 'house', biomes: ['houseroom'], poi: false, name: 'Cottage', category: 'house', rarity: 'uncommon', weight: 1,
     blurb: 'A small house: a living room and kitchen up front, a bedroom or two and a bathroom behind. Stands inside a growth\'s house-room floors.',
-    site: { w: [7, 10], h: [8.5, 11] },
+    site: { w: [7, 10], h: [9.5, 12] },
     plans: { deep: 3, bar: 1 },
     depth: [8, 10],
     rooms: {
@@ -102,7 +102,7 @@
     garage: { p: 0 },
     backDoor: 0.6, sideDoor: 0.1,
     openPlan: 0.6,
-    hall: { w: [1, 1] },
+    hall: { w: [1.5, 1.5] },
     windows: 1,
     vertical: { prefer: ['stair', 'ladder'] },
     wrongness: 0.15
@@ -132,7 +132,7 @@
     garage: { p: 0 },
     backDoor: 0.7, sideDoor: 0.15,
     openPlan: 0.45,
-    hall: { w: [1, 1.2] },
+    hall: { w: [1.5, 1.5] },
     windows: 1,
     vertical: { prefer: ['stair', 'ladder'] },
     wrongness: 0.15
@@ -163,7 +163,7 @@
     garage: { p: 0.95, cars: [2, 2], forward: [0, 3] },
     backDoor: 0.6, sideDoor: 0.35,
     openPlan: 0.4,
-    hall: { w: [1, 1.5] },
+    hall: { w: [1.5, 1.5] },
     windows: 1,
     vertical: { prefer: ['stair', 'ladder'] },
     floors: { sunken: { p: 0.2, rooms: ['living', 'family'], size: [2.5, 4], depth: [0.3, 0.6] } },
@@ -192,7 +192,7 @@
     garage: { p: 0.5, cars: [1, 1], forward: [0, 0] },
     backDoor: 0.6, sideDoor: 0.2,
     openPlan: 0.4,
-    hall: { w: [1, 1.2] },
+    hall: { w: [1.5, 1.5] },
     windows: 1,
     vertical: { prefer: ['stair', 'ladder'] },
     floors: { sunken: { p: 0.25, rooms: ['living'], size: [2.5, 4], depth: [0.3, 0.6] } },
@@ -220,7 +220,7 @@
     garage: { p: 0 },
     backDoor: 0.7, sideDoor: 0,
     openPlan: 0.5,
-    hall: { w: [1, 1.2] },
+    hall: { w: [1.5, 1.5] },
     windows: 1,
     vertical: { prefer: ['stair', 'ladder'] },
     wrongness: 0.12
