@@ -159,3 +159,12 @@ comparison, and the `br.space/0.3` floor-union contract. See
 The current API adds a three-floor mansion experiment, direct kitchen–dining
 relationships, and primary/secondary connection exports. See
 [space-mansion.md](space-mansion.md) for generation rules, controls and testing.
+
+## Height and gallery study
+
+`space.html` now offers explicit room heights, slab openings, interior balconies
+and L/U upper galleries around protected double-height living/foyer space.
+Choose **Gallery house** or **Mansion experiment**, then select a gallery
+profile and floor rise. Height mode exports actual floor surfaces, patched
+ceilings, voids, guards and physical stairs as `br.space/0.4`. Disable heights
+for the previous flat placement. See [space-heights.md](space-heights.md).

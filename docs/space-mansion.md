@@ -1,6 +1,10 @@
 # Mansion experiment and house connections
 
-Select **Mansion experiment (three floors)** in `space.html`. The experiment
+Select **Mansion experiment (three floors)** in `space.html`. Selecting it now
+enables the height/gallery study, with an L gallery overlooking the living
+space. Choose its profile, lower room and floor rise, or disable heights for
+the archived flat model. See [space-heights.md](space-heights.md) for physical
+stairs, cutouts, height constraints and the `br.space/0.4` export. The experiment
 uses the same reserved-floor placement and 0.15 / 0.30 m wall rules as the
 existing shape studies. **Floor view** displays large floor plans stacked vertically for scrolling,
 or a single level. Each level is cropped and scaled to its actual footprint; the JSON
@@ -56,8 +60,8 @@ The seed chooses a coherent subset of the mansion room pool, including:
   gym, hobby room, storage and housekeeping store. Billiards, gallery,
   collection and staff rooms are optional.
 
-There are two aligned stair connections, ground–middle and middle–top.
-Each reserves 1.5 × 4.5 m clear floor independently of hall width. This is
+There are two stair connections, ground–middle and middle–top. With height
+mode off, each reserves 1.5 × 4.5 m clear floor independently of hall width. This is
 the prototype stair envelope, not a detailed riser/headroom construction model.
 Stair floors and room floors are reserved before walls. Every room must be
 reachable from the primary connection. All three floors and the complete
@@ -103,7 +107,7 @@ do not replace the main passage endpoint. Other new-solver house overlays
 remain hidden. The room graph and circulation sequence are exported.
 
 ```js
-// Load core, recipes, space, route, shapes, house, then render.
+// Load core, recipes, space, route, shapes, house, heights, then render.
 BR.SPACE.generate({recipe:'mansion',seed:1,secondaryConnections:3});
 BR.SPACE.generate({recipe:'mansion',seed:1,
   shapes:{hall:'T',living:'alcove'}});

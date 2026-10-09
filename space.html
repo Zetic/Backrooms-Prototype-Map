@@ -70,6 +70,10 @@
     <div class="g2" id="wrongBox"><span>Wrongness</span><input id="wrong" type="range" min="0" max="1" step="0.05"><span id="wrongV"></span><button id="wrongReset" title="back to the house type's own value">reset</button></div>
     <label class="tg"><input id="relationships" type="checkbox" checked> room relationships</label>
     <div class="g2" id="secondaryBox"><span>Mansion secondary connections</span><select id="secondary"><option value="auto">2–3 by seed</option><option value="2">2</option><option value="3">3</option></select></div>
+    <label class="tg"><input id="heights" type="checkbox" checked> Height experiment</label>
+    <div class="g2"><span>Floor rise</span><input id="storeyHeight" type="number" value="3.2" min="2.8" max="4.2" step="0.1"><span>m</span></div>
+    <div class="g2"><span>Upper gallery</span><select id="gallery"><option value="off">off</option><option value="balcony">interior balcony</option><option value="L">L gallery</option><option value="U">U gallery</option></select></div>
+    <div class="g2"><span>Overlook</span><select id="galleryRoom"><option value="living">living room</option><option value="foyer">foyer</option></select></div>
     <label class="tg"><input id="experiment" type="checkbox"> Shape experiment</label>
     <div class="g2"><span>Halls</span><select id="hallShape"><option>mixed</option><option>straight</option><option>L</option><option>T</option></select></div>
     <div class="g2"><span>Living</span><select id="livingShape"><option>mixed</option><option>rectangle</option><option>L</option><option>alcove</option></select></div>
@@ -79,7 +83,7 @@
 </header>
 <main>
   <div id="grid"></div>
-  <div id="one"><div class="view"><canvas id="big"></canvas></div><div id="side"></div></div>
+  <div id="one"><div class="view"><canvas id="big"></canvas><canvas id="section" style="margin-top:24px"></canvas></div><div id="side"></div></div>
   <div id="compare" style="display:none"></div>
   <div id="report"></div>
 </main>
@@ -89,12 +93,13 @@
 <script src="src/space/route.js"></script>
 <script src="src/space/shapes.js"></script>
 <script src="src/space/house.js"></script>
+<script src="src/space/heights.js"></script>
 <script src="src/space/render.js"></script>
 <script>
 (function () {
   'use strict';
   const SP = BR.SPACE, $ = (id) => document.getElementById(id);
-  const state = { recipe: 'passage', seed: 1, view: 'grid', wrong: null, experiment:false, hallShape:'mixed', livingShape:'mixed', relationships:true, secondary:'auto', floorView:'all' };
+  const state = { recipe: 'passage', seed: 1, view: 'grid', wrong: null, experiment:false, hallShape:'mixed', livingShape:'mixed', relationships:true, secondary:'auto', floorView:'all', heights:true, storeyHeight:3.2, gallery:'off', galleryRoom:'living' };
   try { Object.assign(state, JSON.parse(localStorage.getItem('space-lab') || '{}')); } catch (e) { /* no storage */ }
   const save = () => { try { localStorage.setItem('space-lab', JSON.stringify(state)); } catch (e) { /* no storage */ } };
   for (const id of Object.keys(SP.RECIPES)) { const o = document.createElement('option'); o.value = id; o.textContent = SP.RECIPES[id].name; $('recipe').appendChild(o); }
@@ -104,7 +109,7 @@
   const opts = () => ({ labels: $('labels').checked, sizes: $('sizes').checked, kinds: $('kinds').checked, route: $('route').checked });
   const isRoute = () => !!SP.RECIPES[state.recipe].route;
   const shapeOptions = () => ({hall:state.hallShape,living:state.livingShape});
-  const gen = (seed, shaped=state.experiment, relationships=state.relationships) => SP.generate(Object.assign({ recipe: state.recipe, seed, relationships }, state.recipe==='mansion'&&state.secondary!=='auto'?{secondaryConnections:+state.secondary}:{}, isRoute() && state.wrong !== null ? { wrong: state.wrong } : {}, shaped ? {shapes:shapeOptions()} : state.recipe==='mansion'?{shapes:{hall:'straight',living:'rectangle'}}:{}));
+  const gen = (seed, shaped=state.experiment, relationships=state.relationships, heights=state.heights) => {try{return SP.generate(Object.assign({ recipe: state.recipe, seed, relationships, heights,storeyHeight:+state.storeyHeight,gallery:state.gallery,galleryRoom:state.galleryRoom }, state.recipe==='mansion'&&state.secondary!=='auto'?{secondaryConnections:+state.secondary}:{}, isRoute() && state.wrong !== null ? { wrong: state.wrong } : {}, shaped ? {shapes:shapeOptions()} : state.recipe==='mansion'?{shapes:{hall:'straight',living:'rectangle'}}:{}));}catch(e){return {seed,recipe:state.recipe,error:e.message};}};
   const FLOOR = ['ground floor', 'upstairs', 'top floor'];
 
   /** Full-size floors stack vertically; only seed thumbnails fit a short card. */
@@ -125,7 +130,7 @@
       const scale=scales[k],b=boxes[k],ox=(width-(b[2]-b[0])*scale)/2-b[0]*scale,oy=top+head+(heights[k]-head-(b[3]-b[1])*scale)/2-b[1]*scale;
       ctx.fillStyle=SP.COLORS.ground;ctx.fillRect(0,top+head,width,heights[k]-head);
       ctx.fillStyle='#e9e3d6';ctx.font='600 15px system-ui, sans-serif';ctx.textAlign='left';ctx.textBaseline='top';
-      ctx.fillText((FLOOR[floor]||'floor '+floor)+' · '+h.spaces.filter(s=>s.floor===floor).length+' spaces',8,top+4);
+      ctx.fillText((FLOOR[floor]||'floor '+floor)+' · '+h.spaces.filter(s=>s.floor===floor).length+' spaces'+(h.meta.heights?' · floor at '+h.levels.find(l=>l.floor===floor).floorZ.toFixed(2)+' m':''),8,top+4);
       SP.draw(ctx,h,{...o,scale,ox,oy,floor,lot:false});top+=heights[k]+gap;
     });
   }
@@ -155,12 +160,14 @@
   function drawOne() {
     const h = gen(state.seed), side = $('side');
     window.house = h;
-    if (h.error) { $('big').width = 0; side.innerHTML = '<h2>Seed ' + state.seed + '</h2>' + failCard(h); return; }
+    if (h.error) { $('section').style.display='none';$('section').width=0; $('big').width = 0; side.innerHTML = '<h2>Seed ' + state.seed + '</h2>' + failCard(h); return; }
     const wrap = $('one').querySelector('.view'), maxW = Math.max(400, wrap.clientWidth - 22);
     drawFloors($('big'), h, maxW, Math.max(420, window.innerHeight - 220), {...opts(),floorView:state.floorView,detail:true});
+    const section=$('section'),hasGallery=!!h.spaces.find(s=>s.type==='gallery_landing');section.style.display=hasGallery?'':'none';
+    if(hasGallery){const dpr=window.devicePixelRatio||1;section.width=Math.round(maxW*dpr);section.height=440*dpr;section.style.width=maxW+'px';section.style.height='440px';const ctx=section.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);SP.drawGallerySection(ctx,h,{width:maxW,height:440});}
     const bad = SP.verify(h), floor = h.spaces.filter((sp) => !(sp.type === 'stair' && sp.floor > 0)).reduce((t, sp) => t + sp.area, 0), byId = {};
     for (const sp of h.spaces) byId[sp.id] = sp;
-    const rows = h.spaces.map((sp) => '<tr><td>' + sp.name + (sp.shape ? ' <span class="mut">'+sp.shape+'</span>' : '') + (h.floors > 1 ? ' <span class="mut">' + ['G', '1', '2'][sp.floor] + '</span>' : '') + '</td><td class="n">' + sp.size[0].toFixed(2) + ' × ' + sp.size[1].toFixed(2) + '</td><td class="n">' + sp.area.toFixed(1) +
+    const rows = h.spaces.map((sp) => '<tr><td>' + sp.name + (sp.shape ? ' <span class="mut">'+sp.shape+'</span>' : '') + (h.floors > 1 ? ' <span class="mut">' + ['G', '1', '2'][sp.floor] + '</span>' : '') + (sp.height!==undefined?' <span class="mut">height '+sp.height.toFixed(2)+' m</span>':'')+'</td><td class="n">' + sp.size[0].toFixed(2) + ' × ' + sp.size[1].toFixed(2) + '</td><td class="n">' + sp.area.toFixed(1) +
       '</td><td class="n mut">' + (sp.target ? sp.target.toFixed(1) : '') + '</td></tr>').join('');
     const doors = {}; for (const o of h.openings) doors[o.role || o.kind] = (doors[o.role || o.kind] || 0) + 1;
     side.innerHTML = '<h2>' + h.name + ', seed ' + h.seed + '</h2>' +
@@ -171,6 +178,7 @@
       (h.route ? '<h3>What is off</h3>' + (h.wrong.length ? h.wrong.map((w) => '<div class="warn">' + w + '</div>').join('') : '<div class="mut">nothing: an ordinary house</div>') : '') +
       (h.meta.missing && h.meta.missing.length ? '<div class="mut" style="margin-top:4px">Left out for lack of room: ' + h.meta.missing.join(', ') + '</div>' : '') +
       '<h3>Checks</h3>' + (bad.length ? bad.map((b) => '<div class="bad">' + b + '</div>').join('') : '<div class="ok">All pass: no wall on any room floor, walls 0.15 / 0.3 m exactly, every room reached from the primary connection.</div>') +
+      (h.meta.heights?'<h3>Height and openings</h3><div>Floor rise '+h.meta.storeyHeight+' m · slab '+h.meta.slabThickness+' m</div>'+h.spaces.filter(s=>s.type==='gallery_landing').map(s=>'<div>Gallery at '+s.floorZ.toFixed(2)+' m overlooking '+byId[s.lowerRoom].name+' · '+s.area.toFixed(1)+' m² walkway</div>').join('')+h.connectors.map(c=>'<div>'+c.shape+' stairs · rise '+c.rise.toFixed(2)+' m · '+c.width.toFixed(2)+' m wide · '+c.headroom.toFixed(1)+' m headroom</div>').join(''):'')+
       '<h3>Rooms (clear floor, m)</h3><table><tr><th>room</th><th class="n">bounds</th><th class="n">m²</th><th class="n">aimed</th></tr>' + rows + '</table>' +
       '<div class="mut" style="margin-top:4px">Floor ' + floor.toFixed(1) + ' m² · filled nooks ' + h.meta.pocketArea.toFixed(2) + ' m²</div>' +
       '<h3>House connections</h3>'+h.connections.map(c=>'<div>'+c.role+' · '+byId[c.room].name+' · floor '+c.floor+' · '+c.width.toFixed(2)+' m</div>').join('')+
@@ -186,8 +194,8 @@
     for (const id of Object.keys(SP.RECIPES)) {
       let built = 0, clean = 0, score = 0, ms = 0; const plans = {}, probs = {};
       for (let k = 1; k <= N; k++) {
-        const h = SP.generate({ recipe: id, seed: k, relationships:state.relationships, ...(id==='mansion'&&state.secondary!=='auto'?{secondaryConnections:+state.secondary}:{}), ...(state.experiment ? {shapes:shapeOptions()} : {}) }); ms += h.meta ? h.meta.ms : 0;
-        if (h.error) continue;
+        let h;try{h = SP.generate({ recipe: id, seed: k, relationships:state.relationships, heights:state.heights,storeyHeight:+state.storeyHeight,gallery:state.gallery,galleryRoom:state.galleryRoom, ...(id==='mansion'&&state.secondary!=='auto'?{secondaryConnections:+state.secondary}:{}), ...(state.experiment ? {shapes:shapeOptions()} : {}) });}catch(e){h={error:e.message};} ms += h.meta ? h.meta.ms : 0;
+        if (h.error) {probs[h.error]=(probs[h.error]||0)+1;continue;}
         built++; score += h.meta.score; plans[h.meta.plan] = (plans[h.meta.plan] || 0) + 1;
         const bad = SP.verify(h); if (!bad.length) clean++;
         for (const b of bad) { const key = b.replace(/[0-9.]+/g, '#'); probs[key] = (probs[key] || 0) + 1; }
@@ -200,15 +208,15 @@
 
   function drawCompare() {
     const wrap=$('compare'); wrap.innerHTML='';
-    for(const [title,shaped] of (state.recipe==='mansion'?[['Straight mansion',false],['Shaped mansion',true]]:[['Original placement',false],['Relationships + shapes',true]])) {
-      const h=gen(state.seed,shaped,shaped), card=document.createElement('div'); card.className='card';
+    for(const [title,shaped] of (state.heights?[['Flat comparison',false],['Height + gallery experiment',true]]:state.recipe==='mansion'?[['Straight mansion',false],['Shaped mansion',true]]:[['Original placement',false],['Relationships + shapes',true]])) {
+      const h=gen(state.seed,shaped,shaped,shaped?state.heights:false), card=document.createElement('div'); card.className='card';
       card.innerHTML='<h2>'+title+' · seed '+state.seed+'</h2>';
       if(h.error) card.insertAdjacentHTML('beforeend',failCard(h));
       else { const cv=document.createElement('canvas');card.appendChild(cv);drawFloors(cv,h,Math.max(400,window.innerWidth-70),520,{...opts(),detail:true});
         card.insertAdjacentHTML('beforeend','<div class="mut">'+h.meta.ms+' ms · '+h.spaces.length+' rooms · '+SP.verify(h).length+' check problems</div>'); }
       wrap.appendChild(card);
     }
-    wrap.insertAdjacentHTML('beforeend','<p class="mut">Same room program and seed; independent placement. Room relationships apply to current houses and every mansion. Legacy presets use a free outline in shape mode. Mansion passage lines follow the actual floor through concave rooms. Other shaped-house route overlays remain hidden. Room sizes in the table are bounding dimensions; floor areas exclude notches.</p>');
+    wrap.insertAdjacentHTML('beforeend','<p class="mut">Same seed; independent placement. Gallery mode adds an upper walkway and may enlarge the overlooked room to preserve a useful opening. The original room program is retained. Heights and gallery mode use a free outline and physical stair paths. Room sizes are bounding dimensions; floor areas exclude notches and openings.</p>');
   }
   function sync() {
     $('recipe').value = state.recipe; $('seed').value = state.seed;
@@ -220,20 +228,22 @@
     $('floorView').value=state.floorView; $('floorBox').style.display=state.view==='one'?'':'none';
     $('relationships').checked=state.relationships; $('secondary').value=state.secondary; $('secondaryBox').style.display=state.recipe==='mansion'?'':'none';
     $('relationships').disabled=state.recipe==='mansion';
+    $('heights').checked=state.heights; $('storeyHeight').value=state.storeyHeight; $('gallery').value=state.gallery; $('galleryRoom').value=state.galleryRoom;
+    for(const id of ['storeyHeight','gallery','galleryRoom'])$(id).disabled=!state.heights;
     $('experiment').checked=state.experiment; $('hallShape').value=state.hallShape; $('livingShape').value=state.livingShape;
     $('vCompare').classList.toggle('on',state.view==='compare');
     $('compare').style.display=state.view==='compare'?'grid':'none'; $('compare').style.gridTemplateColumns='minmax(0,1fr)'; $('compare').style.gap='12px';
     save();
     if (state.view === 'grid') drawGrid(); else if(state.view==='compare') drawCompare(); else drawOne();
   }
-  $('recipe').onchange = () => { state.recipe = $('recipe').value; state.wrong = null; if(state.recipe==='mansion'){state.view='one';state.experiment=true;} sync(); };
+  $('recipe').onchange = () => { state.recipe = $('recipe').value; state.wrong = null; if(['mansion','galleryhouse'].includes(state.recipe)){state.view='one';state.experiment=true;state.heights=true;state.gallery='L';} sync(); };
   $('seed').onchange = () => { state.seed = Math.max(0, Math.round(+$('seed').value || 0)); sync(); };
   $('prev').onclick = () => { state.seed = Math.max(0, state.seed - (state.view === 'grid' ? 12 : 1)); sync(); };
   $('next').onclick = () => { state.seed += state.view === 'grid' ? 12 : 1; sync(); };
   $('rand').onclick = () => { state.seed = Math.floor(Math.random() * 1e6); sync(); };
   $('vGrid').onclick = () => { state.view = 'grid'; sync(); };
   $('vCompare').onclick=()=>{state.view='compare';sync();};
-  for(const id of ['experiment','relationships','secondary','floorView','hallShape','livingShape']) $(id).onchange=()=>{state[id]=['experiment','relationships'].includes(id)?$(id).checked:$(id).value;sync();};
+  for(const id of ['experiment','relationships','heights','storeyHeight','gallery','galleryRoom','secondary','floorView','hallShape','livingShape']) $(id).onchange=()=>{state[id]=['experiment','relationships','heights'].includes(id)?$(id).checked:$(id).value;sync();};
   $('vOne').onclick = () => { state.view = 'one'; sync(); };
   for (const id of ['labels', 'sizes', 'kinds', 'route']) $(id).onchange = sync;
   $('wrong').onchange = () => { state.wrong = +$('wrong').value; sync(); };
