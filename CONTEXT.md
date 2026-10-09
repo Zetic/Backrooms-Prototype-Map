@@ -1,5 +1,25 @@
 # Map procedural generation: agent handoff
 
+## Room-first performance follow-up (2026-10-09)
+
+The separate `src/space` test bed now accelerates route placement with per-floor
+spatial indexes, candidate-band queries, duplicate geometry caching, early
+rejection of offsets that cannot share enough host wall, scalar gap checks,
+and shared-wall records maintained during placement and branch rollback.
+Final wall raster construction uses contiguous fills, scalar morphology loops,
+and a typed flood-fill stack. The search still evaluates all 20 route attempts;
+random draws, candidate order, scoring, room sizes and wall thicknesses remain.
+
+`tests/space.test.js` and `tests/space-performance.test.js` are now in the full
+runner and CI. Golden output hashes cover 468 original-revision cases, including
+all seven house recipes and wrongness 0 / 0.35 / 1. Elapsed time is excluded.
+`tools/benchmark-space.js` compares a supplied git revision with current code,
+with optional placement-only or raster-only variants. See
+`docs/space-performance.md` for measurements and reproduction commands.
+
+The older snapshot below describes the world/template systems; this follow-up
+changes only the separate room-first generator and its test/benchmark coverage.
+
 Snapshot: 2026-10-08. This is implementation context for the next agent (or
 person) picking the project up. The durable design and milestones live in
 [docs/elevation.md](docs/elevation.md); world ownership, inspection and export in
@@ -645,3 +665,4 @@ about 30%, but the tests run with V8's defaults, as the browser does.)
    of about 60 s on 2 cores is not met (see "What still costs time" above);
    the fix is in the generator's deoptimisations, not the runner. Only on
    request: Cody does not want timing measurements unless asked.
+

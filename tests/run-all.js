@@ -27,9 +27,11 @@ if (!(jobs >= 1)) { console.error('--jobs needs a number of at least 1'); proces
 // [file, args, title, cost]: cost is the file's rough time in seconds in full
 // mode, used only to start the slowest files first
 const SEEDS = full ? ['31337', '7', '12345', '99', '4242'] : ['31337', '7'];
-const ALL = ['templates', 'catalogue', 'neighborhood', 'park', 'fillers', 'architectural', 'elevation', 'connections', 'floors', 'journeys', 'claims', 'cutaway', 'elevation-ui', 'band-world', 'band-render', 'seams', 'world', 'ui-smoke'];
+const ALL = ['templates', 'catalogue', 'neighborhood', 'park', 'fillers', 'architectural', 'elevation', 'connections', 'floors', 'journeys', 'claims', 'cutaway', 'elevation-ui', 'band-world', 'band-render', 'seams', 'world', 'ui-smoke', 'space', 'space-performance'];
 const FILES = [
   ['templates', [], 'templates', 5],
+  ['space', [], 'room-first houses and walk-through routes', 30],
+  ['space-performance', [], 'room-first output preservation and spatial boundaries', 30],
   ['catalogue', [], 'catalogue (every room and zone, alone; pools)', 2],
   ['neighborhood', [], 'neighborhood (templates inside a template)', 5],
   ['park', [], 'park (a hall tiled by zones)', 4],
@@ -93,5 +95,6 @@ Promise.all(Array.from({ length: Math.min(jobs, FILES.length) }, worker)).then((
   if (failed.length) {
     console.log('FAILED: ' + failed.map((r) => r.title).join('; '));
     process.exitCode = 1;
-  } else console.log(only.length ? 'All selected files passed.' : `All template, catalogue, neighborhood, park, filler, architectural geometry, elevation, connection zone, floor, journey, claim, band-world, tile renderer, seam, world (${SEEDS.length} seeds) and page checks passed.`);
+  } else console.log(only.length ? 'All selected files passed.' : `All template, catalogue, neighborhood, park, filler, architectural geometry, elevation, connection zone, floor, journey, claim, band-world, tile renderer, seam, world (${SEEDS.length} seeds), room-first house, output preservation and page checks passed.`);
 });
+

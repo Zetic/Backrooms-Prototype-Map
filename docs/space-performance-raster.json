@@ -1,0 +1,80 @@
+{
+  "baselineRef": "baseline",
+  "baselineLabel": "a2e09427d17d56b0724575c5bdd3f4c208ce1c32",
+  "variant": "raster",
+  "node": "v24.19.0",
+  "platform": "linux",
+  "arch": "x64",
+  "seeds": 50,
+  "rounds": 1,
+  "wrong": 0.35,
+  "rows": [
+    {
+      "recipe": "passage",
+      "baseline": {
+        "meanMs": 118.81944569999997,
+        "medianMs": 111.40715500000078,
+        "p95Ms": 179.05083600000034,
+        "maxMs": 218.96926799999983
+      },
+      "current": {
+        "meanMs": 78.79996319999997,
+        "medianMs": 73.78551499999958,
+        "p95Ms": 117.52492600000005,
+        "maxMs": 130.82893200000012
+      },
+      "speedup": 1.5078616902196729,
+      "identicalOutput": true,
+      "built": 50,
+      "valid": 50,
+      "meanCandidates": 20,
+      "profile": null
+    },
+    {
+      "recipe": "passage1",
+      "baseline": {
+        "meanMs": 64.0140378199999,
+        "medianMs": 61.732930000000124,
+        "p95Ms": 86.99812799999927,
+        "maxMs": 105.87878499999897
+      },
+      "current": {
+        "meanMs": 49.30397630000003,
+        "medianMs": 49.13721699999951,
+        "p95Ms": 67.80562999999984,
+        "maxMs": 94.39718400000129
+      },
+      "speedup": 1.2983544659865467,
+      "identicalOutput": true,
+      "built": 50,
+      "valid": 50,
+      "meanCandidates": 20,
+      "profile": null
+    },
+    {
+      "recipe": "backdoor",
+      "baseline": {
+        "meanMs": 97.57023107999997,
+        "medianMs": 92.95838699999877,
+        "p95Ms": 139.64760000000024,
+        "maxMs": 236.44500999999946
+      },
+      "current": {
+        "meanMs": 79.43879048000002,
+        "medianMs": 78.43851100000029,
+        "p95Ms": 119.27985399999852,
+        "maxMs": 123.1892229999994
+      },
+      "speedup": 1.22824416749604,
+      "identicalOutput": true,
+      "built": 50,
+      "valid": 50,
+      "meanCandidates": 20,
+      "profile": null
+    }
+  ],
+  "sourceHashes": {
+    "baseline": "28730616231fbea68e328b7cc15f95f5c4d8cfe93eaec72ab5fa5a839013bed8",
+    "current": "edfefe8b6a17f64b24d84ceface15cc8d7a0974de4e51c49f33597cdbf404061"
+  }
+}

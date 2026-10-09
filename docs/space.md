@@ -10,7 +10,8 @@ page and its own tests. Nothing in `src/tpl` uses it, and it uses nothing from
 - code: `src/space/recipes.js` (data), `src/space/space.js` (generator and
   checker), `src/space/route.js` (walk-through houses), `src/space/render.js`
   (drawing)
-- tests: `node tests/space.test.js [seeds] [--full]` (not in `tests/run-all.js`)
+- tests: `node tests/space.test.js [seeds] [--full]` and
+  `node tests/space-performance.test.js`; both are included in `tests/run-all.js`
 
 ## The idea
 
@@ -62,6 +63,11 @@ type changes how big the rooms really are. Here it is the other way round:
    is kept (sizes near target, compact, not too much hallway, few extra doors).
 
 ## Walk-through houses (the route plan)
+
+Performance work and reproducible comparisons are documented in
+[space-performance.md](space-performance.md). All 20 route attempts and the
+original selection rules remain; the changes accelerate exact checks and the
+final raster wall construction.
 
 For the backrooms the outline of a house does not have to make sense, but
 walking through it must, like a ride through a set: you should feel you are in
@@ -131,10 +137,13 @@ tests both use it.
 Over 200 seeds of each house type: the bar and deep plans build about 98% of
 the time (the rest fail plainly with "lot": the house does not fit the lot
 drawn for that seed), the walk-through houses every time, and every built
-house passes the checks. A bar or deep house takes 10 to 45 ms, a walk-through
-house 60 to 100 ms.
+house passes the checks. Before the performance follow-up, the reported times
+were 10 to 45 ms for a bar or deep house and 60 to 100 ms for a walk-through
+house. The same-machine before/after measurements are in
+[space-performance.md](space-performance.md).
 
 Not done yet: windows, diagonal and curved rooms (the format is ready for
 them), yards, and joining this into the neighbourhood and world generators.
 Upper floors of walk-through houses may overhang anything: the outline is free
 by design.
+
