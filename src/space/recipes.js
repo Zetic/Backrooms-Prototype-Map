@@ -35,7 +35,11 @@
     pantry: { zone: 'service', min: 1.0, asp: 3, area: [1.5, 3] },
     utility: { zone: 'service', min: 1.4, asp: 3, area: [3, 5], label: 'storage' },
     garage: { zone: 'service', min: 3.0, asp: 2.4, area: [18, 40] },
-    hall: { zone: 'circulation', min: 1.1, asp: 99, label: 'hallway' }
+    hall: { zone: 'circulation', min: 1.1, asp: 99, label: 'hallway' },
+    stair: { zone: 'circulation', min: 1.1, asp: 4, label: 'stairwell' },
+    loft: { zone: 'public', min: 3.0, asp: 2, area: [12, 18] },
+    closet: { zone: 'private', min: 0.7, asp: 3.5, area: [0.9, 1.6] },
+    powder: { zone: 'private', min: 1.2, asp: 2.2, area: [2, 3], label: 'powder room' }
   };
 
   // Which rooms open into which, and how. kind: door | opening | open (no
@@ -49,6 +53,12 @@
     'family|living': { kind: 'opening', w: [1.2, 2] }, 'dining|family': { kind: 'opening', w: [1.2, 2] },
     'kitchen|pantry': { kind: 'door', w: 0.8 }, 'kitchen|laundry': { kind: 'door', w: 0.8 }, 'kitchen|mudroom': { kind: 'opening', w: [0.9, 1.2] },
     'laundry|mudroom': { kind: 'opening', w: [0.9, 1.2] }, 'kitchen|utility': { kind: 'door', w: 0.8 }, 'laundry|utility': { kind: 'door', w: 0.8 },
+    'foyer|stair': { kind: 'opening', w: [1, 1.1] }, 'living|stair': { kind: 'opening', w: [1, 1.1] }, 'family|stair': { kind: 'opening', w: [1, 1.1] },
+    'hall|stair': { kind: 'hall' }, 'loft|stair': { kind: 'opening', w: [1, 1.1] }, 'hall|loft': { kind: 'hall' }, 'foyer|family': { kind: 'opening', w: [1.2, 2] },
+    'foyer|kitchen': { kind: 'opening', w: [1, 1.4] }, 'dining|loft': { kind: 'opening', w: [1.2, 1.8] },
+    'bedroom|closet': { kind: 'door', w: 0.8 }, 'closet|master': { kind: 'door', w: 0.8 }, 'closet|foyer': { kind: 'door', w: 0.8 }, 'closet|hall': { kind: 'door', w: 0.8 },
+    'foyer|powder': { kind: 'door', w: 0.8 }, 'hall|powder': { kind: 'door', w: 0.8 }, 'living|powder': { kind: 'door', w: 0.8 },
+    'bath|loft': { kind: 'door', w: 0.8 }, 'bedroom|loft': { kind: 'door', w: 0.9 }, 'loft|master': { kind: 'door', w: 0.9 }, 'foyer|garage': { kind: 'door', w: 0.9 },
     'ensuite|master': { kind: 'door', w: 0.8 }, 'master|wic': { kind: 'opening', w: [0.8, 1] }, 'ensuite|wic': { kind: 'door', w: 0.8 }, 'living|office': { kind: 'door', w: 0.9 }
   };
   // the garage's door into the house, best first
@@ -95,6 +105,45 @@
         office: { p: 0.35, area: [8, 11] }, linen: { p: 0.5, area: [0.8, 1.2] }
       },
       hall: [1.2, 1.4], garage: { p: 0.95, cars: [2, 2] }, openPlan: 0.4, backDoor: 0.6
+    },
+
+    // Walk-through houses (space/route.js): a route of rooms you pass
+    // through, from the front door to an exit into the rest of the
+    // backrooms, with the other rooms off its sides. script: the route in
+    // order (a list picks one), always ending at the exit. wrong: how much
+    // is off about the house, 0 to 1. hallLen: route hallway length (m).
+    passage: {
+      name: 'Passage house (two floors)',
+      route: { script: ['foyer', ['living', 'family'], 'stair', 'hall', ['loft', 'family'], 'hall'], hallLen: [3, 6], wrong: 0.35 },
+      rooms: {
+        foyer: { area: [4.5, 7] }, living: { area: [16, 22] }, family: { area: [14, 18] }, loft: { area: [12, 16] },
+        kitchen: { area: [10, 14] }, dining: { p: 0.7, area: [9, 12] }, pantry: { p: 0.4 }, laundry: { p: 0.6, area: [3.5, 5] }, mudroom: { p: 0.3 },
+        powder: { p: 0.5 }, office: { p: 0.3, area: [7, 9] }, master: { area: [13, 17], ensuite: 0.6, wic: 0.5 }, bedroom: { n: [2, 3], area: [9, 12] },
+        bath: { n: [1, 2], area: [4.5, 6] }, linen: { p: 0.5, area: [0.8, 1.2] }, closet: { p: 0.6 }
+      },
+      hall: [1.1, 1.3], garage: { p: 0.5, cars: [1, 2] }, openPlan: 0.4
+    },
+    passage1: {
+      name: 'Passage bungalow (one floor)',
+      route: { script: ['foyer', 'living', 'hall', ['family', 'dining'], 'hall'], hallLen: [3, 6], wrong: 0.35 },
+      rooms: {
+        foyer: { area: [4, 6] }, living: { area: [15, 20] }, family: { area: [13, 17] }, dining: { area: [9, 12] },
+        kitchen: { area: [9, 12] }, pantry: { p: 0.3 }, laundry: { p: 0.5, area: [3.5, 5] }, powder: { p: 0.3 },
+        master: { area: [12, 15], ensuite: 0.4, wic: 0.3 }, bedroom: { n: [1, 2], area: [9, 11] }, bath: { area: [4.5, 6] },
+        linen: { p: 0.4, area: [0.8, 1.2] }, closet: { p: 0.5 }
+      },
+      hall: [1.1, 1.25], garage: { p: 0.3, cars: [1, 1] }, openPlan: 0.5
+    },
+    backdoor: {
+      name: 'Back-door ranch (one floor)',
+      route: { script: ['foyer', 'hall', 'living', 'kitchen', 'mudroom'], hallLen: [3, 5], wrong: 0.35 },
+      rooms: {
+        foyer: { area: [4, 6] }, living: { area: [16, 22] }, kitchen: { area: [11, 14] }, mudroom: { area: [3.5, 5] },
+        dining: { p: 0.8, area: [9, 12] }, pantry: { p: 0.4 }, laundry: { p: 0.7, area: [3.5, 5] }, powder: { p: 0.3 }, office: { p: 0.25, area: [7, 9] },
+        master: { area: [13, 16], ensuite: 0.5, wic: 0.4 }, bedroom: { n: [2, 3], area: [9, 12] }, bath: { area: [4.5, 6] },
+        linen: { p: 0.4, area: [0.8, 1.2] }, closet: { p: 0.5 }
+      },
+      hall: [1.1, 1.3], garage: { p: 0.6, cars: [1, 2] }, openPlan: 0.4
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

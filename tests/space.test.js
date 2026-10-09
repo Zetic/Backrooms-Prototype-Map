@@ -9,12 +9,16 @@
  *     far enough apart for two outer walls, interior walls 0.15 m and outer
  *     walls 0.3 m whatever the room sizes, sizes inside each room's ranges,
  *     inside the lot, every room reached from the front door
- *   - the output contract (br.space/0.1)
+ *   - the output contract (br.space/0.2)
+ *   - walk-through houses: the route runs from the front door to the exit
+ *     through rooms you pass through, every other room is a dead end off
+ *     one room of the route, stairwells line up between floors, and the
+ *     wrongness dial changes what is off and nothing else
  *   - generation is deterministic and independent of what was built before
  *   - the checker itself catches a wall on a floor, a bad gap and a cut-off room
  */
 const path = require('path');
-for (const f of ['core', 'space/recipes', 'space/space']) require(path.join(__dirname, '..', 'src', f + '.js'));
+for (const f of ['core', 'space/recipes', 'space/space', 'space/route']) require(path.join(__dirname, '..', 'src', f + '.js'));
 const SP = globalThis.BR.SPACE, MODE = require('./mode');
 
 const N = +(process.argv[2] || MODE.size(40, 150));
@@ -43,7 +47,9 @@ for (const id of Object.keys(SP.RECIPES)) {
 const all = Object.values(houses).flat();
 const contract = (h) => {
   const bad = [];
-  if (h.schema !== 'br.space/0.1') bad.push('schema');
+  if (h.schema !== 'br.space/0.2') bad.push('schema');
+  if (h.levels.length !== h.floors || h.levels.some((l, k) => l.floor !== k)) bad.push('levels');
+  if (h.spaces.some((s) => !(s.floor >= 0 && s.floor < h.floors))) bad.push('space floors');
   if (h.units !== 'm' || h.front !== 'S') bad.push('units / front');
   for (const s of h.spaces) {
     if (!s.id || !s.type || !s.name || !SP.MODULES[s.type]) bad.push('space fields');
@@ -59,12 +65,12 @@ const contract = (h) => {
   return bad;
 };
 const broken = all.map((h) => [h, contract(h)]).filter(([, b]) => b.length);
-check('every house keeps the br.space/0.1 contract', !broken.length, broken.slice(0, 2).map(([h, b]) => h.recipe + ' ' + h.seed + ': ' + b.join(', ')).join('; '));
+check('every house keeps the br.space/0.2 contract', !broken.length, broken.slice(0, 2).map(([h, b]) => h.recipe + ' ' + h.seed + ': ' + b.join(', ')).join('; '));
 
 // walls stay their own size whatever the rooms are
 const thick = new Set(all.flatMap((h) => h.walls.filter((w) => w.kind !== 'open').map((w) => w.thickness)));
 check('wall thickness is only ever 0.15 or 0.3 m', thick.size === 2 && thick.has(0.15) && thick.has(0.3), [...thick].join(', '));
-const tiny = all.flatMap((h) => h.solids.walls.concat(h.solids.pockets).filter((r) => r[2] - r[0] < 0.049 || r[3] - r[1] < 0.049));
+const tiny = all.flatMap((h) => h.levels.flatMap((l) => l.solids.walls.concat(l.solids.pockets)).filter((r) => r[2] - r[0] < 0.049 || r[3] - r[1] < 0.049));
 check('no solid sliver thinner than one 5 cm step', !tiny.length, tiny.length + ' slivers');
 
 // deterministic, and independent of what was built before
@@ -80,7 +86,7 @@ check('a lot too small for the house fails plainly', !!tooSmall.error && tooSmal
 // the checker catches what it should
 const h = JSON.parse(JSON.stringify(houses.ranch[0]));
 const room = h.spaces.find((s) => s.type === 'living');
-const onFloor = JSON.parse(JSON.stringify(h)); onFloor.solids.walls.push([room.rect[0] + 0.5, room.rect[1] + 0.5, room.rect[0] + 0.65, room.rect[1] + 2]);
+const onFloor = JSON.parse(JSON.stringify(h)); onFloor.levels[0].solids.walls.push([room.rect[0] + 0.5, room.rect[1] + 0.5, room.rect[0] + 0.65, room.rect[1] + 2]);
 check('the checker catches a wall on a room floor', SP.verify(onFloor).some((p) => p.includes('wall is on the floor')));
 const gap = JSON.parse(JSON.stringify(h)), wall = gap.walls.find((w) => w.kind === 'interior');
 const mover = gap.spaces.find((s) => s.id === wall.rooms[1]), horiz = wall.line[0][1] === wall.line[1][1];
@@ -89,6 +95,24 @@ check('the checker catches rooms neither one wall nor two outer walls apart', SP
 const cut = JSON.parse(JSON.stringify(h)), bed = cut.spaces.find((s) => s.type === 'bedroom');
 cut.openings = cut.openings.filter((o) => !o.rooms.includes(bed.id));
 check('the checker catches a room that cannot be reached', SP.verify(cut).some((p) => p.includes('cannot be reached')));
+
+// walk-through houses
+const routed = Object.keys(SP.RECIPES).filter((id) => SP.RECIPES[id].route).flatMap((id) => houses[id]);
+check('walk-through houses: every one has a route and an exit', routed.length > 0 && routed.every((x) => x.route && x.route.length >= 3 && x.openings.some((o) => o.role === 'exit')));
+const two = routed.filter((x) => x.floors > 1);
+check('two-floor houses: the route climbs the stairs', two.length > 0 && two.every((x) => x.verticals.length >= 1 && x.route.some((id) => x.spaces.find((s) => s.id === id).floor > 0)));
+check('no route ends at a bathroom or a bedroom', routed.every((x) => !['bath', 'bedroom', 'master', 'ensuite'].includes(x.spaces.find((s) => s.id === x.route[x.route.length - 1]).type)));
+const p1 = JSON.stringify(Object.assign(SP.generate({ recipe: 'passage', seed: 4 }), { meta: null }));
+SP.generate({ recipe: 'backdoor', seed: 9 });
+check('a walk-through house is the same for the same seed', p1 === JSON.stringify(Object.assign(SP.generate({ recipe: 'passage', seed: 4 }), { meta: null })));
+const quiet = SP.generate({ recipe: 'passage', seed: 11, wrong: 0 }), loud = [];
+for (let s = 1; s <= 12; s++) loud.push(SP.generate({ recipe: 'passage', seed: s, wrong: 1 }));
+check('wrongness 0: nothing is off', !quiet.error && quiet.wrong.length === 0 && !SP.verify(quiet).length);
+check('wrongness 1: things are off, and the house still passes the checks', loud.filter((x) => !x.error).every((x) => !SP.verify(x).length) && loud.filter((x) => !x.error && x.wrong.length).length >= 9,
+  loud.filter((x) => !x.error && x.wrong.length).length + '/12 with something off');
+const rt = JSON.parse(JSON.stringify(routed[0])), sideRoom = rt.spaces.find((s) => !rt.route.includes(s.id) && s.type !== 'garage'), others = rt.route.filter((id) => !rt.openings.some((o) => o.rooms.includes(id) && o.rooms.includes(sideRoom.id)));
+rt.openings.push({ id: 'test', kind: 'door', floor: sideRoom.floor, rooms: [sideRoom.id, others[others.length - 1]], width: 0.9, rect: [0, 0, 0, 0], o: 'h' });
+check('the checker catches a side room that makes a way around the route', SP.verify(rt).some((p) => p.includes('way around')));
 
 console.log(failures ? failures + ' checks failed' : 'All checks passed.');
 process.exitCode = failures ? 1 : 0;
