@@ -153,3 +153,9 @@ by design.
 An opt-in experiment adds L/T halls and L/alcove living floors, a same-seed
 comparison, and the `br.space/0.3` floor-union contract. See
 [space-shapes.md](space-shapes.md) for controls, limitations and validation.
+
+## Mansion and functional house connections
+
+The current API adds a three-floor mansion experiment, direct kitchen–dining
+relationships, and primary/secondary connection exports. See
+[space-mansion.md](space-mansion.md) for generation rules, controls and testing.

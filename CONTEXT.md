@@ -1,5 +1,19 @@
 # Map procedural generation: agent handoff
 
+## Mansion and room relationships (2026-10-09)
+
+Load `src/space/house.js` after shapes.js for the current API. Default houses
+require direct kitchen–dining and kitchen–pantry links; `relationships:false`
+retains archived placement for comparisons. Canonical primary/secondary
+connections refer to actual outside openings; vehicle access remains separate.
+Mansion is a three-floor experiment with 1 primary + 2–3 secondary ground-floor
+connections, an expanded room pool, grouped suites/service rooms and complete
+program placement. Its search is bounded and seed-dependent, never timed.
+See [docs/space-mansion.md](docs/space-mansion.md) for API, support/overhang
+limits, connection roles and tests. Archived speedup figures apply only to
+the original placement solver, not this relationship/mansion solver.
+
+
 ## Room-first shape study (2026-10-09)
 
 `src/space/shapes.js` wraps generation only when `spec.shapes` is supplied.

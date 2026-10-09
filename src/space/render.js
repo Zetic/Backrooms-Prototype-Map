@@ -60,7 +60,7 @@
     for (const op of openings) {
       if (op.kind === 'open' || op.kind === 'opening' || op.kind === 'portal') continue;
       const r = op.rect, hz = op.o === 'h';
-      ctx.strokeStyle = op.role === 'front door' ? C.front : C.door;
+      ctx.strokeStyle = ['front door','primary connection'].includes(op.role) ? C.front : C.door;
       if (op.kind === 'vehicle') {
         ctx.setLineDash([3, 3]); ctx.beginPath();
         if (hz) { ctx.moveTo(X(r[0]), Y((r[1] + r[3]) / 2)); ctx.lineTo(X(r[2]), Y((r[1] + r[3]) / 2)); } else { ctx.moveTo(X((r[0] + r[2]) / 2), Y(r[1])); ctx.lineTo(X((r[0] + r[2]) / 2), Y(r[3])); }
@@ -83,7 +83,7 @@
     // the way through: front door, each room of the route and the doors between, the exit
     if (o.route && h.route && h.meta.routeOverlay !== false) {
       const byId = new Map(h.spaces.map((x) => [x.id, x]));
-      const front = h.openings.find((x) => x.role === 'front door'), exit = h.openings.find((x) => x.role === 'exit');
+      const front = h.openings.find((x) => ['front door','primary connection'].includes(x.role)), exit = h.openings.find((x) => ['exit','secondary connection'].includes(x.role));
       const runs = [];
       let run = [];
       if (front && on(front)) run.push(mid(front.rect));
@@ -108,15 +108,16 @@
         const big = Math.max(8, Math.min(13, s * 0.38)), small = Math.max(7, Math.min(11, s * 0.3));
         const vertical = wpx < 60 && (r[3] - r[1]) * s > wpx * 1.5;
         ctx.save(); ctx.translate(cx, cy); if (vertical) ctx.rotate(-Math.PI / 2);
-        if (o.labels) { ctx.fillStyle = C.text; ctx.font = '600 ' + big + 'px system-ui, sans-serif'; ctx.fillText(sp.name, 0, o.sizes ? -small * 0.7 : 0); }
+        if (o.labels) { ctx.fillStyle = C.text; ctx.font = '600 ' + big + 'px system-ui, sans-serif'; ctx.fillText(sp.name, 0, o.sizes ? -small * 0.7 : 0, Math.max(8,(vertical?(r[3]-r[1])*s:wpx)-6)); }
         if (o.sizes) { ctx.fillStyle = C.size; ctx.font = small + 'px system-ui, sans-serif'; ctx.fillText(sp.floorRects ? sp.shape + ' · ' + sp.area.toFixed(1) + ' m²' : sp.size[0].toFixed(2) + ' × ' + sp.size[1].toFixed(2), 0, o.labels ? big * 0.75 : 0); }
         ctx.restore();
       }
-      const exit = openings.find((x) => x.role === 'exit');
-      if (exit) {
-        const [ex, ey] = mid(exit.rect), d = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] }[exit.side];
-        ctx.fillStyle = C.exit; ctx.font = '600 ' + Math.max(9, Math.min(12, s * 0.36)) + 'px system-ui, sans-serif';
-        ctx.fillText('exit to the backrooms', X(ex + d[0] * 1.1), Y(ey + d[1] * 0.7));
+      const ports=openings.filter(x=>['primary connection','secondary connection','exit','front door'].includes(x.role));
+      let secondary=0;
+      for(const op of ports){
+        const primary=['primary connection','front door'].includes(op.role),[ex,ey]=mid(op.rect),d={N:[0,-1],S:[0,1],E:[1,0],W:[-1,0]}[op.side];
+        ctx.fillStyle=primary?C.front:C.exit;ctx.font='600 '+Math.max(9,Math.min(12,s*0.36))+'px system-ui, sans-serif';
+        ctx.fillText(primary?'P':'S'+(++secondary),X(ex+d[0]*0.9),Y(ey+d[1]*0.7));
       }
     }
     ctx.restore();
