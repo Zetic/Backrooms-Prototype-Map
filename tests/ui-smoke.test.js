@@ -3,7 +3,7 @@
 // the call). This is not a browser-engine test.
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
 const { BR, harness } = require('./helpers'), { check, finish } = harness();
-require('../src/tpl/elevation-view');
+require('../src/tpl/elevation-view'); require('../src/scale');
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 let exported = null, download = null;
 class Element {
@@ -17,7 +17,8 @@ class Element {
   appendChild(el) { this.children.push(el); }
   setPointerCapture() {}
   click() { if (this.tagName === 'A') download = { href: this.href, name: this.download }; this.dispatch('click'); }
-  getContext() { return {}; }
+  releasePointerCapture() {}
+  getContext() { return new Proxy({}, { get: (o, k) => (k in o ? o[k] : () => {}), set: (o, k, v) => { o[k] = v; return true; } }); }
 }
 const elements = new Map();
 for (const m of html.matchAll(/<([a-z][a-z0-9]*)\b[^>]*\bid="([^"]+)"/gi)) elements.set(m[2], new Element(m[1]));
@@ -120,6 +121,32 @@ elements.get('way-up').dispatch('click'); flush();
   const d = window.__world().nearestWay('down', last.view.cx, last.view.cy);
   check('the way-down button finds where a climb from the band below arrives', d && last.view.cx === d.at[0] && /Way down to band 0/.test(elements.get('export-status').textContent));
   elements.get('band-down').dispatch('click'); flush();
+}
+{
+  // scale references: the panel lists them; one dragged onto the map lands
+  // where it is let go, at its real size, and can be moved, turned and removed
+  const canvas = elements.get('c'), S = window.__scale, list = elements.get('ref-list').children;
+  check('the scale panel lists the references, each with its real size', list.length === BR.SCALE.REFS.length && /School bus<span>12 × 2.5 m/.test(list.map((b) => b.innerHTML).join()));
+  const bus = list[BR.SCALE.REFS.findIndex((r) => r.id === 'bus')];
+  bus.dispatch('pointerdown', { pointerId: 3 });
+  window.dispatch('pointermove', { target: canvas, clientX: 500, clientY: 300 });
+  canvas.dispatch('pointerup', { pointerId: 3, clientX: 500, clientY: 300 }); window.dispatch('pointerup', { target: canvas, clientX: 500, clientY: 300 }); flush();
+  const z = last.view.zoom, at = [last.view.cx + 50 / z, last.view.cy];
+  const o = S.placed[S.placed.length - 1];
+  check('a reference dragged onto the map is placed where it is let go', S.placed.length === 1 && o.id === 'bus' && Math.abs(o.x - at[0]) < 1e-9 && Math.abs(o.y - at[1]) < 1e-9 && S.selected === 0 && !S.armed);
+  canvas.dispatch('pointerdown', { pointerId: 4, clientX: 500, clientY: 300 });
+  canvas.dispatch('pointermove', { pointerId: 4, clientX: 540, clientY: 320 });
+  canvas.dispatch('pointerup', { pointerId: 4, clientX: 540, clientY: 320 }); flush();
+  check('dragging a placed reference moves it and leaves the map where it was', Math.abs(o.x - (at[0] + 40 / z)) < 1e-9 && Math.abs(o.y - (at[1] + 20 / z)) < 1e-9 && last.view.cx === at[0] - 50 / z);
+  window.dispatch('keydown', { key: 'r', target: window }); flush();
+  check('R turns the selected reference', Math.abs(o.rot - Math.PI / 12) < 1e-9);
+  const [hx, hy] = BR.SCALE.handle(o, z), hp = [450 + (hx - last.view.cx) * z, 300 + (hy - last.view.cy) * z];
+  canvas.dispatch('pointerdown', { pointerId: 5, clientX: hp[0], clientY: hp[1] });
+  canvas.dispatch('pointermove', { pointerId: 5, clientX: 540, clientY: 320 + 200 });
+  canvas.dispatch('pointerup', { pointerId: 5, clientX: 540, clientY: 520 }); flush();
+  check('its handle turns it to face the pointer', Math.abs(o.rot - Math.PI / 2) < 1e-9);
+  window.dispatch('keydown', { key: 'Delete', target: window }); flush();
+  check('Delete removes it; the world is untouched', S.placed.length === 0 && S.selected === -1 && !('scale' in last.opts));
 }
 for (const m of html.matchAll(/<script src="([^"]+)"/g)) check('map script exists: ' + m[1], fs.existsSync(path.join(__dirname, '..', m[1])));
 finish();

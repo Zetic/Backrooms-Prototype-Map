@@ -143,6 +143,8 @@ uses band controls, a continuous cut height, and template-specific inspection.
 | Way ↓ / Way ↑ | Centre the view on where the nearest climb from the band below arrives, or where the nearest growth that reaches the band above starts |
 | Cutaway height | Highest floor below the cut at each XY; lower floors shaded by depth |
 | Click a template | Its actual floor choices, focused upper-floor ghosting and JSON export |
+| Cursor | A person at true size, 0.5 m across, with a ring round it while it is only a few pixels |
+| Scale panel | Drag a reference (person, door, couch, queen bed, car, school bus, shipping container, basketball court, soccer pitch, football field) onto the map at its real size. Drag a placed one to move it; drag its handle or press `R` (Shift+`R` the other way) to turn it; `Delete` removes it, `Esc` drops one in hand. They are drawn over the map only, never part of the world or its exports, and the browser keeps them between visits |
 | Hover | The site's template, size, connections, biome and build time; the POI, its setting and its doors; a raised floor (its level) with its pit, or the ground under one with its capped ceiling; a pillar's growth and whether it reaches the band above; a landing site and the climb into it |
 
 The URL hash keeps the seed, position, zoom, band, cut height and toggles, for example
@@ -157,6 +159,7 @@ The URL hash keeps the seed, position, zoom, band, cut height and toggles, for e
 | `world.js` | Cell plans (borders, blocks, sites, connection graph), site builds, bounded caches, queries |
 | `seams.js` | Where two blueprints end up wall to wall: each shared wall recorded once, and the seam rules that sometimes cut a window or door through it (a house against the backrooms) |
 | `render.js` | The map: tile cache, detail / plan / far views, overlays |
+| `scale.js` | Real-sized reference objects drawn over the map (the scale panel and the person cursor) |
 | `tpl/` | The template system: kit grid, framework, the shared catalogue of room and zone types (`catalogue.js`), House, Rooms and Zone engines, the composite pipeline (`composite.js`: templates built inside a template and merged into one blueprint) and the Neighborhood and Park engines, archetypes, fillers, lots (`lot.js`: settings, the yard, and the adapter that builds templates inside bigger ones), blueprint renderer |
 | `tpl/elevation.js`, `tpl/elevation-view.js`, `elevation-lab.js` | Stacked surfaces, reservations, ladder variants, validation, cutaway, JSON renderer and standalone lab |
 | `tpl/connections.js` | Connection zones (ladder, stair, ramp), template preferences, slope-following reservations, `connectionVariant`, and `linkFloors` (a template's own stairs between its floors) |

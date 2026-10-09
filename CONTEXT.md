@@ -505,6 +505,7 @@ that merely read like a house.
 | `src/band-world.js` | Bands, growths over them (cached; caps, pillars and arrivals applied to builds), stacked claims, spatial graph, world export |
 | `src/growth.js` | Recursive growth: origins, ownership, pillars, levels, legs, arrivals, pits |
 | `src/render.js`, `index.html` | Map tiles and interaction |
+| `src/scale.js` | Scale references over the map: the person cursor (0.5 m) and real-sized objects placed from the Scale panel; overlay only, kept in the browser (`localStorage`) |
 | `src/elevation-lab.js`, `elevation.html`; `workbench.html` | Lab; workbench |
 
 ## Verification
