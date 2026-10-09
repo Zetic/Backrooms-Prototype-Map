@@ -6,8 +6,12 @@ Load `src/space/house.js` after shapes.js for the current API. Default houses
 require direct kitchen–dining and kitchen–pantry links; `relationships:false`
 retains archived placement for comparisons. Canonical primary/secondary
 connections refer to actual outside openings; vehicle access remains separate.
-Mansion is a three-floor experiment with 1 primary + 2–3 secondary ground-floor
-connections, an expanded room pool, grouped suites/service rooms and complete
+Mansion is a three-floor experiment with 1 ground-floor primary + 2–3 secondary
+connections: passage endpoint on the top floor, another on the middle, and
+an optional ground-floor branch. Its stairs reserve 1.5 × 4.5 m clear floor.
+The inspector stacks large cropped floor plans vertically with wrapped labels.
+Mansion passage links/endpoints and side-room bypasses are independently checked.
+It has an expanded room pool, grouped suites/service rooms and complete
 program placement. Its search is bounded and seed-dependent, never timed.
 See [docs/space-mansion.md](docs/space-mansion.md) for API, support/overhang
 limits, connection roles and tests. Archived speedup figures apply only to

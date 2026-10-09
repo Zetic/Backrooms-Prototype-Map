@@ -35,8 +35,10 @@
   .card .t { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
   .card .t b { color: var(--text); font-weight: 600; }
   canvas { display: block; max-width: 100%; }
-  #one { display: none; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; align-items: start; }
+  #one { display: none; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
   #one.on { display: grid; }
+  #one .view canvas, #compare canvas { max-width: none; }
+  #compare .card { overflow: auto; }
   #one .view { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px; overflow: auto; }
   #side { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-variant-numeric: tabular-nums; }
   #side h2 { font-size: 14px; color: var(--accent); margin: 0 0 6px; font-weight: 600; }
@@ -105,20 +107,27 @@
   const gen = (seed, shaped=state.experiment, relationships=state.relationships) => SP.generate(Object.assign({ recipe: state.recipe, seed, relationships }, state.recipe==='mansion'&&state.secondary!=='auto'?{secondaryConnections:+state.secondary}:{}, isRoute() && state.wrong !== null ? { wrong: state.wrong } : {}, shaped ? {shapes:shapeOptions()} : state.recipe==='mansion'?{shapes:{hall:'straight',living:'rectangle'}}:{}));
   const FLOOR = ['ground floor', 'upstairs', 'top floor'];
 
-  /** every floor of h side by side on one canvas */
+  /** Full-size floors stack vertically; only seed thumbnails fit a short card. */
   function drawFloors(cv, h, maxW, maxH, o) {
     const selected=o.floorView!==undefined&&o.floorView!=='all'?Math.min(h.floors-1,+o.floorView):null;
-    const n = selected===null?(h.floors || 1):1, gap = n > 1 ? 1 : 0, head = n > 1 ? 18 : 0;
-    const s = Math.min(maxW / (h.site.w * n + gap * (n - 1)), (maxH - head) / h.site.h), dpr = window.devicePixelRatio || 1;
-    const w = (h.site.w * n + gap * (n - 1)) * s, ht = h.site.h * s + head;
-    cv.width = Math.round(w * dpr); cv.height = Math.round(ht * dpr);
-    cv.style.width = Math.round(w) + 'px'; cv.style.height = Math.round(ht) + 'px';
-    const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    for (let f = 0; f < n; f++) {
-      const ox = f * (h.site.w + gap) * s;
-      if (n > 1) { ctx.fillStyle = '#a39d92'; ctx.font = '12px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(FLOOR[selected===null?f:selected] || 'floor ' + f, ox + 2, 1); }
-      SP.draw(ctx, h, Object.assign({}, o, { scale: s, ox, oy: head, floor: selected===null?f:selected }));
-    }
+    const floors=selected===null?Array.from({length:h.floors||1},(_,f)=>f):[selected];
+    const detail=!!o.detail, gap=24, head=28, boxes=floors.map(f=>SP.floorBounds(h,f));
+    const widest=Math.max(...boxes.map(b=>b[2]-b[0]));
+    const total=boxes.reduce((sum,b)=>sum+b[3]-b[1],0);
+    const thumbnailScale=Math.min(maxW/widest,(maxH-head*floors.length-gap*(floors.length-1))/total);
+    const scales=boxes.map(b=>detail?Math.max(18,Math.min(40,maxW/(b[2]-b[0]))):thumbnailScale);
+    const heights=boxes.map((b,k)=>detail?Math.max(650,(b[3]-b[1])*scales[k]+head):(b[3]-b[1])*scales[k]+head);
+    const width=Math.max(detail?maxW:0,...boxes.map((b,k)=>(b[2]-b[0])*scales[k])),height=heights.reduce((a,b)=>a+b,0)+gap*(floors.length-1),dpr=window.devicePixelRatio||1;
+    cv.width=Math.ceil(width*dpr);cv.height=Math.ceil(height*dpr);cv.style.width=Math.ceil(width)+'px';cv.style.height=Math.ceil(height)+'px';
+    const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+    let top=0;
+    floors.forEach((floor,k)=>{
+      const scale=scales[k],b=boxes[k],ox=(width-(b[2]-b[0])*scale)/2-b[0]*scale,oy=top+head+(heights[k]-head-(b[3]-b[1])*scale)/2-b[1]*scale;
+      ctx.fillStyle=SP.COLORS.ground;ctx.fillRect(0,top+head,width,heights[k]-head);
+      ctx.fillStyle='#e9e3d6';ctx.font='600 15px system-ui, sans-serif';ctx.textAlign='left';ctx.textBaseline='top';
+      ctx.fillText((FLOOR[floor]||'floor '+floor)+' · '+h.spaces.filter(s=>s.floor===floor).length+' spaces',8,top+4);
+      SP.draw(ctx,h,{...o,scale,ox,oy,floor,lot:false});top+=heights[k]+gap;
+    });
   }
   function failCard(h) {
     const why = Object.entries(h.why || {}).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => k + ' ×' + v).join(', ');
@@ -148,7 +157,7 @@
     window.house = h;
     if (h.error) { $('big').width = 0; side.innerHTML = '<h2>Seed ' + state.seed + '</h2>' + failCard(h); return; }
     const wrap = $('one').querySelector('.view'), maxW = Math.max(400, wrap.clientWidth - 22);
-    drawFloors($('big'), h, maxW, Math.max(420, window.innerHeight - 220), {...opts(),floorView:state.floorView});
+    drawFloors($('big'), h, maxW, Math.max(420, window.innerHeight - 220), {...opts(),floorView:state.floorView,detail:true});
     const bad = SP.verify(h), floor = h.spaces.filter((sp) => !(sp.type === 'stair' && sp.floor > 0)).reduce((t, sp) => t + sp.area, 0), byId = {};
     for (const sp of h.spaces) byId[sp.id] = sp;
     const rows = h.spaces.map((sp) => '<tr><td>' + sp.name + (sp.shape ? ' <span class="mut">'+sp.shape+'</span>' : '') + (h.floors > 1 ? ' <span class="mut">' + ['G', '1', '2'][sp.floor] + '</span>' : '') + '</td><td class="n">' + sp.size[0].toFixed(2) + ' × ' + sp.size[1].toFixed(2) + '</td><td class="n">' + sp.area.toFixed(1) +
@@ -158,7 +167,7 @@
       '<div class="mut">' + h.meta.plan + ' plan · lot ' + h.site.w + ' × ' + h.site.h + ' m · ' + (h.meta.openPlan ? 'open plan' : 'separate rooms') + '</div>' +
       (h.route ? '<div class="mut">wrongness ' + h.meta.wrongness.toFixed(2) + '</div>' : '') +
       '<div>Score <b>' + h.meta.score + '</b> · best of ' + h.meta.candidates + ' tries · ' + h.meta.ms + ' ms</div>' +
-      (h.route ? '<h3>Circulation sequence</h3><div>primary connection → ' + h.route.map((id) => byId[id].name).filter((nm, k, a) => !(nm === 'stairwell (top)')).join(' → ') + (h.recipe==='mansion'?' · secondary connections branch off the ground floor':' → secondary connection')+'</div>' : '') +
+      (h.route ? '<h3>Circulation sequence</h3><div>primary connection → ' + h.route.map((id) => byId[id].name).filter((nm, k, a) => !(nm === 'stairwell (top)')).join(' → ') + ' → secondary connection'+(h.recipe==='mansion'?' · additional secondary connections on lower floors':'')+'</div>' : '') +
       (h.route ? '<h3>What is off</h3>' + (h.wrong.length ? h.wrong.map((w) => '<div class="warn">' + w + '</div>').join('') : '<div class="mut">nothing: an ordinary house</div>') : '') +
       (h.meta.missing && h.meta.missing.length ? '<div class="mut" style="margin-top:4px">Left out for lack of room: ' + h.meta.missing.join(', ') + '</div>' : '') +
       '<h3>Checks</h3>' + (bad.length ? bad.map((b) => '<div class="bad">' + b + '</div>').join('') : '<div class="ok">All pass: no wall on any room floor, walls 0.15 / 0.3 m exactly, every room reached from the primary connection.</div>') +
@@ -195,11 +204,11 @@
       const h=gen(state.seed,shaped,shaped), card=document.createElement('div'); card.className='card';
       card.innerHTML='<h2>'+title+' · seed '+state.seed+'</h2>';
       if(h.error) card.insertAdjacentHTML('beforeend',failCard(h));
-      else { const cv=document.createElement('canvas');card.appendChild(cv);drawFloors(cv,h,Math.max(330,window.innerWidth/2-55),520,opts());
+      else { const cv=document.createElement('canvas');card.appendChild(cv);drawFloors(cv,h,Math.max(400,window.innerWidth-70),520,{...opts(),detail:true});
         card.insertAdjacentHTML('beforeend','<div class="mut">'+h.meta.ms+' ms · '+h.spaces.length+' rooms · '+SP.verify(h).length+' check problems</div>'); }
       wrap.appendChild(card);
     }
-    wrap.insertAdjacentHTML('beforeend','<p class="mut">Same room program and seed; independent placement. Room relationships apply to current houses and every mansion. Legacy presets use a free outline in shape mode. Dotted routes are hidden on shaped floors until interior routing supports concave rooms. Room sizes in the table are bounding dimensions; floor areas exclude notches.</p>');
+    wrap.insertAdjacentHTML('beforeend','<p class="mut">Same room program and seed; independent placement. Room relationships apply to current houses and every mansion. Legacy presets use a free outline in shape mode. Mansion passage lines follow the actual floor through concave rooms. Other shaped-house route overlays remain hidden. Room sizes in the table are bounding dimensions; floor areas exclude notches.</p>');
   }
   function sync() {
     $('recipe').value = state.recipe; $('seed').value = state.seed;
@@ -213,7 +222,7 @@
     $('relationships').disabled=state.recipe==='mansion';
     $('experiment').checked=state.experiment; $('hallShape').value=state.hallShape; $('livingShape').value=state.livingShape;
     $('vCompare').classList.toggle('on',state.view==='compare');
-    $('compare').style.display=state.view==='compare'?'grid':'none'; $('compare').style.gridTemplateColumns='repeat(auto-fit,minmax(330px,1fr))'; $('compare').style.gap='12px';
+    $('compare').style.display=state.view==='compare'?'grid':'none'; $('compare').style.gridTemplateColumns='minmax(0,1fr)'; $('compare').style.gap='12px';
     save();
     if (state.view === 'grid') drawGrid(); else if(state.view==='compare') drawCompare(); else drawOne();
   }

@@ -56,7 +56,7 @@
   function profile(value, list, rng) { return value === 'mixed' ? rng.pick(list) : value; }
   function shapes(e, P, options, rng) {
     if (e.type === 'stair' && P.stairWidth) {
-      return [0,1,2,3].map(k=>rotate({kind:'rectangle',parts:[[0,0,P.stairWidth,650]],entrySide:'S',exitSide:'N'},k));
+      return [0,1,2,3].map(k=>rotate({kind:'rectangle',parts:[[0,0,P.stairWidth,P.stairLength||650]],entrySide:'S',exitSide:'N'},k));
     }
     if (e.type === 'hall') {
       const w = P.hall, len = Math.max(w * 2 + 100, e.len || 400), kind = profile(options.hall, ['straight', 'L', 'T'], rng);
@@ -112,7 +112,8 @@
   function attach(e, host, ctx, P, options, rng, path, last) {
     const here = ctx.rooms.filter((n) => n.floor === host.floor), keep = ctx.keep[host.floor] || [], variants = shapes(e, P, options, rng);
     const doorWidth=['linen','closet'].includes(e.type)?60:!P.stairWidth&&['bath','ensuite','wic','powder','pantry'].includes(e.type)?80:90;
-    const need = (e.type==='hall' || ((path || P.stairWidth) && host.type==='hall')) ? P.hall : doorWidth + 2 * CFG.margin;
+    let need = (e.type==='hall' || ((path || P.stairWidth) && host.type==='hall')) ? P.hall : doorWidth + 2 * CFG.margin;
+    if(path&&P.stairWidth&&(e.type==='stair'||host.type==='stair'))need=Math.min(need,P.stairWidth);
     let hostEdges = host.edges.filter((ed) => !path || ed.side !== host.entrySide);
     if(e.type==='stair' && P.stairWidth) hostEdges=hostEdges.filter(ed=>ed.side===host.exitSide||host.type!=='hall');
     if (path && (host.type === 'hall' || host.type === 'stair')) hostEdges = hostEdges.filter((ed) => ed.side === host.exitSide);
@@ -139,7 +140,7 @@
           if (last || e.type === 'garage') {
             for (const ex of n.edges.filter((ed) => ed.side !== n.entrySide && (!n.exitSide || ed.side === n.exitSide))) {
               if (ex.s1 - ex.s0 < (e.type === 'garage' ? e.door : 80) + 2 * CFG.margin) continue;
-              const q = clear(ex, here, keep, e.type === 'garage' ? 450 : 260);
+              const q = clear(ex, here.concat(n), keep, e.type === 'garage' ? 450 : 260);
               if (q) { exit = ex; ground = q; break; }
             }
             if (!exit) continue;
@@ -179,7 +180,7 @@
     ctx.keep[0] = [clear(frontEdge, [], [], 500)];
     let prev = n0;
     for (let k = 1; k < P.path.length; k++) {
-      const e = P.path[k], got = attach(e, prev, ctx, P, options, rng, true, !P.secondaryCount && k === P.path.length - 1);
+      const e = P.path[k], got = attach(e, prev, ctx, P, options, rng, true, (!P.secondaryCount || P.passageExit) && k === P.path.length - 1);
       if (!got) return null;
       const n = got.n; n.wrong = e.wrong;
       ctx.rooms.push(n); ctx.route.push(n); ctx.links.push({ a: prev, b: n, join: got.join, path: true });
@@ -216,7 +217,7 @@
     for(const pair of P.requirements||[]){const [a,b]=pair.map(e=>ctx.rooms.find(n=>n.e===e));if(!a||!b||a.floor!==b.floor)return null;
       if(ctx.links.some(l=>(l.a===a&&l.b===b)||(l.a===b&&l.b===a)))continue;
       const join=contacts(a,b).find(w=>w.s1-w.s0>=120);if(!join)return null;ctx.links.push({a,b,join});}
-    if(P.secondaryCount && !secondaryConnections(ctx,P.secondaryCount,rng)) return null;
+    if(P.secondaryCount && !secondaryConnections(ctx,P.secondaryCount,rng,P.passageExit)) return null;
     if (!ctx.outside.some((o) => o.role === 'exit')) return null;
     return ctx;
   }
@@ -242,26 +243,31 @@
       const satellites=pending.filter(q=>q.requiredHost===e);for(const q of satellites){pending.splice(pending.indexOf(q),1);ordered.push(q);placed.add(q);}}
     P.sides=ordered;
   }
-  function secondaryConnections(ctx,count,rng) {
-    // Public/service doors on the ground floor, with an unobstructed landing.
-    // Each belongs to a different room; garage vehicle doors are separate.
-    const rooms=shuffle(ctx.rooms.filter(n=>n.floor===0&&['hall','living','family','dining','kitchen','mudroom','drawing','sunroom','conservatory','ballroom'].includes(n.type)),rng);
-    let added=0;
-    for(const n of rooms){
-      for(const e of shuffle(n.edges.slice(),rng)) {
-        if(e.s1-e.s0<140)continue;
-        let placed=false;
-        for(const center of new Set([snap((e.s0+e.s1)/2),e.s0+70,e.s1-70])) {
-          const aperture={...e,s0:center-70,s1:center+70};
-          const q=clear(aperture,ctx.rooms.filter(r=>r.floor===0),ctx.keep[0]||[],260);
-          if(!q)continue;
-          ctx.outside.push(outside(n,aperture,110,'exit',rng));(ctx.keep[0]||=[]).push(q);added++;placed=true;break;
+  function secondaryConnections(ctx,count,rng,passageExit) {
+    // Keep the passage's top-floor exit; add one middle-floor connection and
+    // optionally one ground-floor branch, each in a distinct public room.
+    const existing=ctx.outside.filter(o=>o.role==='exit');
+    const floors=passageExit?[1,...(count===3?[0]:[])]:Array(count).fill(0);
+    for(const floor of floors){
+      const rooms=shuffle(ctx.rooms.filter(n=>n.floor===floor&&!existing.some(o=>o.room===n)&&['hall','living','family','loft','dining','kitchen','mudroom','drawing','sunroom','conservatory','ballroom'].includes(n.type)),rng);
+      let placed=false;
+      for(const n of rooms){
+        for(const e of shuffle(n.edges.slice(),rng)) {
+          if(e.s1-e.s0<140)continue;
+          for(const center of new Set([snap((e.s0+e.s1)/2),e.s0+70,e.s1-70])) {
+            const aperture={...e,s0:center-70,s1:center+70};
+            const q=clear(aperture,ctx.rooms.filter(r=>r.floor===floor),ctx.keep[floor]||[],260);
+            if(!q)continue;
+            const op=outside(n,aperture,110,'exit',rng);
+            ctx.outside.push(op);existing.push(op);(ctx.keep[floor]||=[]).push(q);placed=true;break;
+          }
+          if(placed)break;
         }
         if(placed)break;
       }
-      if(added===count)return true;
+      if(!placed)return false;
     }
-    return false;
+    return existing.length===count;
   }
   function emit(ctx, spec, P, options, t0) {
     const all = ctx.rooms.flatMap(n => n.parts).concat(Object.values(ctx.keep).flat()), bb = bounds(all);

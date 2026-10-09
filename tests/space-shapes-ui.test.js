@@ -6,7 +6,7 @@ class Element {
  constructor(tag){this.tagName=tag;this.children=[];this.style={};this.checked=true;this.value='';this.clientWidth=900;this._html='';this.classList={add(){},toggle(){}};}
  get innerHTML(){return this._html;}set innerHTML(s){this._html=s;this.children=[];}
  appendChild(e){this.children.push(e);}insertAdjacentHTML(_,s){this._html+=s;}
- querySelector(){return this;}getContext(){return new Proxy({},{get:(o,k)=>o[k]||(()=>{}),set:(o,k,v)=>(o[k]=v,true)});}
+ querySelector(){return this;}getContext(){return new Proxy({measureText:s=>({width:s.length*7})},{get:(o,k)=>o[k]||(()=>{}),set:(o,k,v)=>(o[k]=v,true)});}
 }
 const els=new Map([...html.matchAll(/<([a-z][a-z0-9]*)\b[^>]*\bid="([^"]+)"/gi)].map(m=>[m[2],new Element(m[1])]));
 const $=id=>els.get(id),window={innerWidth:1200,innerHeight:850,devicePixelRatio:1,addEventListener(){}};
@@ -24,7 +24,9 @@ console.log('ok shape controls, actual controller, comparison, saved options and
 $('relationships').checked=true;$('relationships').onchange();assert.equal(window.house.meta.roomRelationships,true);assert.deepEqual(BR.SPACE.verify(window.house),[]);
 $('recipe').value='mansion';$('recipe').onchange();assert.equal(window.house.floors,3);assert.equal(window.house.connections.filter(c=>c.role==='primary').length,1);
 $('secondary').value='3';$('secondary').onchange();assert.equal(window.house.connections.length,4);assert($('side').innerHTML.includes('House connections'));assert.deepEqual(BR.SPACE.verify(window.house),[]);
+assert($('big').height>=1950);assert(parseInt($('big').style.width)>=878);
 console.log('ok mansion selector, three floors, secondary-count control and connection panel');
 
 $('floorView').value='1';$('floorView').onchange();assert.equal(window.house.floors,3);assert.equal(JSON.parse(saved).floorView,'1');
-console.log('ok individual floor control');
+assert($('big').height>=650);assert($('big').height<1950);
+console.log('ok individual floor control and large stacked floor canvases');
