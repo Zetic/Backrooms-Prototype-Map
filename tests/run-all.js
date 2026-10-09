@@ -27,9 +27,10 @@ if (!(jobs >= 1)) { console.error('--jobs needs a number of at least 1'); proces
 // [file, args, title, cost]: cost is the file's rough time in seconds in full
 // mode, used only to start the slowest files first
 const SEEDS = full ? ['31337', '7', '12345', '99', '4242'] : ['31337', '7'];
-const ALL = ['templates', 'catalogue', 'neighborhood', 'park', 'fillers', 'architectural', 'elevation', 'connections', 'floors', 'journeys', 'claims', 'cutaway', 'elevation-ui', 'band-world', 'band-render', 'seams', 'world', 'ui-smoke', 'space', 'space-performance', 'space-shapes', 'space-shapes-ui', 'space-house'];
+const ALL = ['templates', 'catalogue', 'neighborhood', 'park', 'fillers', 'architectural', 'elevation', 'connections', 'floors', 'journeys', 'claims', 'cutaway', 'elevation-ui', 'band-world', 'band-render', 'seams', 'world', 'ui-smoke', 'space', 'space-performance', 'space-shapes', 'space-shapes-ui', 'space-house', 'space-heights'];
 const FILES = [
   ['templates', [], 'templates', 5],
+  ['space-heights', [], 'room-first heights, protected openings and galleries', 60],
   ['space-house', [], 'mansion floors, room relationships and house connections', 50],
   ['space-shapes-ui', [], 'shape experiment controller', 1],
   ['space-shapes', [], 'experimental joined floors and true outlines', 30],

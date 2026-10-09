@@ -25,7 +25,7 @@
 
   // Crop each inspector floor to its actual rooms, walls and connections.
   SP.floorBounds=function(h,floor){
-    const rects=h.spaces.filter(s=>s.floor===floor).flatMap(s=>s.floorRects||[s.rect]);
+    const rects=h.spaces.filter(s=>s.floor===floor).flatMap(s=>s.planRects||s.floorRects||[s.rect]).concat((h.holes||[]).filter(q=>q.floor===floor).flatMap(q=>q.rects));
     return [Math.min(...rects.map(r=>r[0]))-1.5,Math.min(...rects.map(r=>r[1]))-1.5,
       Math.max(...rects.map(r=>r[2]))+1.5,Math.max(...rects.map(r=>r[3]))+1.5];
   };
@@ -48,15 +48,30 @@
     const path=[];for(let i=to;i!==undefined;i=prev[i])path.unshift(nodes[i]);return [start,...path,end];
   }
   SP.passageRuns=function(h){
-    if(h.recipe!=='mansion'||!h.route)return [];
+    if((h.recipe!=='mansion'&&!h.meta.heights)||!h.route)return [];
     const byId=new Map(h.spaces.map(s=>[s.id,s])),primary=h.connections.find(c=>c.role==='primary'),exit=h.connections.find(c=>c.role==='secondary'&&c.room===h.route.at(-1));
-    const between=(a,b)=>h.openings.find(o=>o.rooms.includes(a)&&o.rooms.includes(b))||h.verticals.find(v=>v.rooms.includes(a)&&v.rooms.includes(b));
+    const between=(a,b,id)=>{const op=h.openings.find(o=>o.rooms.includes(a)&&o.rooms.includes(b));if(op)return op;const v=h.verticals.find(v=>v.rooms.includes(a)&&v.rooms.includes(b));if(!v)return null;const c=h.connectors?.find(c=>c.id===v.id);return c?{rect:(id===c.rooms[0]?c.entry:c.exit).rect}:v;};
     return h.route.map((id,k)=>{
-      const room=byId.get(id),incoming=k?between(h.route[k-1],id):primary,outgoing=k<h.route.length-1?between(id,h.route[k+1]):exit;
+      const room=byId.get(id),incoming=k?between(h.route[k-1],id,id):primary,outgoing=k<h.route.length-1?between(id,h.route[k+1],id):exit;
       if(!room||!incoming||!outgoing)return null;
       const points=floorPath(room.floorRects||[room.rect],mid(incoming.rect),mid(outgoing.rect));
       return points?{room:id,floor:room.floor,points}:null;
     }).filter(Boolean);
+  };
+  SP.drawGallerySection=function(ctx,h,o){
+    const g=h.spaces.find(s=>s.type==='gallery_landing');if(!g)return;
+    const low=h.spaces.find(s=>s.id===g.lowerRoom),hole=h.holes.find(q=>q.gallery===g.id),primary=g.floorRects[0],bandAxis=(primary[2]-primary[0])>(primary[3]-primary[1])?0:1;
+    const axis=g.shape==='U'?bandAxis:1-bandAxis,other=1-axis,point=mid(hole.rects[0])[other],r=low.rect;
+    const width=o.width||900,height=o.height||440,margin=56,scale=Math.min((width-2*margin)/(r[axis+2]-r[axis]),(height-90)/(low.ceilingZ-low.floorZ+1));
+    const left=(width-(r[axis+2]-r[axis])*scale)/2;const X=x=>left+(x-r[axis])*scale,Y=z=>height-38-(z-low.floorZ)*scale;
+    const slice=q=>point>=q[other]&&point<=q[other+2];
+    ctx.fillStyle='#302f2c';ctx.fillRect(0,0,width,height);ctx.fillStyle='#e9e3d6';ctx.font='600 15px system-ui, sans-serif';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText('Gallery section · '+low.name,12,8);
+    for(const s of [low,g])for(const v of s.clearVolumes)if(slice(v.rect)){ctx.fillStyle=s===low?'#d9c9a8':'#e6dfcf';ctx.fillRect(X(v.rect[axis]),Y(v.z1),(v.rect[axis+2]-v.rect[axis])*scale,(v.z1-v.z0)*scale);ctx.fillStyle='#2b2724';ctx.fillRect(X(v.rect[axis]),Y(v.z1+0.15),(v.rect[axis+2]-v.rect[axis])*scale,0.15*scale);}
+    for(const sf of h.surfaces.filter(sf=>[low.id,g.id].includes(sf.room)))for(const q of sf.rects)if(slice(q)){ctx.fillStyle='#5b524a';ctx.fillRect(X(q[axis]),Y(sf.floorZ),(q[axis+2]-q[axis])*scale,sf.slabThickness*scale);}
+    for(const q of h.guards.filter(q=>q.room===g.id))if(Math.abs(q.line[0][axis]-q.line[1][axis])<1e-7&&point>=Math.min(q.line[0][other],q.line[1][other])&&point<=Math.max(q.line[0][other],q.line[1][other])){ctx.strokeStyle='#e5b754';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(X(q.line[0][axis]),Y(q.floorZ));ctx.lineTo(X(q.line[0][axis]),Y(q.floorZ+q.height));ctx.stroke();}
+    ctx.textAlign='left';ctx.textBaseline='middle';ctx.font='12px system-ui, sans-serif';ctx.fillStyle='#e9e3d6';
+    for(const z of [low.floorZ,g.floorZ,low.ceilingZ])ctx.fillText(z.toFixed(2)+' m',left-52,Y(z));
+    const p=mid(hole.rects[0]);ctx.textAlign='center';ctx.fillStyle='#2b2724';ctx.fillText('Open to below',X(p[axis]),Y((g.floorZ+low.ceilingZ)/2));
   };
   SP.draw = function draw(ctx, h, o) {
     o = Object.assign({ floor: 0, scale: 30, ox: 0, oy: 0, labels: true, sizes: true, kinds: true, lot: true, route: true }, o || {});
@@ -77,13 +92,32 @@
     // floors, then the solid parts, then the openings through them
     for (const sp of spaces) for (const r of sp.floorRects || [sp.rect]) rect(r, sp.type === 'garage' ? C.garage : C[sp.zone]);
     for (const r of level.solids.walls) rect(r, C.wall);
+    // Tall walls from the lower room remain visible above an opening.
+    const viewZ=level.floorZ;
+    if(Number.isFinite(viewZ))for(const w of h.walls)if(w.floor!==F&&w.floorZ<=viewZ&&w.ceilingZ>viewZ)rect(w.rect,w.kind==='interior'&&o.kinds?C.interior:C.wall);
     if (o.kinds) for (const w of h.walls) if (on(w) && w.kind === 'interior') rect(w.rect, C.interior);
     for (const r of level.solids.pockets) rect(r, C.pocket);
     for (const op of openings) rect(op.rect, op.kind === 'portal' ? C.exit : op.kind === 'open' ? C.open : C.circulation);
+    // A floor opening reveals a lower surface; it is never painted as a
+    // walkable upper room. Gallery boundaries receive guards, not walls.
+    for(const hole of (h.holes||[]).filter(q=>q.floor===F)){
+      for(const r of hole.rects){rect(r,hole.kind==='open-to-below'?'#898477':'#4c4b46');ctx.strokeStyle='#b9aa8a';ctx.lineWidth=1;ctx.setLineDash([5,5]);ctx.strokeRect(X(r[0]),Y(r[1]),(r[2]-r[0])*s,(r[3]-r[1])*s);ctx.setLineDash([]);}
+      if(hole.kind==='open-to-below'&&o.labels){const r=hole.rects[0],p=mid(r),low=h.spaces.find(q=>q.id===hole.room);ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#eee7d8';ctx.font='12px system-ui, sans-serif';ctx.fillText('Open to '+(low?.name||'below'),X(p[0]),Y(p[1]));ctx.fillText('ceiling '+low.ceilingZ.toFixed(2)+' m',X(p[0]),Y(p[1])+16);}
+    }
+    for(const g of (h.guards||[]).filter(q=>q.floor===F)){ctx.strokeStyle='#e5b754';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(X(g.line[0][0]),Y(g.line[0][1]));ctx.lineTo(X(g.line[1][0]),Y(g.line[1][1]));ctx.stroke();}
     // stairs: treads across the run, the way up marked
     ctx.lineWidth = 1;
     for (const v of h.verticals || []) {
       if (v.floors[0] !== F && v.floors[1] !== F) continue;
+      if(v.path){
+        const c=h.connectors.find(c=>c.id===v.id);ctx.strokeStyle=C.tread;
+        for(let k=1;k<c.path.length;k++){const a=c.path[k-1],b=c.path[k],len=Math.hypot(b[0]-a[0],b[1]-a[1]),ux=(b[0]-a[0])/len,uy=(b[1]-a[1])/len;
+          ctx.lineWidth=c.width*s;ctx.strokeStyle='#d6cdbc';ctx.beginPath();ctx.moveTo(X(a[0]),Y(a[1]));ctx.lineTo(X(b[0]),Y(b[1]));ctx.stroke();
+          if(a[2]!==b[2]){ctx.lineWidth=1;ctx.strokeStyle=C.tread;ctx.beginPath();for(let t=0.2;t<len;t+=0.25){const x=a[0]+ux*t,y=a[1]+uy*t;ctx.moveTo(X(x-uy*c.width/2),Y(y+ux*c.width/2));ctx.lineTo(X(x+uy*c.width/2),Y(y-ux*c.width/2));}ctx.stroke();}
+        }
+        if(o.route){ctx.strokeStyle=C.route;ctx.lineWidth=2;ctx.setLineDash([3,5]);ctx.beginPath();c.path.forEach((p,k)=>k?ctx.lineTo(X(p[0]),Y(p[1])):ctx.moveTo(X(p[0]),Y(p[1])));ctx.stroke();ctx.setLineDash([]);}
+        continue;
+      }
       const r = v.rect, along = v.up === 'N' || v.up === 'S';
       ctx.strokeStyle = C.tread; ctx.beginPath();
       if (along) for (let y = r[1] + 0.25; y < r[3] - 0.1; y += 0.25) { ctx.moveTo(X(r[0]), Y(y)); ctx.lineTo(X(r[2]), Y(y)); }
@@ -115,7 +149,7 @@
       }
       ctx.stroke();
     }
-    if(o.route&&h.recipe==='mansion'){
+    if(o.route&&(h.recipe==='mansion'||h.meta.heights)){
       ctx.strokeStyle=C.route;ctx.lineWidth=2;ctx.setLineDash([3,5]);ctx.globalAlpha=0.85;
       for(const run of SP.passageRuns(h).filter(r=>r.floor===F)){ctx.beginPath();run.points.forEach((p,k)=>k?ctx.lineTo(X(p[0]),Y(p[1])):ctx.moveTo(X(p[0]),Y(p[1])));ctx.stroke();}
       ctx.setLineDash([]);ctx.globalAlpha=1;

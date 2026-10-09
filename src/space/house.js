@@ -76,7 +76,7 @@
     if(spec.secondaryConnections!==undefined&&![2,3].includes(spec.secondaryConnections))throw Error('mansion requires 2 or 3 secondary connections');
     const options={hall:'mixed',living:'mixed',...spec.shapes};
     if(!['mixed','straight','L','T'].includes(options.hall)||!['mixed','rectangle','L','alcove'].includes(options.living))throw Error('unknown shape profile');
-    const P=mansionProgram(seed,spec.secondaryConnections);let best=null,valid=0,attempts=0;
+    const P=mansionProgram(seed,spec.secondaryConnections);if(spec.heights)SP.HEIGHTS.prepare(P,spec);let best=null,valid=0,attempts=0;
     for(;attempts<240&&(attempts<60||!best);attempts++){
       const k=attempts;
       const ctx=SH.build(P,options,new BR.Rng(BR.hash4(seed,hashStr('mansion'),0x5a9e,k)));
@@ -119,7 +119,7 @@
     for(const v of h.verticals){const [a,b]=v.rooms;if(adj.has(a)&&adj.has(b)){adj.get(a).add(b);adj.get(b).add(a);}}
     if(!route.length||h.connections.find(c=>c.role==='primary')?.room!==route[0])bad.push('passage must start at primary connection');
     for(let k=0;k<route.length;k++){
-      if(!byId.has(route[k])||!(SP.PASS.has(byId.get(route[k]).type)||byId.get(route[k]).type==='reception'))bad.push('invalid passage room');
+      if(!byId.has(route[k])||!(SP.PASS.has(byId.get(route[k]).type)||['reception','gallery_landing'].includes(byId.get(route[k]).type)))bad.push('invalid passage room');
       if(k&&!adj.get(route[k-1])?.has(route[k]))bad.push('broken mansion passage');
     }
     const done=new Set();

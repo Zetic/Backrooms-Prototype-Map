@@ -272,3 +272,18 @@ The runner checks:
   all-template connection potential, and the lab's actual controller with a
   minimal DOM/canvas adapter.
 
+
+## Room-first house experiments
+
+Open [space.html](space.html) for the separate house generator. The **Gallery house**
+and **Mansion experiment** presets support explicit floor/ceiling heights,
+protected openings, upper galleries and interior balconies. Choose a balcony,
+L or U profile overlooking living space or the foyer; floor plans stack for
+scrolling, with a section beneath them. Disable **Height experiment** for a
+flat comparison. These experiments preserve room relationships and the main
+passage, and remain separate from world/template generation.
+
+[Height/opening contract and usage](docs/space-heights.md) ·
+[Mansion rooms and connections](docs/space-mansion.md) ·
+[Room-first design](docs/space.md).
+

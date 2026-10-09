@@ -1,3 +1,19 @@
+## Room-first height/gallery study (2026-10-09)
+
+Load `src/space/heights.js` after house.js and before render.js. API height mode
+is opt-in (`heights:true` or an options object); `galleryhouse` opts in by
+default. The browser enables heights, and selecting galleryhouse/mansion
+enables an L upper gallery. `heights:false` preserves previous flat behavior.
+Actual landings/floors, ceiling patches, slab cutouts, voids, guards and stair
+paths/reservations are exported as `br.space/0.4`. Gallery profiles are
+balcony/L/U, overlooking living/foyer; rooms and slabs respect other levels'
+airspace. Gallery mode keeps the selected non-circulation program and direct
+relationships, may enlarge the lower room, and incorporates the gallery into
+the main passage. Physical connectivity is independently rebuilt and checked.
+A section and large stacked floor views expose the result. Support/overhang
+constraints and world integration remain open. See docs/space-heights.md and
+tests/space-heights.test.js, included in the full runner.
+
 # Map procedural generation: agent handoff
 
 ## Mansion and room relationships (2026-10-09)
