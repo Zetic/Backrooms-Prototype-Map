@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Room-First Houses</title>
+<style>
+  :root {
+    --bg: #242321; --card: #302f2c; --panel: #1b1a18; --side: #1f1e1c; --text: #e9e3d6; --muted: #a39d92; --dim: #77716a;
+    --accent: #e5cc9b; --line: rgba(255, 255, 255, 0.09); --bad: #e0705f; --good: #8fc28a; --warn: #e2b45f;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font: 13px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 10px 16px; position: sticky; top: 0; z-index: 2; }
+  h1 { font-size: 15px; margin: 0 0 2px; color: var(--accent); font-weight: 600; }
+  .sub { color: var(--muted); font-size: 12px; margin-bottom: 8px; max-width: 900px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+  .g2 { display: flex; gap: 6px; align-items: center; }
+  .g2 > span { color: var(--muted); font-size: 12px; }
+  select, input[type=number] { background: #121211; color: var(--text); border: 1px solid #3a3a3a; border-radius: 6px; padding: 5px 7px; font: inherit; }
+  input[type=number] { width: 90px; font-variant-numeric: tabular-nums; }
+  button { background: #2f2f2f; color: var(--text); border: 1px solid #444; border-radius: 6px; padding: 5px 10px; font: inherit; cursor: pointer; }
+  button:hover { background: #3a3a3a; }
+  button.primary { background: #4a3f2c; border-color: #6b5a3b; }
+  .tabs { display: flex; }
+  .tabs button { border-radius: 0; color: var(--muted); }
+  .tabs button:first-child { border-radius: 6px 0 0 6px; } .tabs button:last-child { border-radius: 0 6px 6px 0; }
+  .tabs button.on { color: var(--panel); background: var(--accent); border-color: var(--accent); }
+  label.tg { display: inline-flex; gap: 5px; align-items: center; color: var(--muted); cursor: pointer; user-select: none; }
+  label.tg input { accent-color: #e5cc9b; }
+  main { padding: 14px 16px 40px; }
+  #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px; cursor: pointer; min-width: 0; }
+  .card:hover { border-color: #55504a; }
+  .card .t { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .card .t b { color: var(--text); font-weight: 600; }
+  canvas { display: block; max-width: 100%; }
+  #one { display: none; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; align-items: start; }
+  #one.on { display: grid; }
+  #one .view { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px; overflow: auto; }
+  #side { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-variant-numeric: tabular-nums; }
+  #side h2 { font-size: 14px; color: var(--accent); margin: 0 0 6px; font-weight: 600; }
+  #side h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin: 12px 0 4px; font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  td, th { padding: 2px 4px; text-align: left; } th { color: var(--dim); font-weight: 500; }
+  td.n { text-align: right; }
+  .ok { color: var(--good); } .bad { color: var(--bad); } .warn { color: var(--warn); } .mut { color: var(--muted); }
+  #report { margin-top: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: none; }
+  #report.on { display: block; }
+  .key { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--muted); margin-top: 8px; }
+  .sw { display: inline-block; width: 11px; height: 11px; border-radius: 2px; vertical-align: -1px; margin-right: 4px; border: 1px solid rgba(0,0,0,.3); }
+  @media (max-width: 760px) { #one.on { grid-template-columns: 1fr; } #grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Room-first houses (test bed)</h1>
+  <div class="sub">A separate generator, apart from the template engines: every room's floor is reserved first at its own size, then one wall builder puts the walls in the space between rooms. Interior walls are always 0.15 m and outer walls 0.3 m, outside the rooms. Sizes shown are clear floor.</div>
+  <div class="bar">
+    <div class="g2"><span>House</span><select id="recipe"></select></div>
+    <div class="g2"><span>Seed</span><input id="seed" type="number" value="1"><button id="prev">‹</button><button id="next">›</button><button id="rand">Random</button></div>
+    <div class="tabs"><button id="vGrid" class="on">12 seeds</button><button id="vOne">One house</button></div>
+    <label class="tg"><input id="labels" type="checkbox" checked> names</label>
+    <label class="tg"><input id="sizes" type="checkbox" checked> sizes</label>
+    <label class="tg"><input id="kinds" type="checkbox" checked> interior walls shaded</label>
+    <button id="check" class="primary">Check 100 seeds of each</button>
+  </div>
+  <div class="key" id="key"></div>
+</header>
+<main>
+  <div id="grid"></div>
+  <div id="one"><div class="view"><canvas id="big"></canvas></div><div id="side"></div></div>
+  <div id="report"></div>
+</main>
+<script src="src/core.js"></script>
+<script src="src/space/recipes.js"></script>
+<script src="src/space/space.js"></script>
+<script src="src/space/render.js"></script>
+<script>
+(function () {
+  'use strict';
+  const SP = BR.SPACE, $ = (id) => document.getElementById(id);
+  const state = { recipe: 'ranch', seed: 1, view: 'grid' };
+  try { Object.assign(state, JSON.parse(localStorage.getItem('space-lab') || '{}')); } catch (e) { /* no storage */ }
+  const save = () => { try { localStorage.setItem('space-lab', JSON.stringify(state)); } catch (e) { /* no storage */ } };
+  for (const id of Object.keys(SP.RECIPES)) { const o = document.createElement('option'); o.value = id; o.textContent = SP.RECIPES[id].name; $('recipe').appendChild(o); }
+  const C = SP.COLORS;
+  $('key').innerHTML = [['public', 'public rooms'], ['private', 'private rooms'], ['service', 'service'], ['circulation', 'hallway'], ['garage', 'garage'], ['wall', 'outer wall'], ['interior', 'interior wall'], ['pocket', 'filled nook']]
+    .map(([k, t]) => '<span><i class="sw" style="background:' + C[k] + '"></i>' + t + '</span>').join('');
+  const opts = () => ({ labels: $('labels').checked, sizes: $('sizes').checked, kinds: $('kinds').checked });
+
+  function canvasFor(cv, h, maxW, maxH) {
+    const s = Math.min(maxW / h.site.w, maxH / h.site.h), dpr = window.devicePixelRatio || 1;
+    cv.width = Math.round(h.site.w * s * dpr); cv.height = Math.round(h.site.h * s * dpr);
+    cv.style.width = Math.round(h.site.w * s) + 'px'; cv.style.height = Math.round(h.site.h * s) + 'px';
+    const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, s };
+  }
+  function failCard(h) {
+    const why = Object.entries(h.why || {}).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => k + ' ×' + v).join(', ');
+    return '<div class="bad">No layout found.</div><div class="mut">Most common reasons: ' + why + '</div>';
+  }
+
+  function drawGrid() {
+    const g = $('grid'); g.innerHTML = '';
+    for (let k = 0; k < 12; k++) {
+      const seed = state.seed + k, h = SP.generate({ recipe: state.recipe, seed });
+      const card = document.createElement('div'); card.className = 'card';
+      const bad = h.error ? [] : SP.verify(h);
+      card.innerHTML = '<div class="t"><span><b>Seed ' + seed + '</b>' + (h.error ? '' : ' · ' + h.meta.plan + ' plan · ' + h.site.w + ' × ' + h.site.h + ' m lot') + '</span>' +
+        (h.error ? '<span class="bad">failed</span>' : '<span class="' + (bad.length ? 'bad' : 'ok') + '">' + (bad.length ? bad.length + ' problems' : 'checks pass') + '</span>') + '</div>';
+      if (h.error) card.insertAdjacentHTML('beforeend', failCard(h));
+      else { const cv = document.createElement('canvas'); card.appendChild(cv); const { ctx, s } = canvasFor(cv, h, 330, 260); SP.draw(ctx, h, Object.assign(opts(), { scale: s, sizes: false })); }
+      card.onclick = () => { state.seed = seed; state.view = 'one'; sync(); };
+      g.appendChild(card);
+    }
+  }
+
+  function drawOne() {
+    const h = SP.generate({ recipe: state.recipe, seed: state.seed }), side = $('side');
+    window.house = h;
+    if (h.error) { $('big').width = 0; side.innerHTML = '<h2>Seed ' + state.seed + '</h2>' + failCard(h); return; }
+    const wrap = $('one').querySelector('.view'), maxW = Math.max(400, wrap.clientWidth - 22);
+    const { ctx, s } = canvasFor($('big'), h, maxW, Math.max(420, window.innerHeight - 220));
+    SP.draw(ctx, h, Object.assign(opts(), { scale: s }));
+    const bad = SP.verify(h), floor = h.spaces.reduce((t, sp) => t + sp.area, 0);
+    const rows = h.spaces.map((sp) => '<tr><td>' + sp.name + '</td><td class="n">' + sp.size[0].toFixed(2) + ' × ' + sp.size[1].toFixed(2) + '</td><td class="n">' + sp.area.toFixed(1) +
+      '</td><td class="n mut">' + (sp.target ? sp.target.toFixed(1) : '') + '</td></tr>').join('');
+    const doors = {}; for (const o of h.openings) doors[o.role || o.kind] = (doors[o.role || o.kind] || 0) + 1;
+    side.innerHTML = '<h2>' + h.name + ', seed ' + h.seed + '</h2>' +
+      '<div class="mut">' + h.meta.plan + ' plan · lot ' + h.site.w + ' × ' + h.site.h + ' m · ' + (h.meta.openPlan ? 'open plan' : 'separate rooms') + '</div>' +
+      '<div>Score <b>' + h.meta.score + '</b> · best of ' + h.meta.candidates + ' tries · ' + h.meta.ms + ' ms</div>' +
+      '<h3>Checks</h3>' + (bad.length ? bad.map((b) => '<div class="bad">' + b + '</div>').join('') : '<div class="ok">All pass: no wall on any room floor, walls 0.15 / 0.3 m exactly, every room reached from the front door.</div>') +
+      '<h3>Rooms (clear floor, m)</h3><table><tr><th>room</th><th class="n">size</th><th class="n">m²</th><th class="n">aimed</th></tr>' + rows + '</table>' +
+      '<div class="mut" style="margin-top:4px">Floor ' + floor.toFixed(1) + ' m² · filled nooks ' + h.meta.pocketArea.toFixed(2) + ' m²</div>' +
+      '<h3>Openings</h3><div class="mut">' + Object.entries(doors).map(([k, v]) => v + ' ' + k).join(' · ') + '</div>' +
+      '<h3>Score penalties</h3><div class="mut">' + Object.entries(h.meta.terms).map(([k, v]) => k + ' ' + v).join(' · ') + '</div>' +
+      '<h3>Export</h3><button id="json">Copy JSON</button>';
+    $('json').onclick = () => navigator.clipboard && navigator.clipboard.writeText(JSON.stringify(h, null, 1));
+  }
+
+  function check() {
+    const N = 100, rep = $('report'); rep.classList.add('on');
+    let html = '<table><tr><th>house</th><th class="n">built</th><th class="n">checks pass</th><th class="n">mean score</th><th class="n">ms</th><th>plans</th><th>problems</th></tr>';
+    for (const id of Object.keys(SP.RECIPES)) {
+      let built = 0, clean = 0, score = 0, ms = 0; const plans = {}, probs = {};
+      for (let k = 1; k <= N; k++) {
+        const h = SP.generate({ recipe: id, seed: k }); ms += h.meta ? h.meta.ms : 0;
+        if (h.error) continue;
+        built++; score += h.meta.score; plans[h.meta.plan] = (plans[h.meta.plan] || 0) + 1;
+        const bad = SP.verify(h); if (!bad.length) clean++;
+        for (const b of bad) { const key = b.replace(/[0-9.]+/g, '#'); probs[key] = (probs[key] || 0) + 1; }
+      }
+      html += '<tr><td>' + SP.RECIPES[id].name + '</td><td class="n">' + built + '/' + N + '</td><td class="n ' + (clean === built ? 'ok' : 'bad') + '">' + clean + '/' + built + '</td><td class="n">' + (score / (built || 1)).toFixed(1) +
+        '</td><td class="n">' + (ms / N).toFixed(1) + '</td><td class="mut">' + Object.entries(plans).map(([k, v]) => k + ' ' + v).join(', ') + '</td><td class="mut">' + (Object.entries(probs).map(([k, v]) => k + ' ×' + v).join('; ') || 'none') + '</td></tr>';
+    }
+    rep.innerHTML = html + '</table>';
+  }
+
+  function sync() {
+    $('recipe').value = state.recipe; $('seed').value = state.seed;
+    $('vGrid').classList.toggle('on', state.view === 'grid'); $('vOne').classList.toggle('on', state.view === 'one');
+    $('grid').style.display = state.view === 'grid' ? '' : 'none'; $('one').classList.toggle('on', state.view === 'one');
+    save();
+    if (state.view === 'grid') drawGrid(); else drawOne();
+  }
+  $('recipe').onchange = () => { state.recipe = $('recipe').value; sync(); };
+  $('seed').onchange = () => { state.seed = Math.max(0, Math.round(+$('seed').value || 0)); sync(); };
+  $('prev').onclick = () => { state.seed = Math.max(0, state.seed - (state.view === 'grid' ? 12 : 1)); sync(); };
+  $('next').onclick = () => { state.seed += state.view === 'grid' ? 12 : 1; sync(); };
+  $('rand').onclick = () => { state.seed = Math.floor(Math.random() * 1e6); sync(); };
+  $('vGrid').onclick = () => { state.view = 'grid'; sync(); };
+  $('vOne').onclick = () => { state.view = 'one'; sync(); };
+  for (const id of ['labels', 'sizes', 'kinds']) $(id).onchange = sync;
+  $('check').onclick = () => { $('check').textContent = 'Checking…'; setTimeout(() => { check(); $('check').textContent = 'Check 100 seeds of each'; }, 20); };
+  window.addEventListener('resize', () => { if (state.view === 'one') drawOne(); });
+  sync();
+})();
+</script>
+</body>
+</html>
