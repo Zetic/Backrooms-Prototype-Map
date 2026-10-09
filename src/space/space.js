@@ -526,26 +526,47 @@
     const X0 = bb[0] - pad, Y0 = bb[1] - pad, NX = Math.round((bb[2] - bb[0] + 2 * pad) / S), NY = Math.round((bb[3] - bb[1] + 2 * pad) / S);
     const at = (x, y) => y * NX + x, cell = (v, o) => Math.round((v - o) / S);
     const roomOf = new Int16Array(NX * NY).fill(-1);
-    rooms.forEach((n, i) => { for (let y = cell(n.r[1], Y0); y < cell(n.r[3], Y0); y++) for (let x = cell(n.r[0], X0); x < cell(n.r[2], X0); x++) roomOf[at(x, y)] = i; });
+    rooms.forEach((n, i) => {
+      const x0 = cell(n.r[0], X0), x1 = cell(n.r[2], X0), y1 = cell(n.r[3], Y0);
+      for (let y = cell(n.r[1], Y0); y < y1; y++) roomOf.fill(i, y * NX + x0, y * NX + x1);
+    });
     const grow = (src, r) => {
       // square dilation by r cells: rows, then columns
       const tmp = new Uint8Array(NX * NY), out = new Uint8Array(NX * NY);
-      for (let y = 0; y < NY; y++) { let last = -INF; for (let x = 0; x < NX; x++) { if (src[at(x, y)]) last = x; if (x - last <= r) tmp[at(x, y)] = 1; } last = INF; for (let x = NX - 1; x >= 0; x--) { if (src[at(x, y)]) last = x; if (last - x <= r) tmp[at(x, y)] = 1; } }
-      for (let x = 0; x < NX; x++) { let last = -INF; for (let y = 0; y < NY; y++) { if (tmp[at(x, y)]) last = y; if (y - last <= r) out[at(x, y)] = 1; } last = INF; for (let y = NY - 1; y >= 0; y--) { if (tmp[at(x, y)]) last = y; if (last - y <= r) out[at(x, y)] = 1; } }
+      for (let y = 0, row = 0; y < NY; y++, row += NX) {
+        let last = -INF;
+        for (let x = 0; x < NX; x++) { const k = row + x; if (src[k]) last = x; if (x - last <= r) tmp[k] = 1; }
+        last = INF;
+        for (let x = NX - 1; x >= 0; x--) { const k = row + x; if (src[k]) last = x; if (last - x <= r) tmp[k] = 1; }
+      }
+      for (let x = 0; x < NX; x++) {
+        let last = -INF;
+        for (let y = 0, k = x; y < NY; y++, k += NX) { if (tmp[k]) last = y; if (y - last <= r) out[k] = 1; }
+        last = INF;
+        for (let y = NY - 1, k = y * NX + x; y >= 0; y--, k -= NX) { if (tmp[k]) last = y; if (last - y <= r) out[k] = 1; }
+      }
       return out;
     };
-    const inv = (a) => a.map((v) => (v ? 0 : 1));
-    const isRoom = roomOf.map((v) => (v >= 0 ? 1 : 0));
+    const inv = (a) => { const out = new Uint8Array(a.length); for (let k = 0; k < a.length; k++) out[k] = a[k] ? 0 : 1; return out; };
+    const isRoom = new Uint8Array(roomOf.length);
+    for (let k = 0; k < roomOf.length; k++) isRoom[k] = roomOf[k] >= 0 ? 1 : 0;
     const shell = grow(isRoom, Math.round(TE() / S));
     const R = Math.round(CFG.slot / 2 / S), closed = inv(grow(inv(grow(shell, R)), R));
     for (let k = 0; k < closed.length; k++) if (shell[k]) closed[k] = 1;
     // holes: whatever the outside cannot reach
-    const outside = new Uint8Array(NX * NY), st = [];
-    for (let x = 0; x < NX; x++) for (const y of [0, NY - 1]) if (!closed[at(x, y)]) { outside[at(x, y)] = 1; st.push(at(x, y)); }
-    for (let y = 0; y < NY; y++) for (const x of [0, NX - 1]) if (!closed[at(x, y)] && !outside[at(x, y)]) { outside[at(x, y)] = 1; st.push(at(x, y)); }
-    while (st.length) {
-      const k = st.pop(), x = k % NX, y = (k - x) / NX;
-      for (const [u, v] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) if (u >= 0 && v >= 0 && u < NX && v < NY && !closed[at(u, v)] && !outside[at(u, v)]) { outside[at(u, v)] = 1; st.push(at(u, v)); }
+    // Each cell is queued at most once. A typed stack and scalar neighbors
+    // avoid allocating four coordinate arrays for every visited raster cell.
+    const outside = new Uint8Array(NX * NY), st = new Int32Array(NX * NY);
+    let top = 0;
+    const visit = (k) => { if (!closed[k] && !outside[k]) { outside[k] = 1; st[top++] = k; } };
+    for (let x = 0; x < NX; x++) { visit(x); visit((NY - 1) * NX + x); }
+    for (let y = 0; y < NY; y++) { visit(y * NX); visit(y * NX + NX - 1); }
+    while (top) {
+      const k = st[--top], x = k % NX;
+      if (x + 1 < NX) visit(k + 1);
+      if (x > 0) visit(k - 1);
+      if (k + NX < outside.length) visit(k + NX);
+      if (k >= NX) visit(k - NX);
     }
     // 0 outside, 1 room, 2 wall, 3 pocket, 4 opening (floor through a wall)
     const kind = new Uint8Array(NX * NY);
@@ -788,3 +809,4 @@
 
   SP._internal = { room, row, col, solve, fit, place, ext, range, pairs, compile, program, emit, exitRect, cm, m, snap, snapUp, snapDown, rr, hashStr, keyOf, shuffle, bboxOf, W, H, CFG };
 })(typeof window !== 'undefined' ? window : globalThis);
+

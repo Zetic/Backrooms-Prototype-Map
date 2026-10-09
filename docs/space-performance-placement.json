@@ -1,0 +1,104 @@
+{
+  "baselineRef": "baseline",
+  "baselineLabel": "a2e09427d17d56b0724575c5bdd3f4c208ce1c32",
+  "variant": "placement",
+  "node": "v24.19.0",
+  "platform": "linux",
+  "arch": "x64",
+  "seeds": 50,
+  "rounds": 1,
+  "wrong": 0.35,
+  "rows": [
+    {
+      "recipe": "passage",
+      "baseline": {
+        "meanMs": 114.47445536000004,
+        "medianMs": 108.2965979999999,
+        "p95Ms": 177.29688599999963,
+        "maxMs": 207.95007599999985
+      },
+      "current": {
+        "meanMs": 105.89535735999996,
+        "medianMs": 99.38178199999948,
+        "p95Ms": 162.60555299999987,
+        "maxMs": 205.97771899999998
+      },
+      "speedup": 1.0810148642384267,
+      "identicalOutput": true,
+      "built": 50,
+      "valid": 50,
+      "meanCandidates": 20,
+      "profile": {
+        "fitCalls": 85407,
+        "roomChecks": 282481,
+        "fullScanRooms": 726611,
+        "cacheHits": 3209,
+        "branchRollbacks": 1,
+        "attemptsMs": 69.62888099999964,
+        "emitMs": 56.24249999999938
+      }
+    },
+    {
+      "recipe": "passage1",
+      "baseline": {
+        "meanMs": 72.01452408000011,
+        "medianMs": 66.70985400000063,
+        "p95Ms": 115.06281200000012,
+        "maxMs": 160.55819100000008
+      },
+      "current": {
+        "meanMs": 61.68302457999991,
+        "medianMs": 61.29047899999932,
+        "p95Ms": 78.16177699999935,
+        "maxMs": 96.15775500000018
+      },
+      "speedup": 1.1674933998510522,
+      "identicalOutput": true,
+      "built": 50,
+      "valid": 50,
+      "meanCandidates": 20,
+      "profile": {
+        "fitCalls": 63871,
+        "roomChecks": 207771,
+        "fullScanRooms": 607186,
+        "cacheHits": 2142,
+        "branchRollbacks": 0,
+        "attemptsMs": 49.51161400000092,
+        "emitMs": 30.724442999999155
+      }
+    },
+    {
+      "recipe": "backdoor",
+      "baseline": {
+        "meanMs": 91.99339889999989,
+        "medianMs": 88.20960399999967,
+        "p95Ms": 129.95003800000086,
+        "maxMs": 137.43349300000045
+      },
+      "current": {
+        "meanMs": 61.29171007999997,
+        "medianMs": 59.53852200000074,
+        "p95Ms": 83.76901599999837,
+        "maxMs": 86.51425899999958
+      },
+      "speedup": 1.5009109515777428,
+      "identicalOutput": true,
+      "built": 50,
+      "valid": 50,
+      "meanCandidates": 20,
+      "profile": {
+        "fitCalls": 101216,
+        "roomChecks": 349626,
+        "fullScanRooms": 1200168,
+        "cacheHits": 4114,
+        "branchRollbacks": 2,
+        "attemptsMs": 31.835923999999068,
+        "emitMs": 32.77772900000127
+      }
+    }
+  ],
+  "sourceHashes": {
+    "baseline": "28730616231fbea68e328b7cc15f95f5c4d8cfe93eaec72ab5fa5a839013bed8",
+    "current": "880c2f8be76a571fb79239fe0490783bdc44ecc4f743cf721e779c248026a49b"
+  }
+}

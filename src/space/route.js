@@ -32,9 +32,8 @@
 (function (root) {
   'use strict';
   const BR = root.BR, SP = BR.SPACE, I = SP._internal;
-  const { CFG, cm, snap, rr, hashStr, keyOf, shuffle, bboxOf, W, H, pairs, emit } = I;
+  const { CFG, cm, snap, rr, hashStr, keyOf, shuffle, bboxOf, W, H, emit } = I;
   const TI = () => CFG.interior, TE = () => CFG.exterior;
-  const INF = 1e9;
   const OPP = { N: 'S', S: 'N', E: 'W', W: 'E' };
 
   // the rooms each kind of side room opens off, best first
@@ -115,6 +114,67 @@
   }
 
   // ------------------------------------------------------------- placing
+  // Broad phase only: room positions remain on the original 5 cm step.
+  // Closed cell bounds deliberately include boundary contacts. Query stamps
+  // deduplicate rooms spanning several buckets without a Set per candidate.
+  class RoomIndex {
+    constructor() { this.rooms = []; this.columns = new Map(); this.stamp = 0; }
+    add(n) {
+      this.rooms.push(n); n.buckets = [];
+      for (let x = Math.floor(n.r[0] / 600); x <= Math.floor(n.r[2] / 600); x++) {
+        let col = this.columns.get(x);
+        if (!col) this.columns.set(x, col = new Map());
+        for (let y = Math.floor(n.r[1] / 600); y <= Math.floor(n.r[3] / 600); y++) {
+          let bucket = col.get(y);
+          if (!bucket) col.set(y, bucket = []);
+          bucket.push(n); n.buckets.push(bucket);
+        }
+      }
+    }
+    pop() {
+      const n = this.rooms.pop();
+      for (const bucket of n.buckets) bucket.splice(bucket.indexOf(n), 1);
+      return n;
+    }
+    query(r, pad = 0, ordered = false) {
+      if (this.rooms.length <= 8) return this.rooms;
+      const out = [], stamp = ++this.stamp;
+      for (let x = Math.floor((r[0] - pad) / 600); x <= Math.floor((r[2] + pad) / 600); x++) {
+        const col = this.columns.get(x);
+        if (!col) continue;
+        for (let y = Math.floor((r[1] - pad) / 600); y <= Math.floor((r[3] + pad) / 600); y++) {
+          const bucket = col.get(y);
+          if (!bucket) continue;
+          for (const n of bucket) if (n.queryStamp !== stamp) { n.queryStamp = stamp; out.push(n); }
+        }
+      }
+      if (ordered) out.sort((a, b) => a.order - b.order);
+      return out;
+    }
+  }
+  function indexOn(ctx, f) { return ctx.indexes[f] || (ctx.indexes[f] = new RoomIndex()); }
+  // Record all contacts, including incidental walls with rooms other than the
+  // host. Temporary branch halls remove their contacts on rollback.
+  function addRoom(ctx, n) {
+    const ix = indexOn(ctx, n.floor);
+    n.order = ctx.rooms.length; n.wallStart = ctx.walls.length;
+    for (const old of ix.query(n.r, TI(), true)) {
+      const A = old.r, B = n.r, ox = Math.min(A[2], B[2]) - Math.max(A[0], B[0]), oy = Math.min(A[3], B[3]) - Math.max(A[1], B[1]);
+      if (ox > 0 && Math.max(A[1], B[1]) - Math.min(A[3], B[3]) === TI()) {
+        const a = A[1] < B[1] ? old : n, b = a === old ? n : old;
+        ctx.walls.push({ o: 'h', a, b, c0: a.r[3], c1: b.r[1], s0: Math.max(A[0], B[0]), s1: Math.min(A[2], B[2]) });
+      }
+      if (oy > 0 && Math.max(A[0], B[0]) - Math.min(A[2], B[2]) === TI()) {
+        const a = A[0] < B[0] ? old : n, b = a === old ? n : old;
+        ctx.walls.push({ o: 'v', a, b, c0: a.r[2], c1: b.r[0], s0: Math.max(A[1], B[1]), s1: Math.min(A[3], B[3]) });
+      }
+    }
+    ix.add(n); ctx.rooms.push(n);
+  }
+  function popRoom(ctx) {
+    const n = ctx.rooms.pop();
+    indexOn(ctx, n.floor).pop(); ctx.walls.length = n.wallStart;
+  }
   /** the shapes a room may take (x size, y size, cm), a few near its target */
   function shapes(e, rng, P) {
     if (e.type === 'hall') return [[P.hall, e.len], [e.len, P.hall]];
@@ -137,14 +197,24 @@
     return [h[0] - TI() - D, a, h[0] - TI(), a + L];
   }
   /** room rect r on a floor: no overlap, and one wall or two outer walls from every room it faces */
-  function fits(r, here, keep) {
+  function fits(r, here, keep, stats) {
     let touch = 0;
+    if (stats) stats.fitCalls++;
     for (const o of here) {
-      const q = o.r, ox = Math.min(r[2], q[2]) - Math.max(r[0], q[0]), oy = Math.min(r[3], q[3]) - Math.max(r[1], q[1]);
+      if (stats) stats.roomChecks++;
+      const q = o.r;
+      // A distant room cannot overlap, violate a gap, or contribute a contact.
+      if (q[0] - r[2] >= 2 * TE() || r[0] - q[2] >= 2 * TE() || q[1] - r[3] >= 2 * TE() || r[1] - q[3] >= 2 * TE()) continue;
+      const ox = Math.min(r[2], q[2]) - Math.max(r[0], q[0]), oy = Math.min(r[3], q[3]) - Math.max(r[1], q[1]);
       if (ox > 0 && oy > 0) return -1;
-      for (const [ov, gap] of [[ox, Math.max(r[1], q[1]) - Math.min(r[3], q[3])], [oy, Math.max(r[0], q[0]) - Math.min(r[2], q[2])]]) {
-        if (ov <= 0) continue;
-        if (gap === TI()) touch += ov >= 60 ? 1 : 0;
+      if (ox > 0) {
+        const gap = Math.max(r[1], q[1]) - Math.min(r[3], q[3]);
+        if (gap === TI()) touch += ox >= 60 ? 1 : 0;
+        else if (gap < 2 * TE()) return -1;
+      }
+      if (oy > 0) {
+        const gap = Math.max(r[0], q[0]) - Math.min(r[2], q[2]);
+        if (gap === TI()) touch += oy >= 60 ? 1 : 0;
         else if (gap < 2 * TE()) return -1;
       }
     }
@@ -159,27 +229,58 @@
    * clear: depth of clear outside space the room needs on its far side.
    */
   function attach(e, h, ctx, o) {
-    const here = ctx.rooms.filter((n) => n.floor === h.floor), keep = ctx.keep[h.floor] || [];
+    const ix = indexOn(ctx, h.floor), here = ix.rooms, keep = ctx.keep[h.floor] || [], stats = ctx.stats;
+    const nearby = ix.query(h.r, 600, true).filter((n) => Math.max(n.r[0] - h.r[2], h.r[0] - n.r[2], n.r[1] - h.r[3], h.r[1] - n.r[3]) < 600);
+    const xEdges = [], yEdges = [], shapeCounts = new Map();
+    for (const n of nearby) { xEdges.push(n.r[0], n.r[2]); yEdges.push(n.r[1], n.r[3]); }
+    for (const [w, d] of o.shapes) { const key = w + ':' + d; shapeCounts.set(key, (shapeCounts.get(key) || 0) + 1); }
     let best = null;
     for (const face of o.faces) {
       const hz = face === 'N' || face === 'S', p0 = hz ? h.r[0] : h.r[1], p1 = hz ? h.r[2] : h.r[3];
       // where along the face: flush with the host's ends, centred, or in line with a neighbour
-      const edges = [];
-      for (const n of here) if (Math.max(n.r[0] - h.r[2], h.r[0] - n.r[2], n.r[1] - h.r[3], h.r[1] - n.r[3]) < 600) edges.push(hz ? n.r[0] : n.r[1], hz ? n.r[2] : n.r[3]);
+      const edges = hz ? xEdges : yEdges;
+      const shapesSeen = new Map();
       for (const [w, d] of o.shapes) {
         const L = hz ? w : d, D = hz ? d : w;
         if (o.along && L > D) continue;
-        const at = new Set([p0, p1 - L, snap((p0 + p1 - L) / 2), p0 - L + o.need, p1 - o.need]);
-        for (const x of edges) for (const v of [x, x - L, x + TI(), x - TI() - L]) at.add(v);
-        for (let k = 0; k < 3; k++) at.add(snap(p0 - L + o.need + ctx.rng.f() * (p1 - p0 + L - 2 * o.need)));
+        const shapeKey = L + ':' + D;
+        let checked = null;
+        if (shapeCounts.get(w + ':' + d) > 1) {
+          checked = shapesSeen.get(shapeKey);
+          if (!checked) shapesSeen.set(shapeKey, checked = new Map());
+        }
+        const at = new Set(), lo = p0 - L + o.need, hi = p1 - o.need;
+        // One broad-phase lookup for the entire candidate band, rather than
+        // allocating a lookup result for every offset. fits performs the exact
+        // per-rectangle clearance rejection inside this conservative shortlist.
+        const band = rectOn(face, h.r, lo, L, D);
+        if (hz) band[2] = hi + L; else band[3] = hi + L;
+        const near = hi >= lo ? ix.query(band, 2 * TE()) : [];
+        // Offsets outside this interval cannot share enough host wall. Omit
+        // only those deterministic rejects; retain insertion order and all
+        // three random offset draws, even when none can fit.
+        const add = (v) => { if (v >= lo && v <= hi) at.add(v); };
+        add(p0); add(p1 - L); add(snap((p0 + p1 - L) / 2)); add(lo); add(hi);
+        for (const x of edges) { add(x); add(x - L); add(x + TI()); add(x - TI() - L); }
+        for (let k = 0; k < 3; k++) add(snap(lo + ctx.rng.f() * (p1 - p0 + L - 2 * o.need)));
         for (const a of at) {
           const s0 = Math.max(a, p0), s1 = Math.min(a + L, p1);
           if (s1 - s0 < o.need || (o.window && !o.window(face, s0, s1))) continue;
-          const r = rectOn(face, h.r, a, L, D);
-          const t = fits(r, here, keep);
-          if (t < 0) continue;
-          let far = null;
-          if (o.clear) { far = clearOut(r, face, o.clear, here, keep); if (!far) continue; }
+          let geometry = checked ? checked.get(a) : undefined, r, t, far;
+          if (geometry === undefined) {
+            r = rectOn(face, h.r, a, L, D);
+            if (stats) stats.fullScanRooms += here.length;
+            t = fits(r, near, keep, stats);
+            far = t >= 0 && o.clear ? clearOut(r, face, o.clear, here, keep, ix) : null;
+            if (checked) checked.set(a, t < 0 || (o.clear && !far) ? null : { r, t, far });
+            if (t < 0 || (o.clear && !far)) continue;
+          } else {
+            if (stats) stats.cacheHits++;
+            if (!geometry) continue;
+            r = geometry.r; t = geometry.t; far = geometry.far;
+          }
+          // Every logical candidate still receives its original random score,
+          // including cache hits. Candidate order and tie behavior are intact.
           const sc = t + ctx.rng.f() * 1.5;
           if (!best || sc > best.sc) best = { sc, r, face, far };
         }
@@ -188,10 +289,10 @@
     return best;
   }
   /** the strip of clear ground outside room r on side, depth deep, or null */
-  function clearOut(r, side, deep, here, keep) {
+  function clearOut(r, side, deep, here, keep, ix) {
     const q = side === 'S' ? [r[0] - 60, r[3], r[2] + 60, r[3] + deep] : side === 'N' ? [r[0] - 60, r[1] - deep, r[2] + 60, r[1]]
       : side === 'E' ? [r[2], r[1] - 60, r[2] + deep, r[3] + 60] : [r[0] - deep, r[1] - 60, r[0], r[3] + 60];
-    for (const n of here) if (Math.min(q[2], n.r[2]) > Math.max(q[0], n.r[0]) && Math.min(q[3], n.r[3]) > Math.max(q[1], n.r[1])) return null;
+    for (const n of ix ? ix.query(q) : here) if (Math.min(q[2], n.r[2]) > Math.max(q[0], n.r[0]) && Math.min(q[3], n.r[3]) > Math.max(q[1], n.r[1])) return null;
     for (const k of keep) if (Math.min(q[2], k[2]) > Math.max(q[0], k[0]) && Math.min(q[3], k[3]) > Math.max(q[1], k[1])) return null;
     return { side, rect: q };
   }
@@ -205,14 +306,14 @@
   }
 
   /** one candidate house, or { fail } */
-  function build(P, rng) {
-    const ctx = { rooms: [], keep: {}, rng, links: [], outside: [], verticals: [], route: [], notes: [] };
+  function build(P, rng, stats) {
+    const ctx = { rooms: [], indexes: [], walls: [], keep: {}, rng, links: [], outside: [], verticals: [], route: [], notes: [], stats };
     const keepOn = (f, q) => (ctx.keep[f] = ctx.keep[f] || []).push(q);
     // ---- the front door and the foyer
     const first = P.path[0], fs = shapes(first, rng, P)[0];
     const foyer = node(first, [0, 0, fs[0], fs[1]], 0, 'path');
     foyer.entry = 'S';
-    ctx.rooms.push(foyer); ctx.route.push(foyer);
+    addRoom(ctx, foyer); ctx.route.push(foyer);
     const front = outDoor(foyer, 'S', 100, 'entrance', 'front door', rng);
     if (!front) return { fail: 'front door' };
     ctx.outside.push(front);
@@ -241,7 +342,7 @@
       n.entry = OPP[got.face];
       if (lastStep) n.exitSide = got.far.side;
       if (e.wrong) n.wrong = e.wrong;
-      ctx.rooms.push(n); ctx.route.push(n);
+      addRoom(ctx, n); ctx.route.push(n);
       ctx.links.push({ a: prev, b: n, path: true });
       prev = n;
       if (e.type === 'stair') {
@@ -249,7 +350,7 @@
         floor++;
         const up = node(e, n.r.slice(), floor, 'path');
         up.entry = n.entry; up.name = 'stairwell (top)';
-        ctx.rooms.push(up); ctx.route.push(up);
+        addRoom(ctx, up); ctx.route.push(up);
         ctx.verticals.push({ kind: 'stair', rooms: [n, up], up: OPP[n.entry] });
         prev = up;
       }
@@ -297,10 +398,11 @@
           if (!gh) continue;
           const hn = node(he, gh.r, h.floor, 'side');
           hn.entry = OPP[gh.face]; hn.host = h;
-          ctx.rooms.push(hn);
+          addRoom(ctx, hn);
           const got = attach(e, hn, ctx, { faces: shuffle(['N', 'E', 'S', 'W'].filter((f) => f !== hn.entry), rng), need, shapes: shapes(e, rng, P) });
           if (got) { ctx.links.push({ a: h, b: hn, path: false }); placed = got; host = hn; break; }
-          ctx.rooms.pop();
+          popRoom(ctx);
+          if (stats) stats.branchRollbacks++;
         }
       }
       if (!placed) {
@@ -312,7 +414,7 @@
       const n = node(e, placed.r, host.floor, 'side');
       n.host = host; n.entry = OPP[placed.face];
       if (e.wrong) n.wrong = e.wrong;
-      ctx.rooms.push(n);
+      addRoom(ctx, n);
       ctx.links.push({ a: host, b: n, path: false });
       if (e.type === 'garage') {
         const d = outDoor(n, placed.far.side, Math.min(e.door, (placed.far.side === 'N' || placed.far.side === 'S' ? W(n.r) : H(n.r)) - 60), 'vehicle', 'garage door', rng);
@@ -321,15 +423,14 @@
       }
     }
     // ---- doors: from the walls between the rooms, floor by floor
-    const why = {}, walls = [], ops = [];
-    for (let f = 0; f < floors; f++) {
-      const here = ctx.rooms.filter((n) => n.floor === f), ws = pairs(here, why);
-      if (!ws) return { fail: 'gap' };
-      walls.push(...ws);
-    }
+    const walls = ctx.walls, ops = [];
+    // Match the former per-floor i/j pair enumeration exactly (wall IDs and
+    // exterior-face subtraction depend on this order).
+    walls.sort((p, q) => p.a.floor - q.a.floor || Math.min(p.a.order, p.b.order) - Math.min(q.a.order, q.b.order) || Math.max(p.a.order, p.b.order) - Math.max(q.a.order, q.b.order));
+    const wallByPair = new Map(walls.map((w) => [Math.min(w.a.order, w.b.order) + ':' + Math.max(w.a.order, w.b.order), w]));
     const M = CFG.margin;
     for (const l of ctx.links) {
-      const wl = walls.find((x) => (x.a === l.a && x.b === l.b) || (x.a === l.b && x.b === l.a));
+      const wl = wallByPair.get(Math.min(l.a.order, l.b.order) + ':' + Math.max(l.a.order, l.b.order));
       if (!wl || wl.opening) return { fail: 'door: ' + l.a.type + '-' + l.b.type + (wl ? ' twice' : ' no wall') };
       const ov = wl.s1 - wl.s0, L = SP.LINKS[keyOf(l.a.type, l.b.type)];
       let kind, w;
@@ -382,16 +483,20 @@
     const R = SP.RECIPES[spec.recipe], seed = spec.seed >>> 0, salt = hashStr(spec.recipe);
     const wrongness = spec.wrong !== undefined ? spec.wrong : R.route.wrong || 0;
     const why = {};
+    // Opt-in counters and stage timings; ordinary generation adds no metadata.
+    const stats = spec.profile ? { fitCalls: 0, roomChecks: 0, fullScanRooms: 0, cacheHits: 0, branchRollbacks: 0, attemptsMs: 0, emitMs: 0 } : null;
+    const start = stats ? performance.now() : 0;
     let best = null, tried = 0;
     for (let k = 0; k < SP.ROUTE_CANDIDATES; k++) {
       const P = program(R, new BR.Rng(BR.hash4(seed, salt, 0x70a7, 2)), wrongness);
       const rng = new BR.Rng(BR.hash4(seed, salt, 0x70a7, 100 + k));
-      const b = build(P, rng);
+      const b = build(P, rng, stats);
       tried++;
       if (b.fail) { why[b.fail] = (why[b.fail] || 0) + 1; continue; }
       const terms = score(b), pen = Object.values(terms).reduce((s, v) => s + v, 0);
       if (!best || pen < best.pen) best = Object.assign(b, { terms, pen, P });
     }
+    if (stats) stats.attemptsMs = performance.now() - start;
     if (!best) return { schema: SP.SCHEMA, error: 'no valid layout', recipe: spec.recipe, seed, why, tried };
     // the lot: around the house and the clear ground at its doors, the street below
     const b = best, bb = bboxOf(b.rooms);
@@ -403,7 +508,12 @@
     for (const o of b.outside) { const hz = o.side === 'N' || o.side === 'S'; o.s0 += hz ? dx : dy; o.s1 += hz ? dx : dy; o.c += hz ? dy : dx; }
     const site = { w: Math.ceil((W(bb) + 2 * pad) / 50) / 2, h: Math.ceil((H(bb) + 2 * pad + 200) / 50) / 2 };
     const wrong = notes(b);
-    return emit({ recipe: spec.recipe, name: R.name, seed, site, rooms: b.rooms, walls: b.walls, ops: b.ops, outside: b.outside, verticals: b.verticals, route: b.route, wrong,
+    const emitStart = stats ? performance.now() : 0;
+    const house = emit({ recipe: spec.recipe, name: R.name, seed, site, rooms: b.rooms, walls: b.walls, ops: b.ops, outside: b.outside, verticals: b.verticals, route: b.route, wrong,
       meta: { plan: 'route', score: Math.round((100 - b.pen) * 10) / 10, terms: b.terms, wrongness, missing: b.missing, openPlan: b.P.openPlan, candidates: tried, why }, t0 });
+    if (stats) { stats.emitMs = performance.now() - emitStart; house.meta.profile = stats; }
+    return house;
   };
+  SP._routeInternal = { RoomIndex, fits, addRoom, popRoom };
 })(typeof window !== 'undefined' ? window : globalThis);
+
