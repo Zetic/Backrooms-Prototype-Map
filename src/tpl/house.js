@@ -97,7 +97,7 @@
     const g = arch.garage;
     P.garage = g && rng.f() < (g.p === undefined ? 1 : g.p) ? { cars: rng.int(g.cars[0], g.cars[1]), fwd: U(rr(rng, g.forward || 0)) } : null;
     P.openPlan = rng.f() < (arch.openPlan || 0);
-    P.hallW = U(rr(rng, (arch.hall && arch.hall.w) || [1, 1.2]));
+    P.hallW = U(rr(rng, (arch.hall && arch.hall.w) || [1.5, 1.5]));
     P.closets = arch.closets === undefined ? 0.6 : arch.closets;
     P.backDoor = arch.backDoor === undefined ? 0.6 : arch.backDoor;
     P.sideDoor = arch.sideDoor === undefined ? 0.25 : arch.sideDoor;
@@ -183,7 +183,10 @@
   function runNeed(P, list, Wd) {
     const hw = Math.max(2, P.hallW), others = list.filter((x) => x.type !== 'master');
     const sumMin = others.reduce((a, x) => a + T[x.type].minW + (x.type === 'bedroom' ? 1 : 0), 0) + (list.length > others.length ? 8 : 0);
-    return Wd - hw >= 12 ? Math.ceil(sumMin / 2) + 2 : sumMin + 1;
+    // rooms down both sides when the two deepest needs fit across beside the hall
+    const mins = list.map((x) => T[x.type].minW).sort((a, b) => b - a);
+    const two = mins.length > 1 ? mins[0] + mins[mins.length - 1] : 12;
+    return Wd - hw >= Math.min(12, two) ? Math.ceil(sumMin / 2) + 2 : sumMin + 1;
   }
   function garageDims(P, rng) {
     if (!P.garage) return null;
@@ -506,9 +509,100 @@
   }
 
   // ------------------------------------------------------------- plan types
+  // ------------------------------------------------------------ pockets
+  /**
+   * Solid pockets: rooms keep about their own size, and what a plan's zone
+   * stretched them to fill is given back to the outside, as a notch or a jog
+   * in the house's outline.
+   *   - a linen closet, closet or pantry that runs deep from its door is cut
+   *     to a shallow one (1 m, a pantry 1.5 m), the rest behind it left solid
+   *   - a room much bigger than it asked for gives up rows along its back or
+   *     side wall
+   * Only single-rect rooms on an outer wall that is outside along its whole
+   * length, never the front (the street side, +y), the garage, hallways or
+   * stairs, never beside a hallway (its end would stand out of the house),
+   * and never where another storey stands over or under the cut.
+   * Every wall a room shares stays long enough for its door. So the outline
+   * only ever loses notches open to the outside: no enclosed holes.
+   */
+  const SHALLOW = { linen: 2, closet: 2, pantry: 3 };
+  const KEEP_END = { linen: ['hall', 'bath', 'bedroom', 'master'], closet: ['hall', 'bedroom', 'master'], pantry: ['kitchen', 'dining', 'hall', 'family'] };
+  const NO_TRIM = new Set(['garage', 'hall', 'stairwell', 'foyer']);
+  function pockets(B) {
+    const rooms = B.rooms;
+    const covered = (r, lv, skip) => rooms.some((rm, j) => j !== skip && (rm.level || 0) === lv && rm.rects.some((q) => TG.roverlap(q, r)));
+    const otherLevel = (r, lv) => rooms.some((rm) => (rm.level || 0) !== lv && rm.rects.some((q) => TG.roverlap(q, r)));
+    // the band of cells just past edge `side` of rect r (N: above, W: left, E: right)
+    const beyond = (r, side) => side === 'N' ? [r[0], r[1] - 1, r[2], r[1]] : side === 'W' ? [r[0] - 1, r[1], r[0], r[3]] : side === 'E' ? [r[2], r[1], r[2] + 1, r[3]] : [r[0], r[3], r[2], r[3] + 1];
+    const cut = (r, side, k) => side === 'N' ? [[r[0], r[1] + k, r[2], r[3]], [r[0], r[1], r[2], r[1] + k]]
+      : side === 'S' ? [[r[0], r[1], r[2], r[3] - k], [r[0], r[3] - k, r[2], r[3]]]
+        : side === 'W' ? [[r[0] + k, r[1], r[2], r[3]], [r[0], r[1], r[0] + k, r[3]]] : [[r[0], r[1], r[2] - k, r[3]], [r[2] - k, r[1], r[2], r[3]]];
+    // rooms that may want a door or opening between them (CONN, a parent, a planned link)
+    const linked = (i, j) => {
+      const a = rooms[i], b = rooms[j], k = a.type < b.type ? a.type + '|' + b.type : b.type + '|' + a.type;
+      return !!CONN[k] || a.parent === j || b.parent === i || a.type === 'garage' || b.type === 'garage'
+        || B.conns.some((c) => (c.a === i && c.b === j) || (c.a === j && c.b === i));
+    };
+    // try to give `piece` of room i (single rect r -> rest) to the outside
+    // (or, with `to`, to the neighbouring room `to`: an alcove of it)
+    const tryCut = (i, side, k, to) => {
+      const rm = rooms[i], r = rm.rects[0], lv = rm.level || 0;
+      if (to === undefined && covered(beyond(r, side), lv, i)) return false;
+      const [rest, piece] = cut(r, side, k);
+      if (!TG.rvalid(rest) || (to === undefined && otherLevel(piece, lv))) return false;
+      // (a notch beside a hallway would leave the hallway's end standing out of the house)
+      if (to === undefined && rooms.some((o, j) => j !== i && (o.level || 0) === lv && (o.type === 'hall' || o.type === 'stairwell') && touch([piece], o.rects) > 0)) return false;
+      const before = rooms.map((o, j) => (j === i || (o.level || 0) !== lv ? 0 : touch([r], o.rects)));
+      const after = rooms.map((o, j) => (j === i || (o.level || 0) !== lv ? 0 : touch([rest], o.rects)));
+      for (let j = 0; j < rooms.length; j++) if (before[j] >= 2 && after[j] < Math.min(before[j], 4) && linked(i, j)) return false;
+      rm.rects = [rest];
+      if (to !== undefined) rooms[to].rects.push(piece);
+      return true;
+    };
+    const ALCOVE = ['bedroom', 'master', 'office', 'bath', 'laundry', 'utility', 'family', 'dining', 'kitchen', 'living', 'mudroom'];
+    rooms.forEach((rm, i) => {
+      if (rm.rects.length !== 1) return;
+      const r = rm.rects[0], ty = T[rm.type], lv = rm.level || 0;
+      // ---- shallow closets: keep the end at the door, cut the far end
+      const keep = SHALLOW[rm.type];
+      if (keep !== undefined) {
+        const along = TG.rw(r) >= TG.rh(r) ? 'x' : 'y', len = along === 'x' ? TG.rw(r) : TG.rh(r);
+        if (len <= keep || TG.rshort(r) > 3) return;
+        const ends = along === 'x' ? ['W', 'E'] : ['N', 'S'];
+        const at = (side) => rooms.some((o, j) => j !== i && (o.level || 0) === lv && KEEP_END[rm.type].indexOf(o.type) >= 0 && o.rects.some((q) => TG.roverlap(q, beyond(r, side))));
+        const keepAt = ends.find(at);
+        if (!keepAt) return;
+        const far = ends[1 - ends.indexOf(keepAt)];
+        if (tryCut(i, far, len - keep)) return;
+        // inside the house: the rest becomes an alcove of a room beside it
+        const piece = cut(r, far, len - keep)[1], side = TG.rlong(piece);
+        const by = rooms.map((o, j) => j).filter((j) => j !== i && (rooms[j].level || 0) === lv && ALCOVE.indexOf(rooms[j].type) >= 0 && touch([piece], rooms[j].rects) >= side)
+          .sort((p, q) => ALCOVE.indexOf(rooms[p].type) - ALCOVE.indexOf(rooms[q].type));
+        for (const j of by) if (tryCut(i, far, len - keep, j)) break;
+        return;
+      }
+      // ---- oversized rooms give back rows along an outer wall
+      if (NO_TRIM.has(rm.type) || !rm.target || rm.parent !== undefined) return;
+      const area = TG.rarea(r);
+      if (area < rm.target * 1.12) return;
+      const opts = [];
+      for (const side of ['N', 'W', 'E']) {
+        const edge = side === 'N' ? TG.rw(r) : TG.rh(r), dim = side === 'N' ? TG.rh(r) : TG.rw(r);
+        const k = Math.min(Math.floor((area - rm.target) / edge), dim - (ty.minW || 2));
+        if (k < 1) continue;
+        const rest = cut(r, side, k)[0];
+        if (ty.maxAsp && TG.rlong(rest) / TG.rshort(rest) > ty.maxAsp) continue;
+        opts.push({ side, k });
+      }
+      opts.sort((p, q) => q.k - p.k || (p.side === 'N' ? -1 : 1));
+      for (const o of opts) if (tryCut(i, o.side, o.k)) break;
+    });
+  }
+
   function finish(B, P, ctx, rng, info, meta) {
     // everything inside the site
     for (const rm of B.rooms) for (const r of rm.rects) if (!ctx.site.mask.all(r, 1)) return why(ctx, 'site:outside');
+    pockets(B);
     if (!portals(B, P, ctx, rng, info)) return null;
     // garage -> house door
     if (info.garage >= 0) {
@@ -644,7 +738,9 @@
     const { pub, priv } = groups(P), gar = garageDims(P, rng);
     const Apub = sumA(pub), Apriv = privArea(P, priv);
     const gw = gar && BW - gar.w >= 14 ? gar.w : 0;
-    const Wb = Math.min(BW - gw, Math.max(14, Math.round(Math.sqrt((Apub + Apriv) * rng.range(0.55, 0.9)))));
+    // (wide enough for the hallway with a room either side of it)
+    const two = priv.map((e) => T[e.type].minW).sort((a, b) => b - a).slice(0, 2).reduce((a, b) => a + b, 0);
+    const Wb = Math.min(BW - gw, Math.max(14, Math.max(2, P.hallW) + two, Math.round(Math.sqrt((Apub + Apriv) * rng.range(0.55, 0.9)))));
     if (Wb < 12) return why(ctx, 'deep:narrow');
     const Dp = Math.max(10, Math.ceil(Apub / Wb)), Dq = Math.max(8, Math.ceil(Apriv / Wb), runNeed(P, priv, Wb));
     if (Dp + Dq > BD) return why(ctx, 'deep:shallow');
@@ -778,12 +874,18 @@
     if (P.storeys > 1) return planStack(P, ctx, rng);
     const w = Object.assign({}, ctx.arch.plans || { bar: 1 });
     const type = rng.weighted(w);
-    return PLANS[type] ? PLANS[type](P, ctx, rng) : null;
+    if (!PLANS[type]) return null;
+    // a 1 m hallway only where a 1.5 m one leaves no room
+    return PLANS[type](P, ctx, rng) || (P.hallW > 2 ? PLANS[type](Object.assign({}, P, { hallW: 2 }), ctx, rng) : null);
   }
   function fallback(P, ctx, rng) {
-    // trim the program to the essentials and try every plan type a few times
+    // trim the program to the essentials and try every plan type a few times,
+    // then again with a 1 m hallway (a small house on a tight site)
     const Q = Object.assign({}, P, { rooms: P.rooms.filter((e) => ['living', 'kitchen', 'bath', 'bedroom', 'master'].indexOf(e.type) >= 0).slice(0, 5), garage: null });
-    for (let k = 0; k < 40; k++) for (const f of P.storeys > 1 ? [planStack] : [planDeep, planBar]) { const p = f(Q, ctx, rng); if (p) return p; }
+    for (const hallW of P.hallW > 2 ? [P.hallW, 2] : [P.hallW]) {
+      Q.hallW = hallW;
+      for (let k = 0; k < 40; k++) for (const f of P.storeys > 1 ? [planStack] : [planDeep, planBar]) { const p = f(Q, ctx, rng); if (p) return p; }
+    }
     return null;
   }
 
@@ -842,7 +944,7 @@
       const big = rm.rects.reduce((b, r) => (TG.rarea(r) > TG.rarea(b) ? r : b), rm.rects[0]);
       const ty = T[rm.type], asp = TG.rlong(big) / Math.max(1, TG.rshort(big));
       if (ty.maxAsp && asp > ty.maxAsp) t += (asp - ty.maxAsp) * 4;
-      if (ty.win && ty.win.need && ctx.arch.windows !== 0 && exteriorLen(rm, rooms) < 2) t += ty.win.need === 2 ? 10 : 3;
+      if (TPL.WINDOWS && ty.win && ty.win.need && ctx.arch.windows !== 0 && exteriorLen(rm, rooms) < 2) t += ty.win.need === 2 ? 10 : 3;
     }
     if (n) t += (err / n) * 25;
     for (const k of byType('kitchen')) if (!byType('dining').concat(byType('family')).some((d) => touch(k.rects, d.rects) >= 4) && byType('dining').length) t += 6;
@@ -873,7 +975,9 @@
     const main = res.openings.find((o) => o.kind === 'entrance' && o.conn && o.conn.main);
     if (main) {
       const w = res.walls[main.wall], r = w.lo >= 0 ? w.lo : w.hi;
-      if (['foyer', 'living'].indexOf(rooms[r].type) < 0) t.entry = 4;
+      // the front door opens into the foyer when there is one, else the living room
+      const want = rooms.some((rm) => rm.type === 'foyer' && !rm.level) ? ['foyer'] : ['foyer', 'living'];
+      if (want.indexOf(rooms[r].type) < 0) t.entry = 4;
     }
     return t;
   }
@@ -883,7 +987,7 @@
     twin: { weight: 1, label: 'a room repeats' },
     giant: { weight: 1, label: 'one room is far too big' },
     endless: { weight: 0.8, label: 'the hallway keeps going' },
-    windowless: { weight: 0.6, label: 'no windows anywhere' },
+    windowless: { weight: 0.6, label: 'no windows anywhere', requires: () => TPL.WINDOWS },     // (windows are off for now: framework.js)
     stairs: { weight: 0.8, label: 'stairs up into the ceiling' },
     falseDoors: { weight: 0.9, label: 'doors that open onto walls' },
     ceiling: { weight: 0.8, label: 'a ceiling at the wrong height' }
@@ -905,7 +1009,7 @@
   }
 
   TPL.registerEngine({
-    id: 'house', name: 'House', types: T, mutations: MUTATIONS,
+    id: 'house', name: 'House', types: T, mutations: MUTATIONS, inside: true, wallsOut: true,
     program, layout, fallback, quickScore, score, connRule, autoPenalty, postResolve,
     _internal: { touch, slice, layoutPrivate, PLANS }
   });

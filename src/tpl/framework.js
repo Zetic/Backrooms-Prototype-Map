@@ -30,6 +30,10 @@
   const TPL = BR.TPL = BR.TPL || {};
   TPL.SCHEMA = 'br.building/0.2';
   TPL.OUTSIDE = -1;                       // 'the backrooms around the template' as a connection target
+  // Windows are off for now, while the work is on layouts, doorways,
+  // walkways and interior walls. Room types keep their window rules, so
+  // turning this back on restores them.
+  TPL.WINDOWS = false;
   TPL.engines = TPL.engines || {};
   TPL.archetypes = TPL.archetypes || {};
   TPL.registerEngine = (e) => { TPL.engines[e.id] = e; };
@@ -262,16 +266,20 @@
       }
     }
 
-    // ---- reachability from the outside (through portals and verticals)
+    // ---- reachability from the outside (through portals and verticals). An
+    // engine that keeps a building whole inside (`inside`: a house) is
+    // reached from its front door through its own rooms alone: a garage wing
+    // whose only way in is the garage door gets a door into the house
     const verts = plan.verticals || [];
+    const front = E.inside ? res.links.find((Lk) => Lk.b === OUT && Lk.opening !== null && res.openings[Lk.opening].conn && res.openings[Lk.opening].conn.main) : null;
     const reach = () => {
       const N = rooms.length, adj = rooms.map(() => []);
       adj.push([]);
-      const link = (a, b) => { const x = a < 0 ? N : a, y = b < 0 ? N : b; adj[x].push(y); adj[y].push(x); };
+      const link = (a, b) => { if (front && (a < 0 || b < 0)) return; const x = a < 0 ? N : a, y = b < 0 ? N : b; adj[x].push(y); adj[y].push(x); };
       for (const Lk of res.links) if (Lk.kind === 'open' || PASS[Lk.kind]) link(Lk.a, Lk.b);
       for (const v of verts) for (let k = 1; k < v.rooms.length; k++) link(v.rooms[k - 1], v.rooms[k]);
-      const seen = new Uint8Array(N + 1), st = [N];
-      seen[N] = 1;
+      const seen = new Uint8Array(N + 1), st = [front ? front.a : N];
+      seen[st[0]] = 1;
       while (st.length) { const u = st.pop(); for (const v of adj[u]) if (!seen[v]) { seen[v] = 1; st.push(v); } }
       return seen;
     };
@@ -300,7 +308,7 @@
 
     // ---- engine hook (false doors, oddities), then windows
     if (E.postResolve) E.postResolve(res, { addOpening, lineFree, rng, ctx, rooms });
-    const windows = ctx.arch.windows === undefined ? 1 : ctx.arch.windows;
+    const windows = !TPL.WINDOWS ? 0 : ctx.arch.windows === undefined ? 1 : ctx.arch.windows;
     if (!ctx.mut.has('windowless') && windows > 0) {
       for (const w of res.walls) {
         if (w.kind !== 'exterior') continue;
@@ -340,7 +348,7 @@
       const big = rm.rects.reduce((b, r) => (TG.rarea(r) > TG.rarea(b) ? r : b), rm.rects[0]);
       const asp = TG.rlong(big) / Math.max(1, TG.rshort(big));
       if (ty.maxAsp && asp > ty.maxAsp) add('proportion', (asp - ty.maxAsp) * 4);
-      if (ty.win && ty.win.need && !ctx.mut.has('windowless') && ctx.arch.windows !== 0) {
+      if (TPL.WINDOWS && ty.win && ty.win.need && !ctx.mut.has('windowless') && ctx.arch.windows !== 0) {
         const has = res.openings.some((o) => o.kind === 'window' && (res.walls[o.wall].lo === i || res.walls[o.wall].hi === i));
         if (!has) add('noWindow', ty.win.need === 2 ? 10 : 3);
       }
@@ -418,12 +426,25 @@
       };
     });
     const THICK = { exterior: 0.3, interior: 0.15, open: 0 };
-    const walls = res.walls.map((w) => ({
-      id: 'w' + w.id, level: w.level, kind: w.kind,
-      a: w.o === 'h' ? P(m(w.s0), m(w.c)) : P(m(w.c), m(w.s0)),
-      b: w.o === 'h' ? P(m(w.s1), m(w.c)) : P(m(w.c), m(w.s1)),
-      rooms: [id(w.lo), id(w.hi)], thickness: THICK[w.kind] || 0
-    }));
+    // An engine with `wallsOut` lays its outer walls outside its rooms: the
+    // line a-b is the wall's inner face and the wall runs `thickness` toward
+    // `out` (a unit vector), so a room's rects are its clear floor along the
+    // outside. Interior walls stay centred on their line.
+    const outOf = (w) => {
+      const sg = w.lo < 0 ? -1 : 1, mid = (w.s0 + w.s1) / 2;
+      const p0 = w.o === 'h' ? P(m(mid), m(w.c)) : P(m(w.c), m(mid)), p1 = w.o === 'h' ? P(m(mid), m(w.c + sg)) : P(m(w.c + sg), m(mid));
+      return [Math.round((p1[0] - p0[0]) / G), Math.round((p1[1] - p0[1]) / G)];
+    };
+    const walls = res.walls.map((w) => {
+      const o = {
+        id: 'w' + w.id, level: w.level, kind: w.kind,
+        a: w.o === 'h' ? P(m(w.s0), m(w.c)) : P(m(w.c), m(w.s0)),
+        b: w.o === 'h' ? P(m(w.s1), m(w.c)) : P(m(w.c), m(w.s1)),
+        rooms: [id(w.lo), id(w.hi)], thickness: THICK[w.kind] || 0
+      };
+      if (ctx.engine.wallsOut && w.kind === 'exterior') o.out = outOf(w);
+      return o;
+    });
     const openings = res.openings.map((op) => {
       const w = res.walls[op.wall];
       const pa = w.o === 'h' ? [op.s0, w.c] : [w.c, op.s0], pb = w.o === 'h' ? [op.s1, w.c] : [w.c, op.s1];

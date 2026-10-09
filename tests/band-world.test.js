@@ -73,9 +73,9 @@ console.log('ok   invalid portal matching, region sizes and band indices rejecte
 // ---- growth (growth.js): pillars, floors stacked over floors, legs, arrivals
 // in the next band. A column of the world holds several claims, stacked.
 const GROWTH = BR.GROWTH, CL = BR.BAND_CFG.ceilingLimit, EPS = 1e-7;
-const KNOWN = { seed: 7, i: 0, j: 2 };             // band 0: a townhouse's growth, 6 floors at +9.5 m over two cells, a pit, and a climb to band 1
+const KNOWN = { seed: 7, i: -3, j: 0 };            // band 0: a townhouse's growth, 5 floors at +9.5 m over three cells, a pit, and a climb to band 1
 const MULTI = { seed: 7, i: 0, j: 1 };             // band 0: a two-storey house's growth: floors at +6.5 m, a leg up to +9.5 m, and a climb to band 1
-const CROSS = { seed: 31337, i: -1, j: 1 };        // band 0: a growth whose floors spread over two cells
+const CROSS = { seed: 31337, i: -2, j: -4 };       // band 0: a growth whose floors spread over two cells
 const w7 = new BR.BandWorld(7);
 const at = (rects, p) => rects.some((q) => p[0] >= q[0] && p[0] < q[2] && p[1] >= q[1] && p[1] < q[3]);
 const span = (cells) => [Math.min(...cells.map((c) => c[0])), Math.min(...cells.map((c) => c[1])), Math.max(...cells.map((c) => c[0])), Math.max(...cells.map((c) => c[1]))];
@@ -113,7 +113,6 @@ function claimsOf(w, G) {
   assert.equal(G.floorZ, 9.5); assert(G.steered && G.arrival, 'steered, and it arrives');
   assert(G.cells.length >= 2, 'it may grow into a neighbouring cell');
   assert.equal(w.cell(KNOWN.i, KNOWN.j, 0).sites.find((s) => s.id === G.anchor).kind, 'lot', 'its anchor is a house on its own lot');
-  // (its plan placed a two-storey house for it, whose landing found no ground to open onto: another house of the cell that seeds growth carries on up)
   assert(w.cell(KNOWN.i, KNOWN.j, 0).pois.some((P) => P.grows) && BR.TPL.archetypes[G.archetype].grows, 'a house that seeds growth, in the cell its plan placed one');
   // the landing: the house's own stair carried on up, and a door into the growth
   const host = w.spatial(w.site(G.anchor)), house = host.buildings.find((x) => x.poi.id === G.poi);

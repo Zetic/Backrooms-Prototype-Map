@@ -170,7 +170,8 @@ console.log('     avg ' + (ms / Math.max(1, total - errors)).toFixed(1) + ' ms p
     const v = (b.verticals || [])[0];
     if (c.length) { okAll = false; why = c.slice(0, 2).join('; '); break; }
     if (lv.length !== 3 || lv[1].elevation !== 4 || !v || v.rooms.length !== 3) { okAll = false; why = 'levels / verticals wrong'; break; }
-    if (!b.walls.some((w) => w.level === 2) || !b.openings.some((o) => o.level === 2 && o.kind === 'window')) { okAll = false; why = 'upper level has no walls / windows'; break; }
+    // (windows only while they are on: TPL.WINDOWS)
+    if (!b.walls.some((w) => w.level === 2) || (TPL.WINDOWS && !b.openings.some((o) => o.level === 2 && o.kind === 'window'))) { okAll = false; why = 'upper level has no walls / windows'; break; }
   }
   check('multi-level buildings: levels, stacked stairs, reachable upper floors', okAll, why);
   // a broken stack must be caught

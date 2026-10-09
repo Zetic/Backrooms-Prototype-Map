@@ -28,9 +28,11 @@
   // ------------------------------------------------------------ rooms
   // `biomes`: the growth biomes a room type belongs to (biomes.js): the house
   // rooms are what a `houseroom` branch's floors are made of (fillers/house.js)
+  // (a foyer and a bathroom are at least 2 m across: a front door opens into a
+  // room, not a passage, and a tub fits across a bathroom)
   const ROOMS = {
     // living
-    foyer: { zone: 'public', minW: 3, maxAsp: 3, area: [4, 7], ceil: [2.5, 2.9], tags: ['entry'], biomes: ['houseroom'], lone: { pool: 'weird' } },
+    foyer: { zone: 'public', minW: 4, maxAsp: 3, area: [4, 7], ceil: [2.5, 2.9], tags: ['entry'], biomes: ['houseroom'], lone: { pool: 'weird' } },
     living: { zone: 'public', minW: 7, maxAsp: 2.2, area: [16, 26], ceil: [2.5, 2.9], tags: ['living', 'social'], biomes: ['houseroom'], lone: { pool: 'weird' } },
     family: { zone: 'public', minW: 7, maxAsp: 2.2, area: [14, 20], ceil: [2.4, 2.7], tags: ['living', 'social'], label: 'family room', biomes: ['houseroom'], lone: { pool: 'weird' } },
     dining: { zone: 'public', minW: 6, maxAsp: 2, area: [9, 13], ceil: [2.4, 2.7], tags: ['dining', 'social'], biomes: ['houseroom'], lone: { pool: 'weird' } },
@@ -39,8 +41,8 @@
     // sleeping and washing
     bedroom: { zone: 'private', minW: 6, maxAsp: 2, area: [9, 13], ceil: [2.4, 2.6], tags: ['sleeping', 'private'], biomes: ['houseroom'], lone: { pool: 'weird' } },
     master: { zone: 'private', minW: 7, maxAsp: 2, area: [13, 18], ceil: [2.4, 2.8], tags: ['sleeping', 'private', 'primary'], label: 'master bedroom', biomes: ['houseroom'], lone: { pool: 'weird', weight: 0.6 } },
-    bath: { zone: 'private', minW: 3, maxAsp: 3, area: [4, 6], ceil: [2.3, 2.5], tags: ['bathroom', 'wet', 'private'], label: 'bathroom', biomes: ['houseroom'], lone: { pool: 'weird' } },
-    ensuite: { zone: 'private', minW: 3, maxAsp: 3, area: [4, 6], ceil: [2.3, 2.5], tags: ['bathroom', 'wet', 'private', 'ensuite'], biomes: ['houseroom'], lone: { pool: 'weird', weight: 0.5 } },
+    bath: { zone: 'private', minW: 4, maxAsp: 3, area: [4, 6], ceil: [2.3, 2.5], tags: ['bathroom', 'wet', 'private'], label: 'bathroom', biomes: ['houseroom'], lone: { pool: 'weird' } },
+    ensuite: { zone: 'private', minW: 4, maxAsp: 3, area: [4, 6], ceil: [2.3, 2.5], tags: ['bathroom', 'wet', 'private', 'ensuite'], biomes: ['houseroom'], lone: { pool: 'weird', weight: 0.5 } },
     cell: { zone: 'private', minW: 3, maxAsp: 3, ceil: [2.4, 2.6], tags: ['sleeping', 'cell'], lone: { pool: 'weird', site: { w: [2, 3], h: [2.5, 3.5] } } },
     // storage
     closet: { zone: 'service', minW: 2, maxAsp: 4, ceil: [2.2, 2.4], tags: ['storage', 'closet'], lone: { template: 'closet' } },

@@ -39,8 +39,15 @@ Open `workbench.html` to browse, compare and debug templates (section 9).
 * **Kit grid: 0.5 m.** Every room edge, wall and opening edge is a multiple of
   0.5 m, so an Unreal modular kit built on 0.5 / 1 / 2 / 4 m pieces lines up
   exactly.
-* **Walls are centre lines.** Rooms are measured boundary to boundary.
-  Suggested thickness comes with each wall: exterior 0.3 m, interior 0.15 m.
+* **Walls are lines on room boundaries.** Rooms are measured boundary to
+  boundary. Suggested thickness comes with each wall: exterior 0.3 m,
+  interior 0.15 m. An interior wall is centred on its line. A wall with
+  `out` (a house's outer walls) is laid outside its rooms: its line is the
+  wall's inner face and the wall runs its thickness toward `out`, so a room's
+  rects are its clear floor along the outside of the house.
+* **Windows are off for now** (`TPL.WINDOWS = false`, `tpl/framework.js`):
+  no template and no seam rule puts a window in. Room types keep their window
+  rules, so turning the flag on brings them back.
 * **Site frame.** The origin is the site's bounding-box corner. +x goes right
   and +y goes down (the same as the map).
 * **Turning to the main side.** Engines design in a canonical frame with the
@@ -100,7 +107,7 @@ Lengths are in metres in the site frame. Ids are stable within a building.
 | `levels[]` | `{ index, elevation, height }`; there is at least one. A storey of a house, or a gallery's own floor (tpl/floors.js) |
 | `footprint[]` | `{ level, rects }`: built cells per level |
 | `rooms[]` | `{ id, type, name, zone, level, rects, area, ceiling, tags, parent, part? }`. `zone`: public, private, service or circulation. `tags` describe what the room is for (`kitchen`, `wet`, `sleeping`, `storage`, `vehicle`…, plus `wrong:*` for mutations). `parent`: the owning room of closets, ensuites and stalls (and of a sunken floor, a gallery or an undercroft: the room it was cut from). `part`: in a composite template, the part (`parts[]`) the room belongs to, `null` for the composite's own rooms. `floor` (optional, m): the room's floor offset from its level, such as `-0.6` for a sunken floor; its `ceiling` is measured from that floor |
-| `walls[]` | `{ id, level, kind, a, b, rooms [idA, idB], thickness }`. `kind`: `exterior` (one side is the backrooms; that room id is `null`), `interior`, `open` (a boundary with no wall), `facade` (in a composite template: a part's outer wall against the composite's own rooms, such as a house front onto its yard; both room ids are set, thickness as exterior) |
+| `walls[]` | `{ id, level, kind, a, b, rooms [idA, idB], thickness, out? }`. `out`: a unit vector on an outer wall laid outside its rooms (section 1), pointing away from the room. `kind`: `exterior` (one side is the backrooms; that room id is `null`), `interior`, `open` (a boundary with no wall), `facade` (in a composite template: a part's outer wall against the composite's own rooms, such as a house front onto its yard; both room ids are set, thickness as exterior) |
 | `openings[]` | `{ id, level, wall, kind, a, b, width, rooms, swingInto, hinge, height \| sill+head, portal, part?, tags? }`. `kind`: `door`, `double`, `opening` (cased, no leaf), `slider`, `vehicle` (garage/roller door), `window`, `false` (a door on a wall that leads nowhere). In a composite, `part` names the part it came from, and a part's former portal keeps its tags (`front door`, `garage door`) |
 | `portals[]` | `{ id, opening, level, room, role, kind, side, width, clear, main, tags }`. Where the POI meets the backrooms. `role`: `entrance`, `exit` or `both`. `main` marks the main entrance. `clear`: metres of open floor the world must keep in front |
 | `verticals[]` | `{ id, kind, rooms: [bottom → top], dead, tags, shape?, types?, walled?, local? }`: stairs, lifts, ladders linking stacked rooms (a stairwell's storeys), or a floor and one beside it at another height (`local`: a sunken floor), or a hall and its gallery. `dead: true` means it leads nowhere (a mutation). The hints tell the elevation layer what to build: `shape` (`switchback`, `straight`) to try first, `types` in order, `walled` (the flight runs along a real wall) |
@@ -231,10 +238,12 @@ portals: [{ role: 'both', kind: { door: 0.6, double: 0.4 }, side: 'S' },   // th
    * walls per level, from a raster of rooms;
    * explicit connections first, then `engine.connRule` for adjacent pairs;
    * portals on the exterior walls of the requested side;
-   * reachability from outside through portals and verticals, with doors
+   * reachability from outside through portals and verticals (from the front
+     door, never back outside, for an engine with `inside`), with doors
      added (`engine.autoPenalty`) wherever a room would be cut off;
    * `engine.postResolve` (mutations such as false doors);
-   * windows from each room type's rule (recipe `windows: 0..1`).
+   * windows from each room type's rule (recipe `windows: 0..1`), while
+     `TPL.WINDOWS` is on.
 6. **score and validate.** Generic penalties (sizes, proportions, missing
    windows, circulation share, extra doors, missing links) plus engine terms.
    Score = 100 − penalties. The best valid candidate wins.
@@ -259,6 +268,20 @@ Current engines:
   * The private wing searches hall position, master endcap and side
     assignment. It produces an ensuite and walk-in closet around a vestibule,
     plus reach-in closets carved beside bedroom doors.
+  * Hallways are 1.5 m (a recipe's `hall.w`), foyers and bathrooms at least
+    2 m. A plan that fits only with a 1 m hallway gets one.
+  * **Solid pockets.** Rooms keep about their own size: a room that a zone
+    stretched well past what it asked for gives rows back along its back or
+    side wall, and a linen closet, closet or pantry running deep from its
+    door is cut to 1 m (a pantry 1.5 m). What they give up is left outside,
+    as a notch or jog in the outline, or, inside the house, becomes an alcove
+    of the room beside it. Never the front, the garage, hallways or stairs,
+    never beside a hallway, never under or over another storey, and every
+    wall a room shares keeps room for its door.
+  * The front door opens into the foyer when there is one. Every room is
+    reached from the front door without going outside (the engine's
+    `inside`): a garage wing gets its door into the house.
+  * Outer walls are laid outside the rooms (`wallsOut`, section 1).
   * A garage comes with a service room behind it.
   * Portals as above.
   * `stack` (two or three storeys over one footprint): a stair core up one
@@ -367,7 +390,7 @@ BR.TPL.registerArchetype({
 
 | engine | mutations |
 |---|---|
-| house | `twin` (a room repeats), `giant` (one room far too big), `endless` (the hallway keeps going), `windowless`, `stairs` (a staircase into the ceiling), `falseDoors` (doors onto walls), `ceiling` (a ceiling at the wrong height) |
+| house | `twin` (a room repeats), `giant` (one room far too big), `endless` (the hallway keeps going), `windowless` (while windows are on), `stairs` (a staircase into the ceiling), `falseDoors` (doors onto walls), `ceiling` (a ceiling at the wrong height) |
 | room | `falseDoors`, `ceiling` |
 | neighborhood | `twins` (every house is the same house), `vacant` (one lot stands empty); each house also draws its own |
 

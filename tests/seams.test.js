@@ -51,7 +51,8 @@ for (const s of W0.cell(0, 0).sites.slice(0, 30)) for (const S of W0.seams(s)) a
   const inHood = house.filter(({ S }) => (S.a.kind[0] === 'house' ? S.a : S.b).part);
   check('a house inside a neighborhood is matched as a house', inHood.length > 0 && inHood.every(({ S }) => S.a.kind.concat(S.b.kind).indexOf('filler') >= 0), `${inHood.length} house-backrooms seams`);
   const ops = house.flatMap(({ S }) => S.openings), doors = ops.filter((o) => o.kind === 'door').length, wins = ops.filter((o) => o.kind === 'window').length;
-  check('seam rules cut windows and doors through some of them', doors > 0 && wins > 0, `${wins} windows, ${doors} doors on ${house.length} seams`);
+  // (no windows while they are off: TPL.WINDOWS)
+  check('seam rules cut windows and doors through some of them', doors > 0 && (BR.TPL.WINDOWS ? wins > 0 : wins === 0), `${wins} windows, ${doors} doors on ${house.length} seams`);
   check('no rule, no opening (filler against filler, yards, the street)', all.every(({ S }) => S.rule || !S.openings.length));
   // every opening: inside its seam, clear of the ends and of what either side already has there
   const R = SEAM.RULES[0];
@@ -76,7 +77,7 @@ for (const s of W0.cell(0, 0).sites.slice(0, 30)) for (const S of W0.seams(s)) a
   }
   check('a seam opening sits inside its seam, clear of its ends and of every other opening, in a room the rule allows', bad.length === 0, bad.slice(0, 3).join('; '));
   // a house window already on a seam looks into the room next door: it is recorded
-  check('a window a house already had on a seam is recorded as looking through', house.some(({ S }) => S.through.some((o) => o.kind === 'window')));
+  if (BR.TPL.WINDOWS) check('a window a house already had on a seam is recorded as looking through', house.some(({ S }) => S.through.some((o) => o.kind === 'window')));
 }
 
 // ---- 3. a seam door has floor in front of it on both sides, and joins the world graph
@@ -129,7 +130,11 @@ for (const s of W0.cell(0, 0).sites.slice(0, 30)) for (const S of W0.seams(s)) a
   const run = (rules, seed) => hoods.flatMap((h) => { const items = [h.site].concat(h.W.neighbours(h.site)).map((x) => h.W.blueprints(x)); return SEAM.between(items[0], [].concat(...items.slice(1)), { seed: seed || 1, rules }); });
   check('no rules, no openings', run([]).every((S) => !S.openings.length && !S.rule));
   const coin = [{ id: 'coin', a: ['house'], b: ['filler'], window: { p: 0.5, w: [1, 1] } }], sig = (L) => strip(L.map((S) => S.openings));
+  // (a window coin: rolled with windows on for this check)
+  const was = BR.TPL.WINDOWS;
+  BR.TPL.WINDOWS = true;
   check('the dice are the seam\'s own: the same seed rolls the same, another seed rolls differently', sig(run(coin, 5)) === sig(run(coin, 5)) && sig(run(coin, 5)) !== sig(run(coin, 6)));
+  BR.TPL.WINDOWS = was;
   const always = [{ id: 'always', a: ['house'], b: ['filler'], door: { p: 1, w: [1, 1] }, doors: 99 }];
   const got = run(always), houseSeams = got.filter((S) => S.rule === 'always'), withDoor = houseSeams.filter((S) => S.openings.length);
   check('a rule with chance 1 cuts a door wherever one fits', houseSeams.length > 0 && withDoor.length > 0 && withDoor.every((S) => S.openings[0].kind === 'door'), `${withDoor.length} of ${houseSeams.length} seams`);

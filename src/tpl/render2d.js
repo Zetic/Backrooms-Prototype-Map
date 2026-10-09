@@ -184,8 +184,9 @@
     for (const kind of ['interior', 'exterior']) {
       g.strokeStyle = kind === 'exterior' ? TH.wall : TH.thin;
       g.lineWidth = Math.max(kind === 'exterior' ? 2 : 1, (kind === 'exterior' ? 0.3 : 0.15) * S);
+      if (kind === 'exterior') { g.fillStyle = TH.wall; for (const q of runs.exterior) if (q.out) outsideBand(g, q, runs.exterior, X, Y, S); }
       g.beginPath();
-      for (const q of runs[kind]) { g.moveTo(X(q[0]), Y(q[1])); g.lineTo(X(q[2]), Y(q[3])); }
+      for (const q of runs[kind]) if (!q.out) { g.moveTo(X(q[0]), Y(q[1])); g.lineTo(X(q[2]), Y(q[3])); }
       if (kind === 'exterior') for (const c of curves) poly(c.pts);
       g.lineJoin = 'round';
       g.stroke();
@@ -279,12 +280,36 @@
       });
       for (const k of cuts) if (k.o === (horiz ? 'h' : 'v') && Math.abs(k.c - c) < 1e-9 && k.s1 > s0 && k.s0 < s1) gaps.push([k.s0, k.s1]);
       gaps.sort((p, q) => p[0] - q[0]);
-      const seg = (p, q) => { if (q - p > 1e-6) list.push(horiz ? [p, c, q, c] : [c, p, c, q]); };
+      const seg = (p, q) => {
+        if (q - p <= 1e-6) return;
+        const run = horiz ? [p, c, q, c] : [c, p, c, q];
+        if (w.out) { run.out = w.out; run.t = w.thickness || 0.3; }
+        list.push(run);
+      };
       let t = s0;
       for (const gp of gaps) { seg(t, gp[0]); t = Math.max(t, gp[1]); }
       seg(t, s1);
     }
     return out;
+  }
+
+  /**
+   * An outer wall laid outside its rooms (a wall with `out`): the band from
+   * its line `t` toward `out`, carried round a corner where the next outer
+   * wall turns away from the room, so corners close.
+   */
+  function outsideBand(g, q, all, X, Y, S) {
+    const horiz = q[1] === q[3], t = q.t, n = q.out, eq = (a, b) => Math.abs(a - b) < 1e-6;
+    let s0 = horiz ? q[0] : q[1], s1 = horiz ? q[2] : q[3];
+    const c = horiz ? q[1] : q[0];
+    const turnsOut = (px, py, dir) => all.some((o) => o !== q && o.out && (o[1] === o[3]) !== horiz
+      && ((eq(o[0], px) && eq(o[1], py)) || (eq(o[2], px) && eq(o[3], py))) && (horiz ? o.out[0] : o.out[1]) === dir);
+    if (horiz ? turnsOut(s0, c, -1) : turnsOut(c, s0, -1)) s0 -= t;
+    if (horiz ? turnsOut(s1, c, 1) : turnsOut(c, s1, 1)) s1 += t;
+    const c0 = Math.min(c, c + (horiz ? n[1] : n[0]) * t), c1 = Math.max(c, c + (horiz ? n[1] : n[0]) * t);
+    const r = horiz ? [s0, c0, s1, c1] : [c0, s0, c1, s1];
+    const px = (v) => Math.max(1, v * S);
+    g.fillRect(X(r[0]), Y(r[1]), px(r[2] - r[0]), px(r[3] - r[1]));
   }
 
   function drawOpening(g, op, rooms, X, Y, S, TH) {

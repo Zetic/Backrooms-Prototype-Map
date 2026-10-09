@@ -39,7 +39,8 @@ assert(w._tiles.map.size<=260,'continuous height retains bounded tile memory');
   // the ground is painted whole (floors, walls, tags) before any raised floor at
   // or under the cut, which blanks its claim first: nothing of the ground shows over it
   {
-    const isRaised = (c) => String(c.b.fillId).startsWith(B.id) || v.raisedIn(mid[0]-60,mid[1]-60,mid[0]+60,mid[1]+60).some((rs)=>v.raisedBuild(rs).filler===c.b);
+    // (any growth's floor is a raised one: a neighbouring growth's floors can share the tile)
+    const isRaised = (c) => String(c.b.fillId).startsWith('growth:') || v.raisedIn(mid[0]-60,mid[1]-60,mid[0]+60,mid[1]+60).some((rs)=>v.raisedBuild(rs).filler===c.b);
     const tiles = new Set(drawn.map((c)=>c.ctx)); let seen = 0;
     for (const t of tiles) {
       const list = drawn.filter((c)=>c.ctx===t), first = list.findIndex(isRaised);
