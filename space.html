@@ -59,12 +59,15 @@
   <div class="bar">
     <div class="g2"><span>House</span><select id="recipe"></select></div>
     <div class="g2"><span>Seed</span><input id="seed" type="number" value="1"><button id="prev">‹</button><button id="next">›</button><button id="rand">Random</button></div>
-    <div class="tabs"><button id="vGrid" class="on">12 seeds</button><button id="vOne">One house</button></div>
+    <div class="tabs"><button id="vGrid" class="on">12 seeds</button><button id="vOne">One house</button><button id="vCompare">Compare shapes</button></div>
     <label class="tg"><input id="labels" type="checkbox" checked> names</label>
     <label class="tg"><input id="sizes" type="checkbox" checked> sizes</label>
     <label class="tg"><input id="kinds" type="checkbox" checked> interior walls shaded</label>
     <label class="tg"><input id="route" type="checkbox" checked> route</label>
     <div class="g2" id="wrongBox"><span>Wrongness</span><input id="wrong" type="range" min="0" max="1" step="0.05"><span id="wrongV"></span><button id="wrongReset" title="back to the house type's own value">reset</button></div>
+    <label class="tg"><input id="experiment" type="checkbox"> Shape experiment</label>
+    <div class="g2"><span>Halls</span><select id="hallShape"><option>mixed</option><option>straight</option><option>L</option><option>T</option></select></div>
+    <div class="g2"><span>Living</span><select id="livingShape"><option>mixed</option><option>rectangle</option><option>L</option><option>alcove</option></select></div>
     <button id="check" class="primary">Check 40 seeds of each</button>
   </div>
   <div class="key" id="key"></div>
@@ -72,18 +75,20 @@
 <main>
   <div id="grid"></div>
   <div id="one"><div class="view"><canvas id="big"></canvas></div><div id="side"></div></div>
+  <div id="compare" style="display:none"></div>
   <div id="report"></div>
 </main>
 <script src="src/core.js"></script>
 <script src="src/space/recipes.js"></script>
 <script src="src/space/space.js"></script>
 <script src="src/space/route.js"></script>
+<script src="src/space/shapes.js"></script>
 <script src="src/space/render.js"></script>
 <script>
 (function () {
   'use strict';
   const SP = BR.SPACE, $ = (id) => document.getElementById(id);
-  const state = { recipe: 'passage', seed: 1, view: 'grid', wrong: null };
+  const state = { recipe: 'passage', seed: 1, view: 'grid', wrong: null, experiment:false, hallShape:'mixed', livingShape:'mixed' };
   try { Object.assign(state, JSON.parse(localStorage.getItem('space-lab') || '{}')); } catch (e) { /* no storage */ }
   const save = () => { try { localStorage.setItem('space-lab', JSON.stringify(state)); } catch (e) { /* no storage */ } };
   for (const id of Object.keys(SP.RECIPES)) { const o = document.createElement('option'); o.value = id; o.textContent = SP.RECIPES[id].name; $('recipe').appendChild(o); }
@@ -92,7 +97,8 @@
     .map(([k, t]) => '<span><i class="sw" style="background:' + C[k] + '"></i>' + t + '</span>').join('');
   const opts = () => ({ labels: $('labels').checked, sizes: $('sizes').checked, kinds: $('kinds').checked, route: $('route').checked });
   const isRoute = () => !!SP.RECIPES[state.recipe].route;
-  const gen = (seed) => SP.generate(Object.assign({ recipe: state.recipe, seed }, isRoute() && state.wrong !== null ? { wrong: state.wrong } : {}));
+  const shapeOptions = () => ({hall:state.hallShape,living:state.livingShape});
+  const gen = (seed, shaped=state.experiment) => SP.generate(Object.assign({ recipe: state.recipe, seed }, isRoute() && state.wrong !== null ? { wrong: state.wrong } : {}, shaped ? {shapes:shapeOptions()} : {}));
   const FLOOR = ['ground floor', 'upstairs', 'top floor'];
 
   /** every floor of h side by side on one canvas */
@@ -140,7 +146,7 @@
     drawFloors($('big'), h, maxW, Math.max(420, window.innerHeight - 220), opts());
     const bad = SP.verify(h), floor = h.spaces.filter((sp) => !(sp.type === 'stair' && sp.floor > 0)).reduce((t, sp) => t + sp.area, 0), byId = {};
     for (const sp of h.spaces) byId[sp.id] = sp;
-    const rows = h.spaces.map((sp) => '<tr><td>' + sp.name + (h.floors > 1 ? ' <span class="mut">' + ['G', '1', '2'][sp.floor] + '</span>' : '') + '</td><td class="n">' + sp.size[0].toFixed(2) + ' × ' + sp.size[1].toFixed(2) + '</td><td class="n">' + sp.area.toFixed(1) +
+    const rows = h.spaces.map((sp) => '<tr><td>' + sp.name + (sp.shape ? ' <span class="mut">'+sp.shape+'</span>' : '') + (h.floors > 1 ? ' <span class="mut">' + ['G', '1', '2'][sp.floor] + '</span>' : '') + '</td><td class="n">' + sp.size[0].toFixed(2) + ' × ' + sp.size[1].toFixed(2) + '</td><td class="n">' + sp.area.toFixed(1) +
       '</td><td class="n mut">' + (sp.target ? sp.target.toFixed(1) : '') + '</td></tr>').join('');
     const doors = {}; for (const o of h.openings) doors[o.role || o.kind] = (doors[o.role || o.kind] || 0) + 1;
     side.innerHTML = '<h2>' + h.name + ', seed ' + h.seed + '</h2>' +
@@ -151,7 +157,7 @@
       (h.route ? '<h3>What is off</h3>' + (h.wrong.length ? h.wrong.map((w) => '<div class="warn">' + w + '</div>').join('') : '<div class="mut">nothing: an ordinary house</div>') : '') +
       (h.meta.missing && h.meta.missing.length ? '<div class="mut" style="margin-top:4px">Left out for lack of room: ' + h.meta.missing.join(', ') + '</div>' : '') +
       '<h3>Checks</h3>' + (bad.length ? bad.map((b) => '<div class="bad">' + b + '</div>').join('') : '<div class="ok">All pass: no wall on any room floor, walls 0.15 / 0.3 m exactly, every room reached from the front door.</div>') +
-      '<h3>Rooms (clear floor, m)</h3><table><tr><th>room</th><th class="n">size</th><th class="n">m²</th><th class="n">aimed</th></tr>' + rows + '</table>' +
+      '<h3>Rooms (clear floor, m)</h3><table><tr><th>room</th><th class="n">bounds</th><th class="n">m²</th><th class="n">aimed</th></tr>' + rows + '</table>' +
       '<div class="mut" style="margin-top:4px">Floor ' + floor.toFixed(1) + ' m² · filled nooks ' + h.meta.pocketArea.toFixed(2) + ' m²</div>' +
       '<h3>Openings</h3><div class="mut">' + Object.entries(doors).map(([k, v]) => v + ' ' + k).join(' · ') + '</div>' +
       '<h3>Score penalties</h3><div class="mut">' + Object.entries(h.meta.terms).map(([k, v]) => k + ' ' + v).join(' · ') + '</div>' +
@@ -165,7 +171,7 @@
     for (const id of Object.keys(SP.RECIPES)) {
       let built = 0, clean = 0, score = 0, ms = 0; const plans = {}, probs = {};
       for (let k = 1; k <= N; k++) {
-        const h = SP.generate({ recipe: id, seed: k }); ms += h.meta ? h.meta.ms : 0;
+        const h = SP.generate({ recipe: id, seed: k, ...(state.experiment ? {shapes:shapeOptions()} : {}) }); ms += h.meta ? h.meta.ms : 0;
         if (h.error) continue;
         built++; score += h.meta.score; plans[h.meta.plan] = (plans[h.meta.plan] || 0) + 1;
         const bad = SP.verify(h); if (!bad.length) clean++;
@@ -177,6 +183,18 @@
     rep.innerHTML = html + '</table>';
   }
 
+  function drawCompare() {
+    const wrap=$('compare'); wrap.innerHTML='';
+    for(const [title,shaped] of [['Original',false],['Shape experiment',true]]) {
+      const h=gen(state.seed,shaped), card=document.createElement('div'); card.className='card';
+      card.innerHTML='<h2>'+title+' · seed '+state.seed+'</h2>';
+      if(h.error) card.insertAdjacentHTML('beforeend',failCard(h));
+      else { const cv=document.createElement('canvas');card.appendChild(cv);drawFloors(cv,h,Math.max(330,window.innerWidth/2-55),520,opts());
+        card.insertAdjacentHTML('beforeend','<div class="mut">'+h.meta.ms+' ms · '+h.spaces.length+' rooms · '+SP.verify(h).length+' check problems</div>'); }
+      wrap.appendChild(card);
+    }
+    wrap.insertAdjacentHTML('beforeend','<p class="mut">Same room program and seed; independent placement. Legacy presets use a free outline in shape mode. Dotted routes are hidden on shaped floors until interior routing supports concave rooms. Room sizes in the table are bounding dimensions; floor areas exclude notches.</p>');
+  }
   function sync() {
     $('recipe').value = state.recipe; $('seed').value = state.seed;
     $('wrongBox').style.display = isRoute() ? '' : 'none';
@@ -184,8 +202,11 @@
     $('wrong').value = wv; $('wrongV').textContent = (+wv).toFixed(2) + (state.wrong === null ? ' (house type)' : '');
     $('vGrid').classList.toggle('on', state.view === 'grid'); $('vOne').classList.toggle('on', state.view === 'one');
     $('grid').style.display = state.view === 'grid' ? '' : 'none'; $('one').classList.toggle('on', state.view === 'one');
+    $('experiment').checked=state.experiment; $('hallShape').value=state.hallShape; $('livingShape').value=state.livingShape;
+    $('vCompare').classList.toggle('on',state.view==='compare');
+    $('compare').style.display=state.view==='compare'?'grid':'none'; $('compare').style.gridTemplateColumns='repeat(auto-fit,minmax(330px,1fr))'; $('compare').style.gap='12px';
     save();
-    if (state.view === 'grid') drawGrid(); else drawOne();
+    if (state.view === 'grid') drawGrid(); else if(state.view==='compare') drawCompare(); else drawOne();
   }
   $('recipe').onchange = () => { state.recipe = $('recipe').value; state.wrong = null; sync(); };
   $('seed').onchange = () => { state.seed = Math.max(0, Math.round(+$('seed').value || 0)); sync(); };
@@ -193,6 +214,8 @@
   $('next').onclick = () => { state.seed += state.view === 'grid' ? 12 : 1; sync(); };
   $('rand').onclick = () => { state.seed = Math.floor(Math.random() * 1e6); sync(); };
   $('vGrid').onclick = () => { state.view = 'grid'; sync(); };
+  $('vCompare').onclick=()=>{state.view='compare';sync();};
+  for(const id of ['experiment','hallShape','livingShape']) $(id).onchange=()=>{state[id]=id==='experiment'?$(id).checked:$(id).value;sync();};
   $('vOne').onclick = () => { state.view = 'one'; sync(); };
   for (const id of ['labels', 'sizes', 'kinds', 'route']) $(id).onchange = sync;
   $('wrong').onchange = () => { state.wrong = +$('wrong').value; sync(); };
@@ -205,3 +228,4 @@
 </script>
 </body>
 </html>
+

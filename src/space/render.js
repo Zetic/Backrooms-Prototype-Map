@@ -40,7 +40,7 @@
       if (F === 0) ctx.fillText('street', X(h.site.w / 2), Y(h.site.h) - 4);
     }
     // floors, then the solid parts, then the openings through them
-    for (const sp of spaces) rect(sp.rect, sp.type === 'garage' ? C.garage : C[sp.zone]);
+    for (const sp of spaces) for (const r of sp.floorRects || [sp.rect]) rect(r, sp.type === 'garage' ? C.garage : C[sp.zone]);
     for (const r of level.solids.walls) rect(r, C.wall);
     if (o.kinds) for (const w of h.walls) if (on(w) && w.kind === 'interior') rect(w.rect, C.interior);
     for (const r of level.solids.pockets) rect(r, C.pocket);
@@ -81,7 +81,7 @@
       ctx.stroke();
     }
     // the way through: front door, each room of the route and the doors between, the exit
-    if (o.route && h.route) {
+    if (o.route && h.route && h.meta.routeOverlay !== false) {
       const byId = new Map(h.spaces.map((x) => [x.id, x]));
       const front = h.openings.find((x) => x.role === 'front door'), exit = h.openings.find((x) => x.role === 'exit');
       const runs = [];
@@ -104,12 +104,12 @@
     if (o.labels || o.sizes) {
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       for (const sp of spaces) {
-        const r = sp.rect, cx = X((r[0] + r[2]) / 2), cy = Y((r[1] + r[3]) / 2), wpx = (r[2] - r[0]) * s;
+        const r = sp.floorRects ? sp.floorRects.reduce((a,b)=>(a[2]-a[0])*(a[3]-a[1])>(b[2]-b[0])*(b[3]-b[1])?a:b) : sp.rect, cx = X((r[0] + r[2]) / 2), cy = Y((r[1] + r[3]) / 2), wpx = (r[2] - r[0]) * s;
         const big = Math.max(8, Math.min(13, s * 0.38)), small = Math.max(7, Math.min(11, s * 0.3));
         const vertical = wpx < 60 && (r[3] - r[1]) * s > wpx * 1.5;
         ctx.save(); ctx.translate(cx, cy); if (vertical) ctx.rotate(-Math.PI / 2);
         if (o.labels) { ctx.fillStyle = C.text; ctx.font = '600 ' + big + 'px system-ui, sans-serif'; ctx.fillText(sp.name, 0, o.sizes ? -small * 0.7 : 0); }
-        if (o.sizes) { ctx.fillStyle = C.size; ctx.font = small + 'px system-ui, sans-serif'; ctx.fillText(sp.size[0].toFixed(2) + ' × ' + sp.size[1].toFixed(2), 0, o.labels ? big * 0.75 : 0); }
+        if (o.sizes) { ctx.fillStyle = C.size; ctx.font = small + 'px system-ui, sans-serif'; ctx.fillText(sp.floorRects ? sp.shape + ' · ' + sp.area.toFixed(1) + ' m²' : sp.size[0].toFixed(2) + ' × ' + sp.size[1].toFixed(2), 0, o.labels ? big * 0.75 : 0); }
         ctx.restore();
       }
       const exit = openings.find((x) => x.role === 'exit');
@@ -122,3 +122,4 @@
     ctx.restore();
   };
 })(typeof window !== 'undefined' ? window : globalThis);
+

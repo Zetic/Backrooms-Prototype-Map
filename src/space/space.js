@@ -527,8 +527,10 @@
     const at = (x, y) => y * NX + x, cell = (v, o) => Math.round((v - o) / S);
     const roomOf = new Int16Array(NX * NY).fill(-1);
     rooms.forEach((n, i) => {
-      const x0 = cell(n.r[0], X0), x1 = cell(n.r[2], X0), y1 = cell(n.r[3], Y0);
-      for (let y = cell(n.r[1], Y0); y < y1; y++) roomOf.fill(i, y * NX + x0, y * NX + x1);
+      for (const r of n.parts || [n.r]) {
+        const x0 = cell(r[0], X0), x1 = cell(r[2], X0), y1 = cell(r[3], Y0);
+        for (let y = cell(r[1], Y0); y < y1; y++) roomOf.fill(i, y * NX + x0, y * NX + x1);
+      }
     });
     const grow = (src, r) => {
       // square dilation by r cells: rows, then columns

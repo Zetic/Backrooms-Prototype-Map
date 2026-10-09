@@ -27,9 +27,11 @@ if (!(jobs >= 1)) { console.error('--jobs needs a number of at least 1'); proces
 // [file, args, title, cost]: cost is the file's rough time in seconds in full
 // mode, used only to start the slowest files first
 const SEEDS = full ? ['31337', '7', '12345', '99', '4242'] : ['31337', '7'];
-const ALL = ['templates', 'catalogue', 'neighborhood', 'park', 'fillers', 'architectural', 'elevation', 'connections', 'floors', 'journeys', 'claims', 'cutaway', 'elevation-ui', 'band-world', 'band-render', 'seams', 'world', 'ui-smoke', 'space', 'space-performance'];
+const ALL = ['templates', 'catalogue', 'neighborhood', 'park', 'fillers', 'architectural', 'elevation', 'connections', 'floors', 'journeys', 'claims', 'cutaway', 'elevation-ui', 'band-world', 'band-render', 'seams', 'world', 'ui-smoke', 'space', 'space-performance', 'space-shapes', 'space-shapes-ui'];
 const FILES = [
   ['templates', [], 'templates', 5],
+  ['space-shapes-ui', [], 'shape experiment controller', 1],
+  ['space-shapes', [], 'experimental joined floors and true outlines', 30],
   ['space', [], 'room-first houses and walk-through routes', 30],
   ['space-performance', [], 'room-first output preservation and spatial boundaries', 30],
   ['catalogue', [], 'catalogue (every room and zone, alone; pools)', 2],

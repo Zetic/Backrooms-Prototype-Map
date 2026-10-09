@@ -147,3 +147,9 @@ them), yards, and joining this into the neighbourhood and world generators.
 Upper floors of walk-through houses may overhang anything: the outline is free
 by design.
 
+
+## Shape study
+
+An opt-in experiment adds L/T halls and L/alcove living floors, a same-seed
+comparison, and the `br.space/0.3` floor-union contract. See
+[space-shapes.md](space-shapes.md) for controls, limitations and validation.
