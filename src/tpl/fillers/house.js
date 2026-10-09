@@ -57,27 +57,37 @@
     pantry: { w: [3, 4], d: [3, 5] }, utility: { w: [3, 5], d: [3, 5] }, laundry: { w: [4, 6], d: [4, 6] }, mudroom: { w: [4, 5], d: [4, 6] }, foyer: { w: [4, 6], d: [4, 6] }
   };
   // what kind of floor of a house: hallway width and room depth (cells), each
-  // type's weight and how many at most in 200 m² of site (in the house, for
-  // the ONE rooms), the rooms across a hallway's end, and which neighbours may stand open to each other
+  // type's weight and how many the floor has at most, the rooms across a
+  // hallway's end, and which neighbours may stand open to each other. A floor
+  // is one home's, however big the site: one living room, one kitchen, one
+  // master bedroom, a few bedrooms, a bathroom and linen closet for every few
+  // of them (`cap`). What the home does not need stays solid
   const PROGRAMS = {
     bedrooms: { hall: [2, 3], depth: [7, 9], end: ['master'],
-      rooms: { bedroom: [5, 99], bath: [2.5, 2], linen: [1.2, 2], wic: [0.4, 1], office: [0.6, 1] } },
+      rooms: { bedroom: [5, 4], bath: [2.5, 99], linen: [1.2, 99], wic: [0.4, 1], office: [0.6, 1] } },
     living: { hall: [3, 4], depth: [9, 12], end: ['living', 'family'], open: [['living', 'dining'], ['dining', 'kitchen'], ['living', 'family']],
-      rooms: { living: [3, 2], dining: [2, 1], kitchen: [2, 1], family: [1.5, 1], pantry: [0.8, 1], laundry: [1, 1], bath: [1, 2], foyer: [0.8, 1], mudroom: [0.6, 1], office: [0.6, 1], bedroom: [0.2, 99] } },
+      rooms: { living: [3, 1], dining: [2, 1], kitchen: [2, 1], family: [1.5, 1], pantry: [0.8, 1], laundry: [1, 1], bath: [1, 99], foyer: [0.8, 1], mudroom: [0.6, 1], office: [0.6, 1], bedroom: [0.2, 2] } },
     upstairs: { hall: [2, 3], depth: [7, 9], end: ['master', 'family'],
-      rooms: { bedroom: [3, 99], bath: [2, 2], linen: [1, 2], family: [1, 1], office: [1.2, 1], laundry: [0.8, 1], wic: [0.5, 1] } }
+      rooms: { bedroom: [3, 3], bath: [2, 99], linen: [1, 99], family: [1, 1], office: [1.2, 1], laundry: [0.8, 1], wic: [0.5, 1] } }
   };
   // a room never beside another of the same type: these
   const ALONE = new Set(['bath', 'linen', 'wic', 'pantry', 'laundry', 'mudroom', 'foyer', 'kitchen', 'dining']);
-  // one house has one of these however big the floor
-  const ONE = new Set(['kitchen', 'dining', 'foyer', 'pantry', 'laundry', 'mudroom']);
+  /** how many of type t the floor may have: its program's count, a bathroom to the first bedrooms and one more for every three, a linen closet for every three; one master */
+  function cap(prog, used, t) {
+    const beds = (used.bedroom || 0) + (used.master || 0);
+    if (t === 'bath') return 1 + Math.floor(beds / 3);
+    if (t === 'linen') return 1 + Math.floor(beds / 3);
+    if (t === 'master') return 1;
+    return prog.rooms[t] ? prog.rooms[t][1] : 1;
+  }
 
-  /** the next room type: by weight, none past its share, the small ones never twice running */
-  function nextType(rng, prog, used, prev, room) {
+  /** the next room type: by weight, none past its cap, the small ones never twice running, none wider than `room` or deeper than `deep` (cells) can take */
+  function nextType(rng, prog, used, prev, room, deep) {
     const w = {};
-    for (const [t, [wt, max]] of Object.entries(prog.rooms)) {
-      if ((used[t] || 0) >= (ONE.has(t) ? max : Math.round(max * used.k)) || (t === prev && ALONE.has(t))) continue;
+    for (const [t, [wt]] of Object.entries(prog.rooms)) {
+      if ((used[t] || 0) >= cap(prog, used, t) || (t === prev && ALONE.has(t))) continue;
       if (room !== undefined && SIZE[t].w[0] > room) continue;
+      if (deep !== undefined && SIZE[t].d[0] - 1 > deep) continue;
       w[t] = wt;
     }
     return Object.keys(w).length ? rng.weighted(w) : null;
@@ -88,14 +98,20 @@
     for (const [a, b] of C.freeRuns(P, s, side, hall, 3)) {
       let t = a, prev = null, prevV = -1;
       while (b - t >= 2) {
+        // (what is left once the floor has its rooms stays solid)
         let type = nextType(rng, prog, used, prev, b - t);
-        if (!type) { if (b - t >= 2) type = 'linen'; else break; }
-        const z = SIZE[type];
-        let w = Math.min(rng.int(z.w[0], z.w[1]), b - t);
+        if (!type) break;
+        let z = SIZE[type], w = Math.min(rng.int(z.w[0], z.w[1]), b - t);
         // never leave a sliver of run: the room takes it
         if (b - t - w < 2) w = b - t;
-        const dfree = C.depthFree(P, s, side, t, t + w, dmax);
-        if (dfree < 2) { t++; prev = null; prevV = -1; continue; }
+        let dfree = C.depthFree(P, s, side, t, t + w, dmax);
+        // too shallow for its type (a building in the way, the site's edge): a
+        // smaller room, or solid
+        if (dfree < z.d[0] - 1) {
+          type = nextType(rng, prog, used, prev, b - t, dfree);
+          if (type) { z = SIZE[type]; w = Math.min(rng.int(z.w[0], z.w[1]), b - t); if (b - t - w < 2) w = b - t; dfree = C.depthFree(P, s, side, t, t + w, dmax); }
+          if (!type || dfree < z.d[0] - 1) { t++; prev = null; prevV = -1; continue; }
+        }
         // a room that would leave a strip of solid behind it reaches back to it
         const d = dfree <= z.d[1] * 1.5 && SIZE[type].w[0] >= 6 ? dfree : Math.min(dfree, rng.int(z.d[0], z.d[1]));
         if (w * d < 4) { t += w; continue; }
@@ -113,9 +129,10 @@
   /**
    * What packing leaves: every pocket of solid at least 1.5 m across that
    * meets the floor becomes a room, at most 5 x 6 m. Off the hallway, a room
-   * of the program; off a room only, what opens off that room in a house: a
-   * walk-in closet or ensuite off a bedroom, a pantry off a kitchen, a linen
-   * closet or a storage room off the rest, a study where it is bigger.
+   * of the program while the floor still wants one; off a room only, what
+   * opens off that room in a house: a walk-in closet or ensuite off a
+   * bedroom, a pantry off a kitchen, a linen closet or a storage room off the
+   * rest. Anything else stays solid.
    */
   function infill(P, rng, hall, prog, used) {
     const W = P.W, H = P.H, R = P.R.a, free = new TG.Raster(W, H, 0), skip = new Uint8Array(W * H);
@@ -141,8 +158,9 @@
         : [side === 'W' ? r[0] : r[2] - dd, run[0], side === 'W' ? r[0] + dd : r[2], run[1]];
       const room = TG.rarea(r) * 0.25, of = P.rooms[who].type;
       const bed = of === 'bedroom' || of === 'master';
-      let type = who === hall ? nextType(rng, prog, used, null, Math.max(TG.rw(r), TG.rh(r))) || (room > 4 ? 'office' : 'linen')
-        : bed ? (room > 6 && room <= 8 ? 'ensuite' : 'wic') : room <= 4 ? CLOSET[of] || 'linen' : room <= 9 ? (of === 'kitchen' ? 'pantry' : 'utility') : 'office';
+      const type = who === hall ? nextType(rng, prog, used, null, Math.max(TG.rw(r), TG.rh(r)), Math.min(TG.rw(r), TG.rh(r)))
+        : bed ? (room > 6 && room <= 8 ? 'ensuite' : 'wic') : room <= 4 ? CLOSET[of] || 'linen' : room <= 9 ? (of === 'kitchen' ? 'pantry' : 'utility') : null;
+      if (!type) { for (let y = r[1]; y < r[3]; y++) for (let x = r[0]; x < r[2]; x++) skip[y * W + x] = 1; continue; }
       const v = P.add(type, []);
       P.paint(r, v, true);
       P.require.push([who, v]);
@@ -154,7 +172,7 @@
     const prog = PROGRAMS[F.program], I = P.inner, alongX = TG.rw(I) >= TG.rh(I);
     const C0 = alongX ? I[1] : I[0], C1 = alongX ? I[3] : I[2], CN = C1 - C0;
     const cw = rng.int(prog.hall[0], prog.hall[1]), D = rng.int(prog.depth[0], prog.depth[1]);
-    const hall = P.add('hallway', []), used = { k: Math.max(1, P.site.area * 0.25 / 200) };
+    const hall = P.add('hallway', []), used = {};
     P.hall = hall; P.open = P.open || []; P.passage = 'hallway';
     // the hallways: one per band of the site's depth, centred in it; on a
     // site too shallow for rooms both sides, along one edge
@@ -180,7 +198,7 @@
     for (const s of main) {
       if (rng.f() >= 0.6) continue;
       const type = prog.end[rng.int(0, prog.end.length - 1)], z = SIZE[type], e = rng.int(z.d[0], z.d[1]);
-      if (s.a1 - s.a0 < e + 12) continue;
+      if (s.a1 - s.a0 < e + 12 || ends.filter((E) => E.type === type).length >= cap(prog, used, type)) continue;
       const hiEnd = rng.f() < 0.5, a0 = hiEnd ? s.a1 - e : s.a0, a1 = hiEnd ? s.a1 : s.a0 + e;
       if (hiEnd) s.a1 -= e; else s.a0 += e;
       const k0 = rng.int(2, half), k1 = rng.int(2, half);
