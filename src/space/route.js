@@ -514,6 +514,6 @@
     if (stats) { stats.emitMs = performance.now() - emitStart; house.meta.profile = stats; }
     return house;
   };
-  SP._routeInternal = { RoomIndex, fits, addRoom, popRoom };
+  SP._routeInternal = { RoomIndex, fits, addRoom, popRoom, program, shapes };
 })(typeof window !== 'undefined' ? window : globalThis);
 

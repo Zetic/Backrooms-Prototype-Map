@@ -1,5 +1,16 @@
 # Map procedural generation: agent handoff
 
+## Room-first shape study (2026-10-09)
+
+`src/space/shapes.js` wraps generation only when `spec.shapes` is supplied.
+The test bed has shape controls and original/experimental comparisons. Actual
+floors are joined rectangles with concave polygons (`br.space/0.3`); bounding
+rectangles must not be used as floors. Original mode retains its exact output.
+See [docs/space-shapes.md](docs/space-shapes.md) for the free-outline solver,
+explicit failures, profile fallbacks and pending concave route overlay.
+Geometry and controller tests are included in the full runner.
+
+
 ## Room-first performance follow-up (2026-10-09)
 
 The separate `src/space` test bed now accelerates route placement with per-floor
