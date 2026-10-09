@@ -2,8 +2,11 @@
 
 Select **Mansion experiment (three floors)** in `space.html`. The experiment
 uses the same reserved-floor placement and 0.15 / 0.30 m wall rules as the
-existing shape studies. **Floor view** displays all three levels together or
-one level at a larger scale. Secondary connections can be selected as **2**,
+existing shape studies. **Floor view** displays large floor plans stacked vertically for scrolling,
+or a single level. Each level is cropped and scaled to its actual footprint; the JSON
+retains shared building coordinates. Narrow viewports can scroll horizontally
+instead of shrinking the plans. Labels wrap within actual floors and omit
+secondary size text when it cannot fit. Secondary connections can be selected as **2**,
 **3**, or **2–3 by seed**. Hall and living profiles remain available.
 
 ![Three-floor mansion with kitchen directly adjoining dining](images/space-mansion.png)
@@ -24,11 +27,15 @@ checker and archived consumers. Vehicle garage doors remain separate; they
 do not inflate the house connection count. Canvas markers show **P** and
 **S1, S2, S3**; the sidebar lists their rooms, floors and clear widths.
 
-All mansion connections are on the ground floor, and secondaries belong to
-different public/service rooms. The entire room floor is reserved first.
+The primary connection is on the ground floor. The main passage ends at a
+top-floor secondary connection; another secondary is on the middle floor.
+When the seed selects three secondaries, the third branches off the ground
+floor. Secondaries belong to different public/service rooms. The entire room floor is reserved first.
 Secondary openings are then placed on exposed floor edges with a clear
 2.6 m approach reservation; clearance checks include concave parts of the
-same room. The front retains its clear approach, and vehicle access retains
+same room on the same level. Upper-floor openings are outward connection
+ports for adjoining backrooms at that level; they do not add balconies,
+outside stairs or destination floors. The front retains its clear approach, and vehicle access retains
 its separate reservation. An independent output checker confirms exposed
 edges, actual opening references and unobstructed approaches.
 
@@ -50,6 +57,8 @@ The seed chooses a coherent subset of the mansion room pool, including:
   collection and staff rooms are optional.
 
 There are two aligned stair connections, ground–middle and middle–top.
+Each reserves 1.5 × 4.5 m clear floor independently of hall width. This is
+the prototype stair envelope, not a detailed riser/headroom construction model.
 Stair floors and room floors are reserved before walls. Every room must be
 reachable from the primary connection. All three floors and the complete
 selected program are required; a failed placement returns an error rather
@@ -85,8 +94,13 @@ counts remain; placement can differ from the archived bar/deep/route solver.
 **Compare shapes** retains original placement on the left for existing
 recipes. For mansion it compares straight/rectangle with selected shapes.
 The relationship checkbox can restore archived placement for existing houses;
-it is mandatory for mansion. Dotted route overlays remain hidden on the new
-solver; its room graph and circulation sequence are exported.
+it is mandatory for mansion. A mansion follows the passage concept: consecutive
+route rooms join through actual openings and stairs, the route starts at the
+primary and ends at a top-floor secondary, and side-room groups cannot connect
+two route steps to create a bypass. These conditions are independently checked.
+Mansion dotted centrelines follow actual concave floors; secondary branch ports
+do not replace the main passage endpoint. Other new-solver house overlays
+remain hidden. The room graph and circulation sequence are exported.
 
 ```js
 // Load core, recipes, space, route, shapes, house, then render.
@@ -111,12 +125,16 @@ presets, 20 mansion seeds across four hall/living profile pairs, complete
 program counts, functional adjacency, all three floors, aligned stairs,
 connection counts and geometry, deterministic repeated generation, invalid
 output mutations, explicit count controls and undersized-site rejection.
-The current sample built all 280 existing houses and all 80 mansions, with
-all built houses passing verification. These are sample results, not a promise
+The follow-up sample checks the new passage endpoint, middle-floor connection,
+compact stair dimensions, broken route links and forbidden side-room bypasses.
+Renderer tests sample concave passage segments against actual floor rectangles.
+All 280 current-house and 80 mansion profile/seed cases built and passed.
+The full local suite passed 452 checks across 27 files; the final focused full
+run adds the L-hall exit regression and exercises the final display controller. These are sample results, not a promise
 that every possible seed will fit within the bounded search.
 
 The real test-bed controller has a dependency-free DOM/canvas test including
 recipe selection, connection controls, saved settings and individual floors.
-The production-renderer image above was inspected. The archived generation
+The stacked production-renderer image above was inspected. The archived generation
 and performance fixtures still run separately, preserving their original
 geometry. This is a larger layout experiment, with no speed improvement claim.

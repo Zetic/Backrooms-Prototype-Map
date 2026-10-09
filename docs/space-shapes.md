@@ -59,6 +59,8 @@ shape profiles and reports build counts, verification counts and mean times.
 The graph route remains exported and stairwells align between floors. The
 old dotted overlay uses bounding-box centers, which can cross a concave notch,
 so it is hidden for shaped houses pending an interior clearance-aware route.
+The mansion inspector now has a floor-contained centreline overlay for its
+passage; it describes graph traversal rather than a full agent-clearance path.
 Windows, furniture placement, diagonals and curved floors are future work.
 
 ## Validation

@@ -40,7 +40,7 @@
     const corridor=floor=>({type:'hall',floor,len:snap(cm(rng.range(8,12))),area:0});
     const stair=floor=>({type:'stair',floor,area:0});
     const seededSecondary=rng.int(2,3);
-    const P={hall,stairWidth:hall+40,wrongness:0,openPlan:true,secondaryCount:secondary===undefined?seededSecondary:secondary,
+    const P={hall,stairWidth:150,stairLength:450,passageExit:true,wrongness:0,openPlan:true,secondaryCount:secondary===undefined?seededSecondary:secondary,
       path:[foyer,living,corridor(0),reception,corridor(0),stair(0),corridor(1),family,corridor(1),stair(1),corridor(2),loft,corridor(2)],sides:[],requirements:[]};
     const add=(type,floor,range,host)=>{const e=entry(type,floor,range,host);P.sides.push(e);if(host)P.requirements.push([host,e]);return e;};
     // Ground: the dining/kitchen and service groups occupy the same floor.
@@ -113,6 +113,22 @@
     // retains the original placement for comparisons and archived fixtures.
     return connections(generate({...spec,relationships:spec.relationships!==false}));
   };
+  function passageChecks(h,bad,byId){
+    const route=h.route||[],on=new Set(route),adj=new Map(h.spaces.map(s=>[s.id,new Set()]));
+    for(const o of h.openings)if(o.rooms[1]!==null){const [a,b]=o.rooms;if(adj.has(a)&&adj.has(b)){adj.get(a).add(b);adj.get(b).add(a);}}
+    for(const v of h.verticals){const [a,b]=v.rooms;if(adj.has(a)&&adj.has(b)){adj.get(a).add(b);adj.get(b).add(a);}}
+    if(!route.length||h.connections.find(c=>c.role==='primary')?.room!==route[0])bad.push('passage must start at primary connection');
+    for(let k=0;k<route.length;k++){
+      if(!byId.has(route[k])||!(SP.PASS.has(byId.get(route[k]).type)||byId.get(route[k]).type==='reception'))bad.push('invalid passage room');
+      if(k&&!adj.get(route[k-1])?.has(route[k]))bad.push('broken mansion passage');
+    }
+    const done=new Set();
+    for(const s of h.spaces){if(on.has(s.id)||done.has(s.id))continue;
+      const stack=[s.id],touch=new Set();done.add(s.id);
+      while(stack.length)for(const id of adj.get(stack.pop())){if(on.has(id))touch.add(id);else if(!done.has(id)){done.add(id);stack.push(id);}}
+      if(touch.size>1)bad.push('side rooms bypass mansion passage');
+    }
+  }
   SP.verify=function(h){
     if(h.error)return [h.error];
     const legacy={...h,openings:h.openings.map(o=>o.legacyRole?{...o,role:o.legacyRole}:o)};
@@ -123,7 +139,9 @@
     if(h.recipe==='mansion'){
       if(h.floors!==3)bad.push('mansion requires three floors');
       if(![2,3].includes(h.connections.filter(c=>c.role==='secondary').length))bad.push('mansion requires 2 or 3 secondary connections');
-      if(h.connections.some(c=>c.floor!==0))bad.push('mansion connection must be on ground floor');
+      if(!h.connections.some(c=>c.role==='secondary'&&c.floor===1))bad.push('mansion requires a middle-floor connection');
+      if(!h.connections.some(c=>c.role==='secondary'&&c.floor===2&&c.room===h.route?.at(-1)))bad.push('mansion passage must end at a top-floor connection');
+      passageChecks(h,bad,byId);
     }
     if(h.connections.length!==external.length||new Set(h.connections.map(c=>c.opening)).size!==external.length)bad.push('connection opening mismatch');
     for(const c of h.connections){

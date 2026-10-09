@@ -30,7 +30,8 @@ for(const hall of profiles)for(let seed=1;seed<=(full?20:3);seed++){
  assert.equal(h.floors,3);assert.deepEqual(h.levels.map(l=>l.floor),[0,1,2]);
  assert(h.spaces.length>=40);assert(h.spaces.filter(s=>['master','bedroom','guest'].includes(s.type)).length>=6);
  assert.equal(h.connections.filter(c=>c.role==='primary').length,1);assert([3,4].includes(h.connections.length));
- assert(h.connections.every(c=>c.floor===0));totals.add(h.connections.length);
+ assert(h.connections.some(c=>c.role==='primary'&&c.floor===0));assert(h.connections.some(c=>c.role==='secondary'&&c.floor===1));assert(h.connections.some(c=>c.role==='secondary'&&c.floor===2&&c.room===h.route.at(-1)));
+ for(const v of h.verticals){const dims=[v.rect[2]-v.rect[0],v.rect[3]-v.rect[1]].sort((a,b)=>a-b);assert(Math.abs(dims[0]-1.5)<1e-8);assert(Math.abs(dims[1]-4.5)<1e-8);}totals.add(h.connections.length);
  assert(h.requirements.length>=12);
  const P=SP.MANSION.program(seed),entries=P.path.concat(P.sides);
  for(const e of P.sides)assert(h.spaces.some(s=>s.type===e.type&&s.floor===e.floor));
@@ -50,3 +51,16 @@ const blocked=structuredClone(h),c=blocked.connections[1],op=blocked.openings.fi
 assert.throws(()=>SP.generate({recipe:'mansion',seed:1,secondaryConnections:1}),/2 or 3/);
 assert(SP.generate({recipe:'mansion',seed:1,site:{w:1,h:1}}).error);
 console.log('ok secondary-count controls, invalid connection/adjacency mutations and undersized-site rejection');
+
+const broken=structuredClone(h),routePair=broken.route.slice(0,2);broken.openings=broken.openings.filter(o=>!(o.rooms.includes(routePair[0])&&o.rooms.includes(routePair[1])));assert(SP.verify(broken).includes('broken mansion passage'));
+const noEnd=structuredClone(h),end=noEnd.connections.find(c=>c.room===noEnd.route.at(-1));end.room=noEnd.route[0];assert(SP.verify(noEnd).includes('mansion passage must end at a top-floor connection'));
+const bypass=structuredClone(h),side=bypass.spaces.find(s=>!bypass.route.includes(s.id));bypass.openings.push({rooms:[side.id,bypass.route[0]]},{rooms:[side.id,bypass.route[1]]});assert(SP.verify(bypass).includes('side rooms bypass mansion passage'));
+require('../src/space/render.js');
+for(const hall of profiles){const m=SP.generate({recipe:'mansion',seed:1,shapes:{hall,living:'L'}}),runs=SP.passageRuns(m);assert.equal(runs.length,m.route.length);
+ for(const run of runs){const room=m.spaces.find(s=>s.id===run.room),inside=p=>room.floorRects.some(r=>p[0]>=r[0]-1e-8&&p[0]<=r[2]+1e-8&&p[1]>=r[1]-1e-8&&p[1]<=r[3]+1e-8);
+  for(let k=2;k<run.points.length-1;k++){const a=run.points[k-1],b=run.points[k];for(let t=0;t<=20;t++)assert(inside([a[0]+(b[0]-a[0])*t/20,a[1]+(b[1]-a[1])*t/20]),'passage line outside floor');}}
+}
+console.log('ok passage endpoint, broken-link and bypass mutations; concave passage lines stay on floor');
+
+const concaveExit=SP.generate({recipe:'mansion',seed:12,shapes:{hall:'L',living:'L'}});assert(!concaveExit.error);assert.deepEqual(SP.verify(concaveExit),[]);
+console.log('ok L-hall exit approach includes the destination room own floor parts');
