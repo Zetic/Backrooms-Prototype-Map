@@ -12,8 +12,8 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
     font: 13px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
-  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; cursor: grab; touch-action: none; }
-  canvas.drag { cursor: grabbing; }
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; cursor: none; touch-action: none; }
+  #scale-layer { pointer-events: none; }
   #hud { position: fixed; top: 12px; left: 12px; width: 292px; max-height: calc(100vh - 24px); overflow-y: auto;
     background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
     backdrop-filter: blur(6px); user-select: none; }
@@ -43,11 +43,23 @@
   #help { position: fixed; right: 12px; bottom: 12px; color: rgba(255,255,255,.55); font-size: 12px; background: rgba(0,0,0,.3);
     padding: 5px 9px; border-radius: 6px; }
   #hud.min > :not(h1) { display: none; }
-  @media (max-width: 520px) { #hud { width: calc(100vw - 24px); } #help { display: none; } }
+  #refs { position: fixed; top: 12px; right: 12px; width: 252px; max-height: calc(100vh - 60px); overflow-y: auto;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+    backdrop-filter: blur(6px); user-select: none; }
+  #refs h2 { font-size: 13px; margin: 0 0 6px; color: var(--accent); font-weight: 600; cursor: pointer; }
+  #refs.min > :not(h2) { display: none; }
+  #ref-list { display: flex; flex-direction: column; gap: 3px; margin-bottom: 6px; }
+  #ref-list button { display: flex; white-space: nowrap; align-items: center; gap: 7px; text-align: left; padding: 4px 7px; cursor: grab; touch-action: none; }
+  #ref-list button.armed { border-color: var(--accent); background: #3a362d; }
+  #ref-list i { width: 11px; height: 11px; border-radius: 2px; flex: none; border: 1px solid rgba(0,0,0,.4); }
+  #ref-list span { margin-left: auto; white-space: nowrap; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  @media (max-width: 520px) { #hud { width: calc(100vw - 24px); } #help { display: none; }
+    #refs { top: auto; bottom: 12px; left: 12px; right: 12px; width: auto; max-height: 40vh; } }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
+<canvas id="scale-layer"></canvas>
 <div id="hud">
   <h1 title="click to collapse">Backrooms map prototype</h1>
   <div class="row">
@@ -99,7 +111,14 @@
   <div id="stats"></div>
   <div class="note" style="margin-top:8px"><a href="workbench.html">Template workbench</a> · <a href="elevation.html">Elevation lab</a></div>
 </div>
-<div id="help">drag / WASD to pan &middot; wheel / +&minus; to zoom</div>
+<div id="refs">
+  <h2 id="refs-title" title="click to collapse">Scale</h2>
+  <div class="note">The cursor is a person, 0.5 m across. Drag any of these onto the map at its real size.</div>
+  <div id="ref-list"></div>
+  <div class="note">Drag a placed one to move it. Drag its handle or press R to turn it, Delete to remove it.</div>
+  <div class="row"><button id="ref-remove" disabled>Remove</button><button id="ref-clear">Clear all</button></div>
+</div>
+<div id="help">drag / WASD to pan &middot; wheel / +&minus; to zoom &middot; R turns a reference</div>
 
 <script src="src/core.js"></script>
 <script src="src/tpl/grid.js"></script>
@@ -138,6 +157,7 @@
 <script src="src/band-world.js"></script>
 <script src="src/growth.js"></script>
 <script src="src/render.js"></script>
+<script src="src/scale.js"></script>
 <script>
 (function () {
   'use strict';
@@ -145,6 +165,7 @@
   const canvas = document.getElementById('c');
   const ctx = canvas.getContext('2d');
   const $ = (id) => document.getElementById(id);
+  const layer = $('scale-layer'), lctx = layer.getContext('2d');
   const OPTS = ['labels', 'outlines', 'graph', 'ghost'];
   const DEFAULT_ON = new Set(['labels']);                 // on unless the URL says 0
 
@@ -162,7 +183,7 @@
   if (!Q.has('cut')) state.cutZ = state.band * BR.BAND_CFG.spacing + (Number(Q.get('floor')) || 0);
   for (const k of OPTS) state.opts[k] = DEFAULT_ON.has(k) ? Q.get(k) !== '0' : Q.get(k) === '1';
   const hideHud = Q.get('hud') === '0';
-  if (hideHud) { $('hud').style.display = 'none'; $('help').style.display = 'none'; }
+  if (hideHud) { $('hud').style.display = 'none'; $('help').style.display = 'none'; $('refs').style.display = 'none'; }
   const ZMIN = 0.03, ZMAX = 40;
 
   function seedNum(s) {
@@ -180,7 +201,8 @@
     DPR = Math.min(window.devicePixelRatio || 1, 2);
     W = window.innerWidth; H = window.innerHeight;
     canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
-    dirty = true;
+    layer.width = canvas.width; layer.height = canvas.height;
+    dirty = true; ref.dirty = true;
   }
 
   // ---------- render loop: the renderer draws into cached tiles; each frame
@@ -197,6 +219,7 @@
       dirty = false;
       updateStats();
     }
+    drawRefs();
     window.__ready = !pending && !dirty;
     requestAnimationFrame(frame);
   }
@@ -272,16 +295,109 @@
   }
   function changed() { dirty = true; saveHash(); }
 
+  // ---------- scale references (scale.js): drawn over the map on their own
+  // layer, never part of the world. The cursor is a person at true size.
+  const SCALE = BR.SCALE, STORE = 'br-scale-refs', TURN = Math.PI / 12;
+  const ref = { placed: [], selected: -1, hover: -1, armed: null, fromPanel: false, held: null, mouse: null, dirty: true, view: '' };
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE) || '[]');
+    ref.placed = saved.filter((o) => o && SCALE.byId[o.id] && [o.x, o.y, o.rot].every(Number.isFinite));
+  } catch (e) { /* no storage: placed references last until the page reloads */ }
+  function saveRefs() {
+    ref.dirty = true;
+    try { localStorage.setItem(STORE, JSON.stringify(ref.placed.map(({ id, x, y, rot }) => ({ id, x, y, rot })))); } catch (e) { /* as above */ }
+  }
+  const toWorld = (px, py) => [state.x + (px - W / 2) / state.zoom, state.y + (py - H / 2) / state.zoom];
+  function drawRefs() {
+    const key = [state.x, state.y, state.zoom, W, H, DPR].join();
+    if (!ref.dirty && key === ref.view) return;
+    ref.dirty = false; ref.view = key;
+    const at = ref.mouse && toWorld(ref.mouse[0], ref.mouse[1]);
+    SCALE.draw(lctx, { cx: state.x, cy: state.y, zoom: state.zoom, w: W, h: H, dpr: DPR }, {
+      objs: ref.placed, selected: ref.selected, hover: ref.hover, cursor: at,
+      ghost: ref.armed && at ? { id: ref.armed.id, x: at[0], y: at[1], rot: ref.armed.rot } : null
+    });
+  }
+  function selectRef(k) { ref.selected = k; $('ref-remove').disabled = k < 0; ref.dirty = true; }
+  function removeRef() { if (ref.selected < 0) return; ref.placed.splice(ref.selected, 1); ref.hover = -1; selectRef(-1); saveRefs(); }
+  function arm(id) {
+    ref.armed = id ? { id, rot: ref.armed && ref.armed.id === id ? ref.armed.rot : 0 } : null;
+    for (const [rid, b] of refButtons) if (ref.armed && rid === id) b.classList.add('armed'); else b.classList.remove('armed');
+    ref.dirty = true;
+  }
+  function placeRef(px, py) {
+    const [x, y] = toWorld(px, py);
+    ref.placed.push({ id: ref.armed.id, x, y, rot: ref.armed.rot }); arm(null); selectRef(ref.placed.length - 1); saveRefs();
+  }
+  /** a press on the map: places the reference in hand, or takes hold of a placed one or its handle (true: the map does not pan) */
+  function refDown(px, py) {
+    if (ref.armed) { placeRef(px, py); ref.held = { kind: 'placed' }; return true; }
+    const [x, y] = toWorld(px, py);
+    if (ref.selected >= 0) {
+      const o = ref.placed[ref.selected], h = SCALE.handle(o, state.zoom);
+      if (!SCALE.byId[o.id].round && Math.hypot(x - h[0], y - h[1]) <= 9 / state.zoom) { ref.held = { kind: 'turn', o }; return true; }
+    }
+    const k = SCALE.hit(ref.placed, x, y, 6 / state.zoom);
+    if (k < 0) { if (ref.selected >= 0) selectRef(-1); return false; }
+    const o = ref.placed[k]; selectRef(k); ref.held = { kind: 'move', o, dx: o.x - x, dy: o.y - y };
+    return true;
+  }
+  function refDrag(px, py, snap) {
+    const [x, y] = toWorld(px, py), h = ref.held;
+    if (h.kind === 'move') { h.o.x = x + h.dx; h.o.y = y + h.dy; }
+    else if (h.kind === 'turn') { const a = Math.atan2(y - h.o.y, x - h.o.x); h.o.rot = snap ? Math.round(a / TURN) * TURN : a; }
+    ref.dirty = true;
+  }
+  /** R turns the selected reference, or the one in hand, a twelfth of a half turn */
+  function turnRef(dir) {
+    const o = ref.armed || (ref.selected >= 0 ? ref.placed[ref.selected] : null);
+    if (!o) return false;
+    o.rot = (Math.round((o.rot || 0) / TURN) + dir) * TURN % (Math.PI * 2);
+    if (o === ref.armed) ref.dirty = true; else saveRefs();
+    return true;
+  }
+  const refButtons = [];
+  for (const r of SCALE.REFS) {
+    const b = document.createElement('button');
+    b.innerHTML = '<i style="background:' + r.fill + '"></i>' + r.name + '<span>' + SCALE.sizeOf(r) + '</span>';
+    b.title = 'Drag onto the map, or click here and then on the map';
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (b.releasePointerCapture) b.releasePointerCapture(e.pointerId);   // (a touch would stay with the button)
+      arm(r.id); ref.fromPanel = true;
+    });
+    $('ref-list').appendChild(b); refButtons.push([r.id, b]);
+  }
+  window.addEventListener('pointermove', (e) => {
+    const over = e.target === canvas;
+    ref.mouse = over ? [e.clientX, e.clientY] : null;
+    if (over && !ref.held && !pointers.size) { const [x, y] = toWorld(e.clientX, e.clientY); ref.hover = SCALE.hit(ref.placed, x, y, 6 / state.zoom); }
+    ref.dirty = true;
+  });
+  window.addEventListener('pointerup', (e) => {
+    // a reference dragged out of the panel lands where it is let go; let go
+    // over the panel, it stays in hand until the next click on the map
+    if (!ref.fromPanel) return;
+    ref.fromPanel = false;
+    if (e.target === canvas && ref.armed) placeRef(e.clientX, e.clientY);
+  });
+  canvas.addEventListener('pointerleave', () => { ref.mouse = null; ref.dirty = true; });
+  $('ref-remove').addEventListener('click', removeRef);
+  $('ref-clear').addEventListener('click', () => { ref.placed.length = 0; ref.hover = -1; selectRef(-1); saveRefs(); });
+  $('refs-title').addEventListener('click', () => $('refs').classList.toggle('min'));
+
   // ---------- input: drag, wheel, keys, touch pinch
   let drag = null;
   const pointers = new Map();
   canvas.addEventListener('pointerdown', (e) => {
     canvas.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 1 && refDown(e.clientX, e.clientY)) return;
     if (pointers.size === 1) { drag = { x: e.clientX, y: e.clientY, moved: false }; canvas.classList.add('drag'); }
     else if (drag) drag.moved = true;
   });
   canvas.addEventListener('pointermove', (e) => {
+    if (ref.held && pointers.has(e.pointerId)) { pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (pointers.size === 1) refDrag(e.clientX, e.clientY, e.shiftKey); return; }
     if (!pointers.has(e.pointerId)) { inspect(e.clientX, e.clientY); return; }
     const prev = pointers.get(e.pointerId);
     if (pointers.size === 2) {
@@ -302,7 +418,9 @@
       changed();
     }
   });
-  const up = (e) => { if (e.type !== 'pointercancel' && drag && !drag.moved && pointers.size === 1) selectAt(e.clientX, e.clientY); pointers.delete(e.pointerId); if (!pointers.size) { drag = null; canvas.classList.remove('drag'); } };
+  const up = (e) => {
+    if (ref.held) { if (ref.held.kind !== 'placed') saveRefs(); ref.held = null; pointers.delete(e.pointerId); if (!pointers.size) { drag = null; canvas.classList.remove('drag'); } return; }
+    if (e.type !== 'pointercancel' && drag && !drag.moved && pointers.size === 1) selectAt(e.clientX, e.clientY); pointers.delete(e.pointerId); if (!pointers.size) { drag = null; canvas.classList.remove('drag'); } };
   canvas.addEventListener('pointerup', up);
   canvas.addEventListener('pointercancel', up);
 
@@ -322,6 +440,9 @@
   window.addEventListener('keydown', (e) => {
     if (['INPUT', 'SELECT', 'BUTTON'].includes(e.target.tagName)) return;
     const k = e.key.toLowerCase();
+    if (k === 'r' && !e.ctrlKey && !e.metaKey && turnRef(e.shiftKey ? -1 : 1)) return;
+    if ((k === 'delete' || k === 'backspace') && ref.selected >= 0) { e.preventDefault(); removeRef(); return; }
+    if (k === 'escape') { arm(null); selectRef(-1); return; }
     if (k === '+' || k === '=') { zoomAt(W / 2, H / 2, 1.25); return; }
     if (k === '-' || k === '_') { zoomAt(W / 2, H / 2, 0.8); return; }
     keys.add(k);
@@ -472,6 +593,7 @@
   resize();
   requestAnimationFrame(frame);
   window.__world = () => world;
+  window.__scale = { get placed() { return ref.placed; }, get selected() { return ref.selected; }, get armed() { return ref.armed; } };
   window.__cutaway = { selectAt, setHeight, get selected() { return selectedTemplate; } };
 })();
 </script>
