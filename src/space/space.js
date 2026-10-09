@@ -40,7 +40,7 @@
   'use strict';
   const BR = root.BR, SP = BR.SPACE = BR.SPACE || {};
 
-  SP.SCHEMA = 'br.space/0.1';
+  SP.SCHEMA = 'br.space/0.2';
   // all in cm. interior / exterior: wall thicknesses. margin: the least
   // wall left beside an opening. slot: an outside nook narrower than this
   // (after the outer walls) is filled solid. candidates: layouts tried.
@@ -508,6 +508,12 @@
     return { ops, outside, front, extra };
   }
 
+  /** the hole an outside door makes in the outer wall on its side of the room */
+  function exitRect(o) {
+    return o.side === 'S' ? [o.s0, o.c, o.s1, o.c + TE()] : o.side === 'N' ? [o.s0, o.c - TE(), o.s1, o.c]
+      : o.side === 'E' ? [o.c, o.s0, o.c + TE(), o.s1] : [o.c - TE(), o.s0, o.c, o.s1];
+  }
+
   // ------------------------------------------------------------- walls
   /**
    * The one wall builder: from the placed rooms alone. Solid = the rooms
@@ -546,7 +552,7 @@
     for (let k = 0; k < kind.length; k++) kind[k] = roomOf[k] >= 0 ? 1 : outside[k] ? 0 : shell[k] ? 2 : 3;
     const cut = (r) => { for (let y = cell(r[1], Y0); y < cell(r[3], Y0); y++) for (let x = cell(r[0], X0); x < cell(r[2], X0); x++) if (kind[at(x, y)] >= 2) kind[at(x, y)] = 4; };
     for (const op of ops) { const w = op.wall; cut(w.o === 'h' ? [op.s0, w.c0, op.s1, w.c1] : [w.c0, op.s0, w.c1, op.s1]); }
-    for (const o of exits) cut(o.side === 'S' ? [o.s0, o.c, o.s1, o.c + TE()] : [o.s0, o.c - TE(), o.s1, o.c]);
+    for (const o of exits) cut(exitRect(o));
     // as rects: runs of one kind per row, merged down while they repeat
     const rects = { 2: [], 3: [], 4: [] };
     let open = new Map();
@@ -603,6 +609,7 @@
     const t0 = (typeof performance !== 'undefined' ? performance : Date).now();
     const R = SP.RECIPES[spec.recipe];
     if (!R) throw new Error('no such recipe: ' + spec.recipe);
+    if (R.route) return SP.generateRoute(spec, t0);
     const seed = spec.seed >>> 0, salt = hashStr(spec.recipe);
     const srng = new BR.Rng(BR.hash4(seed, salt, 0x5ace, 1));
     const site = spec.site || { w: Math.round(srng.range(R.site.w[0], R.site.w[1]) * 2) / 2, h: Math.round(srng.range(R.site.h[0], R.site.h[1]) * 2) / 2 };
@@ -634,24 +641,42 @@
   };
 
   function output(best, spec, seed, site, why, tried, t0) {
-    const { rooms, walls, doors } = best, R = SP.RECIPES[spec.recipe];
+    const R = SP.RECIPES[spec.recipe];
+    return emit({ recipe: spec.recipe, name: R.name, seed, site, rooms: best.rooms, walls: best.walls, ops: best.doors.ops, outside: best.doors.outside,
+      meta: { plan: best.plan.type, score: Math.round((100 - best.pen) * 10) / 10, terms: best.terms, openPlan: best.P.openPlan, candidates: tried, why }, t0 });
+  }
+
+  /**
+   * The output of any plan, in metres. rooms carry .floor (0 when left
+   * out); walls are the pairs one wall apart (each pair on one floor);
+   * outside: doors in the outer wall. Extra: verticals [{ kind, rooms: [lower,
+   * upper] }], route (rooms in walking order), wrong (what is off).
+   */
+  function emit(o) {
+    const { rooms, walls } = o, fl = (n) => n.floor || 0;
     const ids = new Map(rooms.map((n, i) => [n, 'r' + i])), counts = {};
-    const solid = compile(rooms, walls, doors.ops, doors.outside);
+    const floors = [...new Set(rooms.map(fl))].sort((p, q) => p - q);
+    const levels = floors.map((f) => {
+      const here = rooms.filter((n) => fl(n) === f);
+      const solid = compile(here, null, o.ops.filter((op) => fl(op.wall.a) === f), o.outside.filter((x) => fl(x.room) === f));
+      return { floor: f, solids: { walls: solid.walls.map((r) => r.map(m)), pockets: solid.pockets.map((r) => r.map(m)), openings: solid.cuts.map((r) => r.map(m)) },
+        footprint: solid.footprint.map((r) => r.map(m)), pocketArea: Math.round(solid.pocketArea / 100) / 100 };
+    });
     const spaces = rooms.map((n) => {
       counts[n.type] = (counts[n.type] || 0) + 1;
       const M = SP.MODULES[n.type], r = n.r.map(m);
-      const name = (M.label || n.type) + (rooms.filter((x) => x.type === n.type).length > 1 ? ' ' + counts[n.type] : '');
-      return { id: ids.get(n), type: n.type, name, zone: M.zone, rect: r, poly: [[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]],
-        size: [m(W(n.r)), m(H(n.r))], area: Math.round(W(n.r) * H(n.r) / 100) / 100, target: n.type === 'hall' || n.type === 'garage' ? null : Math.round(n.e.area / 100) / 100,
+      const name = n.name || (M.label || n.type) + (rooms.filter((x) => x.type === n.type && !x.name).length > 1 ? ' ' + counts[n.type] : '');
+      return { id: ids.get(n), type: n.type, name, zone: M.zone, floor: fl(n), rect: r, poly: [[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]],
+        size: [m(W(n.r)), m(H(n.r))], area: Math.round(W(n.r) * H(n.r) / 100) / 100, target: n.type === 'hall' || n.type === 'garage' || n.type === 'stair' ? null : Math.round(n.e.area / 100) / 100,
         parent: n.e.of ? ids.get(rooms.find((x) => x.e === n.e.of)) || null : null };
     });
     // walls: one per pair of rooms one wall apart, then each room's outer faces
     const out = [];
     for (const wl of walls) {
-      const o = wl.opening && wl.opening.kind === 'open' ? 'open' : 'interior';
+      const k = wl.opening && wl.opening.kind === 'open' ? 'open' : 'interior';
       const rect = wl.o === 'h' ? [wl.s0, wl.c0, wl.s1, wl.c1] : [wl.c0, wl.s0, wl.c1, wl.s1];
       const mid = (wl.c0 + wl.c1) / 2;
-      out.push({ id: 'w' + out.length, kind: o, rooms: [ids.get(wl.a), ids.get(wl.b)], thickness: o === 'open' ? 0 : m(TI()), rect: rect.map(m),
+      out.push({ id: 'w' + out.length, kind: k, floor: fl(wl.a), rooms: [ids.get(wl.a), ids.get(wl.b)], thickness: k === 'open' ? 0 : m(TI()), rect: rect.map(m),
         line: wl.o === 'h' ? [[m(wl.s0), m(mid)], [m(wl.s1), m(mid)]] : [[m(mid), m(wl.s0)], [m(mid), m(wl.s1)]] });
     }
     for (const n of rooms) for (const side of ['N', 'E', 'S', 'W']) {
@@ -664,30 +689,29 @@
         if (b - a <= 0) return;
         const dir = side === 'N' ? [0, -1] : side === 'S' ? [0, 1] : side === 'W' ? [-1, 0] : [1, 0];
         const rect = hz ? [a, Math.min(c, c + dir[1] * TE()), b, Math.max(c, c + dir[1] * TE())] : [Math.min(c, c + dir[0] * TE()), a, Math.max(c, c + dir[0] * TE()), b];
-        out.push({ id: 'w' + out.length, kind: 'exterior', rooms: [ids.get(n), null], thickness: m(TE()), out: dir, rect: rect.map(m),
+        out.push({ id: 'w' + out.length, kind: 'exterior', floor: fl(n), rooms: [ids.get(n), null], thickness: m(TE()), out: dir, rect: rect.map(m),
           line: hz ? [[m(a), m(c)], [m(b), m(c)]] : [[m(c), m(a)], [m(c), m(b)]] });
       };
       for (const [a, b] of taken) { seg(cur, a); cur = Math.max(cur, b); }
       seg(cur, s1);
     }
-    const ops = doors.ops.map((op, k) => {
+    const ops = o.ops.map((op, k) => {
       const wl = op.wall, rect = wl.o === 'h' ? [op.s0, wl.c0, op.s1, wl.c1] : [wl.c0, op.s0, wl.c1, op.s1];
-      return { id: 'o' + k, kind: op.kind, rooms: [ids.get(wl.a), ids.get(wl.b)], width: m(op.s1 - op.s0), rect: rect.map(m), o: wl.o };
-    }).concat(doors.outside.map((o, k) => {
-      const rect = o.side === 'S' ? [o.s0, o.c, o.s1, o.c + TE()] : [o.s0, o.c - TE(), o.s1, o.c];
-      return { id: 'x' + k, kind: o.kind, role: o.role, rooms: [ids.get(o.room), null], width: m(o.s1 - o.s0), rect: rect.map(m), o: 'h', side: o.side };
-    }));
-    const pen = Object.values(best.terms).reduce((s, v) => s + v, 0);
-    return {
-      schema: SP.SCHEMA, recipe: spec.recipe, name: R.name, seed, site: { w: site.w, h: site.h }, units: 'm', front: 'S',
+      return { id: 'o' + k, kind: op.kind, floor: fl(wl.a), rooms: [ids.get(wl.a), ids.get(wl.b)], width: m(op.s1 - op.s0), rect: rect.map(m), o: wl.o };
+    }).concat(o.outside.map((x, k) => ({ id: 'x' + k, kind: x.kind, role: x.role, floor: fl(x.room), rooms: [ids.get(x.room), null], width: m(x.s1 - x.s0),
+      rect: exitRect(x).map(m), o: x.side === 'N' || x.side === 'S' ? 'h' : 'v', side: x.side })));
+    const verticals = (o.verticals || []).map((v, k) => ({ id: 'v' + k, kind: v.kind, rooms: v.rooms.map((n) => ids.get(n)), floors: v.rooms.map(fl), rect: v.rooms[0].r.map(m), up: v.up }));
+    const edges = ops.map((x) => [x.rooms[0], x.rooms[1] || 'outside', x.kind, x.id]).concat(verticals.map((v) => [v.rooms[0], v.rooms[1], v.kind, v.id]));
+    const house = {
+      schema: SP.SCHEMA, recipe: o.recipe, name: o.name, seed: o.seed, site: { w: o.site.w, h: o.site.h }, units: 'm', front: 'S',
       thickness: { interior: m(TI()), exterior: m(TE()) },
-      spaces, walls: out, openings: ops,
-      solids: { walls: solid.walls.map((r) => r.map(m)), pockets: solid.pockets.map((r) => r.map(m)), openings: solid.cuts.map((r) => r.map(m)) },
-      footprint: solid.footprint.map((r) => r.map(m)),
-      graph: { nodes: spaces.map((s) => s.id).concat('outside'), edges: ops.map((o) => [o.rooms[0], o.rooms[1] || 'outside', o.kind, o.id]) },
-      meta: { plan: best.plan.type, score: Math.round((100 - pen) * 10) / 10, terms: best.terms, pocketArea: Math.round(solid.pocketArea / 100) / 100,
-        openPlan: best.P.openPlan, candidates: tried, why, ms: Math.round(((typeof performance !== 'undefined' ? performance : Date).now() - t0) * 10) / 10 }
+      floors: floors.length, spaces, walls: out, openings: ops, verticals, levels,
+      graph: { nodes: spaces.map((s) => s.id).concat('outside'), edges },
+      meta: Object.assign({ pocketArea: levels.reduce((t, l) => t + l.pocketArea, 0) }, o.meta, { ms: Math.round(((typeof performance !== 'undefined' ? performance : Date).now() - o.t0) * 10) / 10 })
     };
+    if (o.route) house.route = o.route.map((n) => ids.get(n));
+    if (o.wrong) house.wrong = o.wrong;
+    return house;
   }
 
   /**
@@ -697,17 +721,18 @@
    */
   SP.verify = function verify(h) {
     const bad = [], c = (v) => Math.round(v * 100), sp = h.spaces, rs = sp.map((s) => s.rect.map(c));
-    const ti = c(h.thickness.interior), te = c(h.thickness.exterior);
+    const ti = c(h.thickness.interior), te = c(h.thickness.exterior), fl = (x) => x.floor || 0;
     for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) {
+      if (fl(sp[i]) !== fl(sp[j])) continue;
       const A = rs[i], B = rs[j], ox = Math.min(A[2], B[2]) - Math.max(A[0], B[0]), oy = Math.min(A[3], B[3]) - Math.max(A[1], B[1]);
       if (ox > 0 && oy > 0) bad.push(sp[i].name + ' overlaps ' + sp[j].name);
       const gap = ox > 0 ? Math.max(A[1], B[1]) - Math.min(A[3], B[3]) : oy > 0 ? Math.max(A[0], B[0]) - Math.min(A[2], B[2]) : null;
-      if (gap !== null && gap > 0 && gap !== ti && gap < 2 * te) bad.push(sp[i].name + ' and ' + sp[j].name + ' are ' + gap + ' cm apart');
+      if (gap !== null && gap >= 0 && gap !== ti && gap < 2 * te) bad.push(sp[i].name + ' and ' + sp[j].name + ' are ' + gap + ' cm apart');
     }
     // walls never take reserved floor
-    for (const w of h.solids.walls.concat(h.solids.pockets)) {
+    for (const L of h.levels) for (const w of L.solids.walls.concat(L.solids.pockets)) {
       const W = w.map(c);
-      rs.forEach((R, i) => { if (Math.min(R[2], W[2]) > Math.max(R[0], W[0]) && Math.min(R[3], W[3]) > Math.max(R[1], W[1])) bad.push('a wall is on the floor of ' + sp[i].name); });
+      rs.forEach((R, i) => { if (fl(sp[i]) === L.floor && Math.min(R[2], W[2]) > Math.max(R[0], W[0]) && Math.min(R[3], W[3]) > Math.max(R[1], W[1])) bad.push('a wall is on the floor of ' + sp[i].name); });
     }
     for (const w of h.walls) {
       const W = w.rect.map(c), across = w.kind === 'exterior' ? w.out[0] === 0 : w.line[0][1] === w.line[1][1], t = across ? W[3] - W[1] : W[2] - W[0];
@@ -721,16 +746,45 @@
       if (Math.max(w, d) > Math.min(w, d) * M.asp + 1) bad.push(sp[i].name + ' is too long for its width');
       if (rs[i][0] < te || rs[i][1] < te || rs[i][2] > c(h.site.w) - te || rs[i][3] > c(h.site.h) - te) bad.push(sp[i].name + ' is off the lot');
     }
+    // stairs: the same floor area on both floors
+    const byId = new Map(sp.map((s) => [s.id, s]));
+    for (const v of h.verticals || []) {
+      const [a, b] = v.rooms.map((id) => byId.get(id));
+      if (!a || !b || fl(b) !== fl(a) + 1 || a.rect.join() !== b.rect.join()) bad.push('a stairwell does not line up between floors');
+    }
     // every room reached from the front door, inside the house
+    const adj = new Map(sp.map((s) => [s.id, []]));
+    for (const o of h.openings) if (o.rooms[1]) { adj.get(o.rooms[0]).push(o.rooms[1]); adj.get(o.rooms[1]).push(o.rooms[0]); }
+    for (const v of h.verticals || []) { adj.get(v.rooms[0]).push(v.rooms[1]); adj.get(v.rooms[1]).push(v.rooms[0]); }
     const front = h.openings.find((o) => o.role === 'front door');
     if (!front) bad.push('no front door');
     else {
       const seen = new Set([front.rooms[0]]), st = [front.rooms[0]];
-      while (st.length) { const u = st.pop(); for (const o of h.openings) if (o.rooms[1] && o.rooms.includes(u)) { const v = o.rooms[0] === u ? o.rooms[1] : o.rooms[0]; if (!seen.has(v)) { seen.add(v); st.push(v); } } }
+      while (st.length) for (const v of adj.get(st.pop())) if (!seen.has(v)) { seen.add(v); st.push(v); }
       for (const s of sp) if (!seen.has(s.id)) bad.push(s.name + ' cannot be reached from the front door');
+    }
+    // a route: front door to the exit through rooms you pass through; every
+    // other room a dead end off one room of the route
+    if (h.route) {
+      const on = new Set(h.route), exit = h.openings.find((o) => o.role === 'exit');
+      if (!front || front.rooms[0] !== h.route[0]) bad.push('the route does not start at the front door');
+      if (!exit || exit.rooms[0] !== h.route[h.route.length - 1]) bad.push('the route does not end at the exit');
+      for (let k = 1; k < h.route.length; k++) if (!adj.get(h.route[k - 1]).includes(h.route[k])) bad.push('the route breaks between ' + byId.get(h.route[k - 1]).name + ' and ' + byId.get(h.route[k]).name);
+      for (const id of h.route) if (!SP.PASS.has(byId.get(id).type)) bad.push(byId.get(id).name + ' is on the route but is not a room you pass through');
+      const done = new Set();
+      for (const s of sp) {
+        if (on.has(s.id) || done.has(s.id)) continue;
+        const group = new Set([s.id]), st = [s.id], touch = new Set();
+        while (st.length) for (const v of adj.get(st.pop())) { if (on.has(v)) touch.add(v); else if (!group.has(v)) { group.add(v); st.push(v); } }
+        group.forEach((g) => done.add(g));
+        if (touch.size > 1) bad.push(s.name + ' makes a way around the route');
+      }
     }
     return bad;
   };
 
-  SP._internal = { room, row, col, solve, fit, place, ext, range, pairs, compile, program };
+  /** the rooms a route may pass through */
+  SP.PASS = new Set(['foyer', 'living', 'family', 'dining', 'kitchen', 'hall', 'stair', 'loft', 'mudroom']);
+
+  SP._internal = { room, row, col, solve, fit, place, ext, range, pairs, compile, program, emit, exitRect, cm, m, snap, snapUp, snapDown, rr, hashStr, keyOf, shuffle, bboxOf, W, H, CFG };
 })(typeof window !== 'undefined' ? window : globalThis);
