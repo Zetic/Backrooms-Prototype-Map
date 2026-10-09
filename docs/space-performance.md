@@ -115,3 +115,11 @@ node tests/run-all.js --full
 The local full run passed all **441 checks across 24 files**. Exact-output
 regressions retain the original generator's known fixed-lot failures; this
 change optimizes generation rather than changing which houses can be built.
+
+## Later room-relationship and mansion experiments
+
+The measurements above apply to the archived placement solver. The later
+`house.js` API enables a different relationship solver by default, and adds
+three-floor mansions; those results are not covered by these speedup numbers.
+`tools/benchmark-space.js` still loads the original four modules. Use
+`relationships:false` in the full test-bed API to retain archived placement.

@@ -55,6 +55,9 @@
   }
   function profile(value, list, rng) { return value === 'mixed' ? rng.pick(list) : value; }
   function shapes(e, P, options, rng) {
+    if (e.type === 'stair' && P.stairWidth) {
+      return [0,1,2,3].map(k=>rotate({kind:'rectangle',parts:[[0,0,P.stairWidth,650]],entrySide:'S',exitSide:'N'},k));
+    }
     if (e.type === 'hall') {
       const w = P.hall, len = Math.max(w * 2 + 100, e.len || 400), kind = profile(options.hall, ['straight', 'L', 'T'], rng);
       let parts;
@@ -64,11 +67,11 @@
       const shape = { kind, parts, entrySide: 'S', exitSide: kind === 'straight' ? 'N' : rng.pick(kind === 'T' ? ['E', 'W'] : ['E']) };
       return [0, 1, 2, 3].map((k) => rotate(shape, k));
     }
-    if (['living', 'family', 'loft'].includes(e.type)) {
+    if (['living', 'family', 'loft', 'drawing', 'sitting', 'sunroom', 'conservatory', 'lounge'].includes(e.type)) {
       const kind = profile(options.living, ['rectangle', 'L', 'alcove'], rng);
       if (kind !== 'rectangle') {
         const min = cm(SP.MODULES[e.type].min), wingW = kind === 'L' ? 240 : 180, wingD = 240;
-        const coreW = min, coreD = Math.max(min, snap((e.area - wingW * wingD) / coreW));
+        const coreW = Math.max(min,snap(Math.sqrt(Math.max(min*min,e.area-wingW*wingD)/1.5))), coreD = Math.max(min, snap((e.area - wingW * wingD) / coreW));
         const y = kind === 'L' ? coreD - wingD : snap((coreD - wingD) / 2);
         const parts = [[0, 0, coreW, coreD], [coreW, y, coreW + wingW, y + wingD]];
         if (sumArea(parts) <= e.area * 1.25 + CFG.step * coreW) return [0, 1, 2, 3].map((k) => rotate({ kind, parts }, k));
@@ -108,8 +111,10 @@
   }
   function attach(e, host, ctx, P, options, rng, path, last) {
     const here = ctx.rooms.filter((n) => n.floor === host.floor), keep = ctx.keep[host.floor] || [], variants = shapes(e, P, options, rng);
-    const need = (host.type === 'hall' || e.type === 'hall') ? P.hall : (['linen', 'closet'].includes(e.type) ? 60 : 90) + 2 * CFG.margin;
-    let hostEdges = host.edges.filter((ed) => ed.side !== host.entrySide);
+    const doorWidth=['linen','closet'].includes(e.type)?60:!P.stairWidth&&['bath','ensuite','wic','powder','pantry'].includes(e.type)?80:90;
+    const need = (e.type==='hall' || ((path || P.stairWidth) && host.type==='hall')) ? P.hall : doorWidth + 2 * CFG.margin;
+    let hostEdges = host.edges.filter((ed) => !path || ed.side !== host.entrySide);
+    if(e.type==='stair' && P.stairWidth) hostEdges=hostEdges.filter(ed=>ed.side===host.exitSide||host.type!=='hall');
     if (path && (host.type === 'hall' || host.type === 'stair')) hostEdges = hostEdges.filter((ed) => ed.side === host.exitSide);
     let best = null;
     for (const edge of shuffle(hostEdges.slice(), rng)) for (const variant of variants) {
@@ -117,6 +122,10 @@
       for (const entry of edges(variant.parts).filter((ed) => ed.side === OPP[edge.side])) {
         if (entry.s1 - entry.s0 < need || edge.s1 - edge.s0 < need) continue;
         const offsets = new Set([edge.s0 - entry.s0, edge.s1 - entry.s1, snap((edge.s0 + edge.s1 - entry.s0 - entry.s1) / 2)]);
+        if(P.roomRelationships) {
+          const lo=snap(edge.s0+need-entry.s1),hi=snap(edge.s1-need-entry.s0);
+          for(let offset=lo;offset<=hi;offset+=100)offsets.add(offset);
+        }
         for (const offset of offsets) {
           const axis = edge.c + (edge.side === 'S' || edge.side === 'E' ? CFG.interior : -CFG.interior) - entry.c;
           const parts = move(variant.parts, horizontal(edge) ? offset : axis, horizontal(edge) ? axis : offset);
@@ -137,7 +146,8 @@
           }
           // Prefer compact attachments, with a little seeded variation. No
           // geometry is clipped to the lot or painted over another room.
-          const bb = bboxOf(here.concat(n)), score = -W(bb) * H(bb) / 1e6 + rng.f();
+          const bb = bboxOf(here.concat(n)), score = -W(bb) * H(bb) / 1e6 + rng.f() * (P.stairWidth ? 12 : 1)
+            + (P.stairWidth && e.requiredHost && offset===snap((edge.s0+edge.s1-entry.s0-entry.s1)/2) ? 40 : 0);
           if (!best || score > best.score) best = { n, join, exit, ground, score };
         }
       }
@@ -169,7 +179,7 @@
     ctx.keep[0] = [clear(frontEdge, [], [], 500)];
     let prev = n0;
     for (let k = 1; k < P.path.length; k++) {
-      const e = P.path[k], got = attach(e, prev, ctx, P, options, rng, true, k === P.path.length - 1);
+      const e = P.path[k], got = attach(e, prev, ctx, P, options, rng, true, !P.secondaryCount && k === P.path.length - 1);
       if (!got) return null;
       const n = got.n; n.wrong = e.wrong;
       ctx.rooms.push(n); ctx.route.push(n); ctx.links.push({ a: prev, b: n, join: got.join, path: true });
@@ -181,16 +191,16 @@
       }
     }
     for (const e of P.sides) {
-      const hosts = e.of || e.through ? ctx.rooms.filter((n) => n.e === (e.of || e.through)) : ctx.rooms.filter((n) => (e.hosts || SP.HOSTS[e.type] || ['hall']).includes(n.type));
+      const hosts = e.requiredHost || e.of || e.through ? ctx.rooms.filter((n) => n.e === (e.requiredHost || e.of || e.through)) : ctx.rooms.filter((n) => (e.hosts || SP.HOSTS[e.type] || ['hall']).includes(n.type));
       const upper = ['master', 'bedroom', 'bath', 'linen'].includes(e.type), ground = e.type === 'garage';
-      const allowed = hosts.filter((n) => !ground || n.floor === 0).sort((a, b) => (upper ? b.floor - a.floor : a.floor - b.floor) || (a.type === 'hall' ? -1 : b.type === 'hall' ? 1 : 0));
+      const allowed = hosts.filter((n) => (e.floor===undefined || n.floor===e.floor) && (!ground || n.floor===0)).sort((a, b) => (upper ? b.floor - a.floor : a.floor - b.floor) || (a.type === 'hall' ? -1 : b.type === 'hall' ? 1 : 0));
       let got = null, host = null;
       for (const h of allowed) { got = attach(e, h, ctx, P, options, rng, false, false); if (got) { host = h; break; } }
       if (!got) {
         // A short branch is useful only when its destination room can also fit.
-        if (e.of || e.through) return null;
-        for (const h of ctx.rooms.filter((n) => ['hall', 'living', 'loft', 'family'].includes(n.type)).sort((a, b) => upper ? b.floor - a.floor : a.floor - b.floor)) {
-          const he = { type: 'hall', len: 300, area: 0 }, branch = attach(he, h, ctx, P, { ...options, hall: 'straight' }, rng, false, false);
+        if (e.requiredHost || e.of || e.through) return null;
+        for (const h of ctx.rooms.filter((n) => ['hall', 'living', 'loft', 'family'].includes(n.type) && (e.floor===undefined || n.floor===e.floor)).sort((a, b) => upper ? b.floor - a.floor : a.floor - b.floor)) {
+          const he = { type: 'hall', len: P.stairWidth ? snap(rng.range(700,1200)) : 300, area: 0 }, branch = attach(he, h, ctx, P, { ...options, hall: 'straight' }, rng, false, false);
           if (!branch) continue;
           ctx.rooms.push(branch.n);
           got = attach(e, branch.n, ctx, P, options, rng, false, false);
@@ -203,8 +213,55 @@
       ctx.rooms.push(got.n); ctx.links.push({ a: host, b: got.n, join: got.join });
       if (got.exit) { ctx.outside.push(outside(got.n, got.exit, e.door, 'garage door', rng)); (ctx.keep[0] ||= []).push(got.ground); }
     }
+    for(const pair of P.requirements||[]){const [a,b]=pair.map(e=>ctx.rooms.find(n=>n.e===e));if(!a||!b||a.floor!==b.floor)return null;
+      if(ctx.links.some(l=>(l.a===a&&l.b===b)||(l.a===b&&l.b===a)))continue;
+      const join=contacts(a,b).find(w=>w.s1-w.s0>=120);if(!join)return null;ctx.links.push({a,b,join});}
+    if(P.secondaryCount && !secondaryConnections(ctx,P.secondaryCount,rng)) return null;
     if (!ctx.outside.some((o) => o.role === 'exit')) return null;
     return ctx;
+  }
+  function relationships(P) {
+    for(const type of ['kitchen','dining']){const repeated=P.path.filter(e=>e.type===type);for(const e of repeated.slice(1)){e.type='lounge';e.wrong='additional living space';}}
+    const all=P.path.concat(P.sides), kitchens=all.filter(e=>e.type==='kitchen');
+    P.requirements=P.requirements||[];P.roomRelationships=true;
+    if(!kitchens.length)return;
+    for(const dining of all.filter(e=>e.type==='dining')) {
+      const kitchen=kitchens[0];
+      if(P.path.includes(dining)) kitchen.requiredHost=dining;
+      else dining.requiredHost=kitchen;
+      if(!P.path.includes(kitchen)&&!P.path.includes(dining)){kitchen.floor=0;dining.floor=0;}
+      kitchen.hosts=null; kitchen.wrong=undefined; dining.hosts=null; dining.wrong=undefined;
+      P.requirements.push([kitchen,dining]);
+    }
+    for(const pantry of all.filter(e=>e.type==='pantry')){pantry.requiredHost=kitchens[0];P.requirements.push([kitchens[0],pantry]);}
+    // Required satellites immediately follow their host, before unrelated
+    // rooms can consume its exposed faces. Route hosts are already placed.
+    const ordered=[], pending=P.sides.slice(), placed=new Set(P.path);
+    while(pending.length){let i=pending.findIndex(e=>!e.requiredHost||placed.has(e.requiredHost));if(i<0)throw Error('cyclic room requirement');
+      const e=pending.splice(i,1)[0];ordered.push(e);placed.add(e);
+      const satellites=pending.filter(q=>q.requiredHost===e);for(const q of satellites){pending.splice(pending.indexOf(q),1);ordered.push(q);placed.add(q);}}
+    P.sides=ordered;
+  }
+  function secondaryConnections(ctx,count,rng) {
+    // Public/service doors on the ground floor, with an unobstructed landing.
+    // Each belongs to a different room; garage vehicle doors are separate.
+    const rooms=shuffle(ctx.rooms.filter(n=>n.floor===0&&['hall','living','family','dining','kitchen','mudroom','drawing','sunroom','conservatory','ballroom'].includes(n.type)),rng);
+    let added=0;
+    for(const n of rooms){
+      for(const e of shuffle(n.edges.slice(),rng)) {
+        if(e.s1-e.s0<140)continue;
+        let placed=false;
+        for(const center of new Set([snap((e.s0+e.s1)/2),e.s0+70,e.s1-70])) {
+          const aperture={...e,s0:center-70,s1:center+70};
+          const q=clear(aperture,ctx.rooms.filter(r=>r.floor===0),ctx.keep[0]||[],260);
+          if(!q)continue;
+          ctx.outside.push(outside(n,aperture,110,'exit',rng));(ctx.keep[0]||=[]).push(q);added++;placed=true;break;
+        }
+        if(placed)break;
+      }
+      if(added===count)return true;
+    }
+    return false;
   }
   function emit(ctx, spec, P, options, t0) {
     const all = ctx.rooms.flatMap(n => n.parts).concat(Object.values(ctx.keep).flat()), bb = bounds(all);
@@ -224,7 +281,7 @@
     });
     const h = I.emit({ ...ctx, ops, walls, recipe:spec.recipe, name:SP.RECIPES[spec.recipe].name,
       seed:spec.seed, site:{ w:(bb[2]-bb[0]+200)/100, h:(bb[3]-bb[1]+200)/100 }, t0,
-      meta:{ plan:'shape study', shapeOptions:options, hallWidth:P.hall/100, candidates:60, score:-Math.round(W(bboxOf(ctx.rooms))*H(bboxOf(ctx.rooms))/10000), terms:{}, wrongness:P.wrongness } });
+      meta:{ plan:spec.shapes?'shape study':'relationships', shapeOptions:options, roomRelationships:!!P.roomRelationships, hallWidth:P.hall/100, candidates:60, score:-Math.round(W(bboxOf(ctx.rooms))*H(bboxOf(ctx.rooms))/10000), terms:{}, wrongness:P.wrongness } });
     h.schema='br.space/0.3'; h.wrong=ctx.rooms.filter(n=>n.wrong).map(n=>n.type+': '+n.wrong);
     ctx.rooms.forEach((n,i) => { const sp=h.spaces[i]; sp.floorRects=n.parts.map(r=>r.map(v=>v/100)); sp.poly=polygon(n.parts).map(p=>p.map(v=>v/100)); sp.area=sumArea(n.parts)/10000; sp.shape=n.shape; });
     h.walls=h.walls.filter(w=>w.kind!=='exterior');
@@ -239,14 +296,16 @@
     // Bounding-box route centers can lie outside a concave room. Hide the
     // route overlay until a clearance-aware interior path is exported.
     h.meta.routeOverlay=false;
+    h.requirements=(P.requirements||[]).map(q=>({kind:'direct',rooms:q.map(e=>h.spaces[ctx.rooms.findIndex(n=>n.e===e)].id)}));
     return h;
   }
   SP.generate=function(spec) {
-    if (!spec.shapes) return baseGenerate(spec);
-    const options={hall:'mixed',living:'mixed',...spec.shapes};
+    if (!spec.shapes && !spec.relationships) return baseGenerate(spec);
+    const options={hall:spec.shapes?'mixed':'straight',living:spec.shapes?'mixed':'rectangle',...spec.shapes};
     if(!['mixed','straight','L','T'].includes(options.hall)||!['mixed','rectangle','L','alcove'].includes(options.living)) throw new Error('unknown shape profile');
     const R=SP.RECIPES[spec.recipe]; if(!R) throw new Error('unknown house recipe');
     const seed=spec.seed===undefined?1:spec.seed, t0=performance.now(), P=roomProgram(R,spec.recipe,seed,spec.wrong);
+    if(spec.relationships!==false) relationships(P);
     let best=null, validCandidates=0;
     for(let k=0;k<60;k++) { const ctx=build(P,options,new BR.Rng(BR.hash4(seed,hashStr(spec.recipe),0x5a9e,k)));
       if(!ctx) continue; validCandidates++;
@@ -285,5 +344,5 @@
     for(const v of h.verticals)fail(JSON.stringify(h.spaces.find(s=>s.id===v.rooms[0]).floorRects)===JSON.stringify(h.spaces.find(s=>s.id===v.rooms[1]).floorRects),'unaligned stairs');
     return [...new Set(errors)];
   };
-  Object.assign(SH,{edges,polygon,shapes,fits,contacts,build,roomProgram});
+  Object.assign(SH,{edges,polygon,shapes,fits,contacts,build,roomProgram,emit,relationships});
 })(typeof window !== 'undefined' ? window : globalThis);

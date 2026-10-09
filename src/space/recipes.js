@@ -37,6 +37,7 @@
     garage: { zone: 'service', min: 3.0, asp: 2.4, area: [18, 40] },
     hall: { zone: 'circulation', min: 1.1, asp: 99, label: 'hallway' },
     stair: { zone: 'circulation', min: 1.1, asp: 4, label: 'stairwell' },
+    lounge: { zone: 'public', min: 2.8, asp: 2.5, area: [12, 24], label: 'lounge' },
     loft: { zone: 'public', min: 3.0, asp: 2, area: [12, 18] },
     closet: { zone: 'private', min: 0.7, asp: 3.5, area: [0.9, 1.6] },
     powder: { zone: 'private', min: 1.2, asp: 2.2, area: [2, 3], label: 'powder room' }
@@ -147,3 +148,4 @@
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);
+

@@ -72,3 +72,10 @@ and solid-floor overlap, lot bounds, room reachability and aligned stairs.
 Mutation checks exercise incorrect area, a wall painted on a floor and a
 cut-off graph. The real HTML controller is exercised with a DOM/canvas adapter;
 the picture above was rendered with the production renderer and inspected.
+
+## Current house API
+
+`house.js` now enables functional room relationships and canonical connection
+roles, and adds the mansion experiment. The earlier shape-only solver remains
+available with `relationships:false`. See [space-mansion.md](space-mansion.md).
+The validation counts above describe the original shape-study revision.
